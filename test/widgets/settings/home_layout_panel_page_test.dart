@@ -15,7 +15,7 @@ void main() {
   });
 
   testWidgets(
-      'shows language selector, dock collapse, row spacing, card size and icon size sliders',
+      'shows language selector, dock collapse, row spacing, card size and icon size controls',
       (tester) async {
     final settings = await _createSettingsService();
     final appsService = MockAppsService();
@@ -31,6 +31,7 @@ void main() {
     expect(find.text('Card size'), findsAtLeastNWidgets(1));
     expect(find.text('Icon size'), findsAtLeastNWidgets(1));
     expect(find.text('Dock glass intensity'), findsAtLeastNWidgets(1));
+    expect(find.text('Settings transparency'), findsAtLeastNWidgets(1));
     expect(find.text('Collapsed dock rows'), findsAtLeastNWidgets(1));
     expect(find.text('Row spacing'), findsAtLeastNWidgets(1));
     expect(find.text('Auto collapse dock'), findsAtLeastNWidgets(1));
@@ -41,17 +42,23 @@ void main() {
       findsOneWidget,
     );
     expect(
-        find.byKey(const Key('app_card_layout_scale_slider')), findsOneWidget);
-    expect(
-        find.byKey(const Key('app_card_media_scale_slider')), findsOneWidget);
-    expect(find.byKey(const Key('home_dock_auto_collapse_delay_slider')),
-        findsOneWidget);
-    expect(find.byKey(const Key('home_dock_glass_intensity_slider')),
+        find.byKey(const Key('app_card_layout_scale_selector')),
         findsOneWidget);
     expect(
-        find.byKey(const Key('home_dock_row_spacing_slider')), findsOneWidget);
-    expect(find.text('85%'), findsAtLeastNWidgets(1));
-    expect(find.text('100%'), findsAtLeastNWidgets(1));
+        find.byKey(const Key('app_card_media_scale_stepper')),
+        findsOneWidget);
+    expect(find.byKey(const Key('home_dock_auto_collapse_delay_selector')),
+        findsOneWidget);
+    expect(find.byKey(const Key('home_dock_glass_intensity_selector')),
+        findsOneWidget);
+    expect(find.byKey(const Key('settings_ui_transparency_stepper')),
+        findsOneWidget);
+    expect(
+        find.byKey(const Key('home_dock_row_spacing_stepper')),
+        findsOneWidget);
+    expect(find.text('90%'), findsAtLeastNWidgets(1));
+    expect(find.text('110%'), findsAtLeastNWidgets(1));
+    expect(find.text('24dp'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('updates locale mode and icon scale from controls',
@@ -84,44 +91,90 @@ void main() {
 
     expect(settings.homeDockCollapsedRowsPreset, 2);
 
-    final layoutSlider = tester
-        .widget<Slider>(find.byKey(const Key('app_card_layout_scale_slider')));
-    layoutSlider.onChanged?.call(95);
+    await _scrollToFinder(
+      tester,
+      find.byKey(const Key('icon_corner_radius_stepper')),
+    );
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'icon_corner_radius_increase',
+    )));
+    await tester.pumpAndSettle();
+
+    expect(
+      settings.appCardCornerRadius,
+      SettingsService.appCardCornerRadiusDefault + 1,
+    );
+
+    await _scrollToFinder(
+      tester,
+      find.byKey(const ValueKey<String>('app_card_layout_scale_option_95')),
+    );
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'app_card_layout_scale_option_95',
+    )));
     await tester.pumpAndSettle();
 
     expect(settings.appCardLayoutScalePercent, 95);
 
-    final slider = tester
-        .widget<Slider>(find.byKey(const Key('app_card_media_scale_slider')));
-    slider.onChanged?.call(110);
+    await _scrollToFinder(
+      tester,
+      find.byKey(const Key('app_card_media_scale_stepper')),
+    );
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'app_card_media_scale_increase',
+    )));
     await tester.pumpAndSettle();
 
-    expect(settings.appCardMediaScalePercent, 110);
-    expect(find.text('110%'), findsAtLeastNWidgets(1));
+    expect(settings.appCardMediaScalePercent, 115);
+    expect(find.text('115%'), findsAtLeastNWidgets(1));
 
-    final collapseDelaySlider = tester.widget<Slider>(
-      find.byKey(const Key('home_dock_auto_collapse_delay_slider')),
+    await _scrollToFinder(
+      tester,
+      find.byKey(
+        const ValueKey<String>('home_dock_auto_collapse_delay_option_30'),
+      ),
     );
-    collapseDelaySlider.onChanged?.call(30);
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'home_dock_auto_collapse_delay_option_30',
+    )));
     await tester.pumpAndSettle();
 
     expect(settings.homeDockAutoCollapseDelaySeconds, 30);
 
-    final glassSlider = tester.widget<Slider>(
-      find.byKey(const Key('home_dock_glass_intensity_slider')),
+    await _scrollToFinder(
+      tester,
+      find.byKey(
+        const ValueKey<String>('home_dock_glass_intensity_option_40'),
+      ),
     );
-    glassSlider.onChanged?.call(45);
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'home_dock_glass_intensity_option_40',
+    )));
     await tester.pumpAndSettle();
 
-    expect(settings.homeDockGlassIntensityPercent, 45);
+    expect(settings.homeDockGlassIntensityPercent, 40);
 
-    final rowSpacingSlider = tester.widget<Slider>(
-      find.byKey(const Key('home_dock_row_spacing_slider')),
+    await _scrollToFinder(
+      tester,
+      find.byKey(const Key('settings_ui_transparency_stepper')),
     );
-    rowSpacingSlider.onChanged?.call(8);
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'settings_ui_transparency_decrease',
+    )));
     await tester.pumpAndSettle();
 
-    expect(settings.homeDockRowSpacing, 8);
+    expect(settings.settingsUiTransparencyPercent, 15);
+
+    await _scrollToFinder(
+      tester,
+      find.byKey(const Key('home_dock_row_spacing_stepper')),
+    );
+    await tester.tap(find.byKey(const ValueKey<String>(
+      'home_dock_row_spacing_decrease',
+    )));
+    await tester.pumpAndSettle();
+
+    expect(settings.homeDockRowSpacing, 1);
   });
 }
 
@@ -152,8 +205,15 @@ Future<void> _pumpPage(
 }
 
 Future<void> _scrollToLocaleControl(WidgetTester tester) async {
-  await tester.scrollUntilVisible(
+  await _scrollToFinder(
+    tester,
     find.byKey(const Key('app_locale_mode_selector')),
+  );
+}
+
+Future<void> _scrollToFinder(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
     240,
     scrollable: find
         .descendant(

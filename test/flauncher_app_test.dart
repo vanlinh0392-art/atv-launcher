@@ -40,6 +40,10 @@ void main() {
     when(wallpaperService.isVideoMode).thenReturn(false);
     when(wallpaperService.videoTextureId).thenReturn(null);
     when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.status).thenReturn(const <String, dynamic>{
+      'memory': <String, dynamic>{},
+      'provisioning': <String, dynamic>{},
+    });
     when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
       'health': 'healthy',
       'requirements': <Map<String, dynamic>>[],
@@ -69,7 +73,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(_materialApp(tester).locale, isNull);
+    expect(_materialApp(tester).locale, const Locale('vi'));
 
     await settings.setAppLocaleMode(SettingsService.appLocaleEnglish);
     await tester.pumpAndSettle();

@@ -1,6 +1,6 @@
 /*
  * FLauncher
- * Copyright (C) 2021  Étienne Fesser
+ * Copyright (C) 2021  Etienne Fesser
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,30 +17,31 @@
  */
 
 import 'package:flutter/material.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class FLauncherAboutDialog extends StatelessWidget {
   final PackageInfo packageInfo;
 
-  FLauncherAboutDialog({
-    Key? key,
+  const FLauncherAboutDialog({
+    super.key,
     required this.packageInfo,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    AppLocalizations localizations = AppLocalizations.of(context)!;
+    final localizations = AppLocalizations.of(context)!;
 
     return AboutDialog(
       applicationName: packageInfo.appName,
       applicationVersion: "${packageInfo.version} (${packageInfo.buildNumber})",
       applicationIcon: Image.asset("assets/logo.png", height: 72),
-      applicationLegalese: "© 2024 Oscar Rojas",
+      applicationLegalese: "© 2026 xfire0392-netizen",
       children: [
-        SizedBox(height: 24),
-        Text(localizations
-            .textAboutDialog("https://github.com/osrosal/flauncher"))
+        const SizedBox(height: 24),
+        Text(localizations.textAboutDialog(
+          "https://github.com/xfire0392-netizen/atv-launcher",
+        )),
       ],
     );
   }

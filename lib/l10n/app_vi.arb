@@ -271,6 +271,8 @@
     "homeDockCollapsedRowsDescription": "Chọn HOME sẽ tự co về 1 hàng hay 2 hàng sau thời gian chờ không thao tác.",
 "iconCornerRadiusDescription": "Bo góc chỉ cho thẻ ứng dụng ở màn hình chính, không đổi thẻ settings.",
     "iconCornerRadiusTitle": "Bo góc icon",
+    "settingsUiTransparencyTitle": "Độ trong suốt cài đặt",
+    "settingsUiTransparencyDescription": "Điều chỉnh độ trong của toàn bộ bề mặt và khung cài đặt ATV Launcher mà không ảnh hưởng giao diện HOME.",
     "appCardLayoutSizeTitle": "Kích thước thẻ",
     "appCardLayoutSizeDescription": "Phóng to hoặc thu nhỏ toàn bộ thẻ ứng dụng trong từng ô cố định mà không đổi số hàng hay bố cục dock.",
     "ramChipLabel": "RAM trống {value}",
@@ -618,7 +620,7 @@
     "videoBlurLow": "Thấp",
     "videoBlurMedium": "Trung bình",
     "videoBlurHigh": "Cao",
-    "textAboutDialog": "FLauncher là launcher mã nguồn mở thay thế cho Android TV.\nMã nguồn tại {repoUrl}.\n\nLogo bởi Katie (@fureturoe), thiết kế bởi @FXCostanzo.",
+    "textAboutDialog": "ATV Launcher là launcher Android TV cá nhân do xfire0392-netizen duy trì.\nMã nguồn tại {repoUrl}.\n\nDự án được xây trên FLauncher của Etienne Fesser và bản fork Flutter của osrosal. Logo bởi Katie (@fureturoe), thiết kế gốc bởi @FXCostanzo.",
     "@textAboutDialog": {
         "placeholders": {
             "repoUrl": {

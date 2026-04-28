@@ -38,6 +38,12 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
     _selectedRoute = HomeLayoutPanelPage.routeName;
     _detailEntryNode = FocusNode(debugLabel: 'settings_detail_entry');
     _detailScopeNode = FocusScopeNode(debugLabel: 'settings_detail_scope');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _focusDetailPane();
+    });
   }
 
   @override

@@ -1,9 +1,12 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
+import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -18,6 +21,7 @@ class WallpaperPanelPage extends StatelessWidget {
     return Consumer2<WallpaperService, SystemBridgeService>(
       builder: (context, wallpaperService, bridgeService, _) => ListView(
         key: const PageStorageKey<String>(WallpaperPanelPage.routeName),
+        padding: const EdgeInsets.only(bottom: 16),
         children: [
           SettingsAdaptiveGrid(
             children: [
@@ -190,29 +194,37 @@ class WallpaperPanelPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                SwitchListTile(
+                const SizedBox(height: 10),
+                RoundedSwitchListTile(
                   value: wallpaperService.videoPlaylistLoop,
                   onChanged: wallpaperService.isVideoMode
                       ? wallpaperService.setVideoPlaylistLoop
                       : null,
-                  title: Text(localizations.loopPlaylist),
+                  title: Text(
+                    localizations.loopPlaylist,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  secondary: const Icon(Icons.repeat_outlined),
                 ),
                 if (wallpaperService.videoAdvanceMode == 'fixed_interval')
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(localizations.switchIntervalSeconds(
-                      wallpaperService.videoSwitchIntervalSeconds,
-                    )),
-                    subtitle: Slider(
-                      value: wallpaperService.videoSwitchIntervalSeconds
-                          .toDouble(),
-                      min: 5,
-                      max: 300,
-                      divisions: 59,
-                      label: '${wallpaperService.videoSwitchIntervalSeconds}s',
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: _WallpaperStepperSettingCard(
+                      selectorKey:
+                          const Key('video_switch_interval_seconds_stepper'),
+                      buttonKeyPrefix: 'video_switch_interval_seconds',
+                      title: localizations.switchIntervalSeconds(
+                        wallpaperService.videoSwitchIntervalSeconds,
+                      ),
+                      subtitle: localizations.fixedInterval,
+                      icon: Icons.timer_outlined,
+                      value: wallpaperService.videoSwitchIntervalSeconds,
+                      valueLabelBuilder: (value) => '${value}s',
+                      minimum: 5,
+                      maximum: 300,
+                      step: 5,
                       onChanged: wallpaperService.isVideoMode
-                          ? (value) => wallpaperService
-                              .setVideoSwitchIntervalSeconds(value.round())
+                          ? wallpaperService.setVideoSwitchIntervalSeconds
                           : null,
                     ),
                   ),
@@ -227,27 +239,42 @@ class WallpaperPanelPage extends StatelessWidget {
                 Text(localizations.playbackAppearanceTitle,
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
-                SwitchListTile(
+                RoundedSwitchListTile(
                   value: wallpaperService.videoLoop,
                   onChanged: wallpaperService.isVideoMode
                       ? wallpaperService.setVideoLoop
                       : null,
-                  title: Text(localizations.loopSingleVideo),
+                  title: Text(
+                    localizations.loopSingleVideo,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  secondary: const Icon(Icons.loop_outlined),
                 ),
-                SwitchListTile(
+                const SizedBox(height: 10),
+                RoundedSwitchListTile(
                   value: wallpaperService.videoMute,
                   onChanged: wallpaperService.isVideoMode
                       ? wallpaperService.setVideoMute
                       : null,
-                  title: Text(localizations.muteVideo),
+                  title: Text(
+                    localizations.muteVideo,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  secondary: const Icon(Icons.volume_off_outlined),
                 ),
-                SwitchListTile(
+                const SizedBox(height: 10),
+                RoundedSwitchListTile(
                   value: wallpaperService.videoAutoResume,
                   onChanged: wallpaperService.isVideoMode
                       ? wallpaperService.setVideoAutoResume
                       : null,
-                  title: Text(localizations.autoResumeOnHome),
+                  title: Text(
+                    localizations.autoResumeOnHome,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  secondary: const Icon(Icons.home_max_outlined),
                 ),
+                const SizedBox(height: 10),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.crop),
@@ -265,6 +292,7 @@ class WallpaperPanelPage extends StatelessWidget {
                           )
                       : null,
                 ),
+                const SizedBox(height: 10),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.blur_on_outlined),
@@ -283,22 +311,22 @@ class WallpaperPanelPage extends StatelessWidget {
                           )
                       : null,
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.dark_mode_outlined),
-                  title: Text(localizations
-                      .dimOverlayPercent(wallpaperService.videoDimPercent)),
-                  subtitle: Slider(
-                    value: wallpaperService.videoDimPercent.toDouble(),
-                    max: 100,
-                    min: 0,
-                    divisions: 20,
-                    label: '${wallpaperService.videoDimPercent}%',
-                    onChanged: wallpaperService.isVideoMode
-                        ? (value) =>
-                            wallpaperService.setVideoDimPercent(value.round())
-                        : null,
-                  ),
+                const SizedBox(height: 10),
+                _WallpaperStepperSettingCard(
+                  selectorKey: const Key('video_dim_percent_stepper'),
+                  buttonKeyPrefix: 'video_dim_percent',
+                  title: localizations
+                      .dimOverlayPercent(wallpaperService.videoDimPercent),
+                  subtitle: localizations.playbackAppearanceTitle,
+                  icon: Icons.dark_mode_outlined,
+                  value: wallpaperService.videoDimPercent,
+                  valueLabelBuilder: (value) => '${value}%',
+                  minimum: 0,
+                  maximum: 100,
+                  step: 5,
+                  onChanged: wallpaperService.isVideoMode
+                      ? wallpaperService.setVideoDimPercent
+                      : null,
                 ),
               ],
             ),
@@ -561,4 +589,188 @@ class _LibrarySelection {
     required this.bucketId,
     required this.folderName,
   });
+}
+
+class _WallpaperStepperSettingCard extends StatefulWidget {
+  final Key? selectorKey;
+  final String? buttonKeyPrefix;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final int value;
+  final int minimum;
+  final int maximum;
+  final int step;
+  final String Function(int value) valueLabelBuilder;
+  final ValueChanged<int>? onChanged;
+
+  const _WallpaperStepperSettingCard({
+    this.selectorKey,
+    this.buttonKeyPrefix,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.minimum,
+    required this.maximum,
+    required this.step,
+    required this.valueLabelBuilder,
+    required this.onChanged,
+  });
+
+  @override
+  State<_WallpaperStepperSettingCard> createState() =>
+      _WallpaperStepperSettingCardState();
+}
+
+class _WallpaperStepperSettingCardState
+    extends State<_WallpaperStepperSettingCard> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final canDecrease =
+        widget.onChanged != null && widget.value > widget.minimum;
+    final canIncrease =
+        widget.onChanged != null && widget.value < widget.maximum;
+
+    return EnsureVisible(
+      alignment: 0.12,
+      child: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+              _shiftValue(-widget.step),
+          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+              _shiftValue(widget.step),
+        },
+        child: FocusableActionDetector(
+          onShowFocusHighlight: (value) {
+            if (_focused != value) {
+              setState(() => _focused = value);
+            }
+          },
+          child: SettingsFocusFrame(
+            key: widget.selectorKey,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 120),
+              opacity: _focused ? 1 : 0.96,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(widget.icon, color: Colors.white70),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.subtitle,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      ExcludeFocus(
+                        child: FilledButton.tonal(
+                          onPressed:
+                              canDecrease ? () => _shiftValue(-widget.step) : null,
+                          key: widget.buttonKeyPrefix == null
+                              ? null
+                              : ValueKey<String>(
+                                  '${widget.buttonKeyPrefix}_decrease',
+                                ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Icon(Icons.remove),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.06),
+                            ),
+                          ),
+                          child: Text(
+                            widget.valueLabelBuilder(widget.value),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ExcludeFocus(
+                        child: FilledButton.tonal(
+                          onPressed:
+                              canIncrease ? () => _shiftValue(widget.step) : null,
+                          key: widget.buttonKeyPrefix == null
+                              ? null
+                              : ValueKey<String>(
+                                  '${widget.buttonKeyPrefix}_increase',
+                                ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Icon(Icons.add),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _shiftValue(int delta) {
+    if (widget.onChanged == null) {
+      return;
+    }
+    final next = (widget.value + delta).clamp(widget.minimum, widget.maximum);
+    if (next != widget.value) {
+      widget.onChanged!(next);
+    }
+  }
 }

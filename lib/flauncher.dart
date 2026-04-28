@@ -277,6 +277,12 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     } else if (widget.autoCollapseEnabled && !oldWidget.autoCollapseEnabled) {
       _collapsed = true;
       _hasInteractedSinceEntry = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_collapsed) {
+          return;
+        }
+        _resetDockToStart();
+      });
     }
   }
 
@@ -588,14 +594,25 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     }
     setState(() {
       _collapsed = true;
+      _activeSectionName = _firstCategoryName(widget.sections);
+      _lastFocusedRowSignature = null;
     });
+    _resetDockToStart();
   }
 
   void _handleDockHeightAnimationEnd() {
+    if (_collapsed) {
+      _jumpDockToTop();
+      return;
+    }
     _centerLatestFocusedRow(animate: false);
   }
 
   void _scheduleCenterFocusedRow(BuildContext itemContext) {
+    if (_collapsed) {
+      _jumpDockToTop();
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _lastFocusedItemContext != itemContext) {
         return;
@@ -605,6 +622,10 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   }
 
   void _centerLatestFocusedRow({required bool animate}) {
+    if (_collapsed) {
+      _jumpDockToTop();
+      return;
+    }
     final dockContext = _dockListKey.currentContext;
     if (dockContext == null) {
       return;
@@ -664,6 +685,41 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     } else {
       _dockScrollController.jumpTo(targetOffset);
     }
+  }
+
+  void _resetDockToStart() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _jumpDockToTop();
+      _focusFirstDockItem();
+    });
+  }
+
+  void _jumpDockToTop() {
+    if (!_dockScrollController.hasClients) {
+      return;
+    }
+    final minScrollExtent = _dockScrollController.position.minScrollExtent;
+    if ((_dockScrollController.offset - minScrollExtent).abs() < 1) {
+      return;
+    }
+    _dockScrollController.jumpTo(minScrollExtent);
+  }
+
+  void _focusFirstDockItem() {
+    final dockContext = _dockListKey.currentContext;
+    if (dockContext == null) {
+      return;
+    }
+    final nodes = FocusManager.instance.rootScope.traversalDescendants
+        .where((node) => _isDockDescendant(node.context, dockContext))
+        .toList(growable: false);
+    if (nodes.isEmpty) {
+      return;
+    }
+    nodes.first.requestFocus();
   }
 }
 

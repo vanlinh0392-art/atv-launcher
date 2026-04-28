@@ -1,162 +1,138 @@
 # ATV Launcher
 
-ATV Launcher is a Flutter-based Android TV launcher focused on non-Google TVs, Xiaomi TV / Mi Box devices, and Android TV 9+ deployments that need deeper system control than a typical launcher.
+ATV Launcher là dự án launcher Android TV cá nhân mình đang duy trì dưới tài khoản `xfire0392-netizen`, tập trung cho TV không có Google, Xiaomi TV / Mi Box và các thiết bị Android TV 9+ cần nhiều quyền hệ thống hơn launcher thông thường.
 
-This project starts from [`osrosal/flauncher`](https://github.com/osrosal/flauncher) tag `v2025.07.001` and turns it into a single integrated launcher APK with:
+Fork này lấy nền từ [`osrosal/flauncher`](https://github.com/osrosal/flauncher) tag `v2025.07.001`, sau đó mở rộng thành một APK launcher tích hợp cho:
 
-- a TV-first bottom-dock home screen
-- local and playlist video wallpapers
-- bilingual UI (`English` and `Vietnamese`)
-- integrated system bridge for provisioning, voice, accessibility, DPI, DNS, and diagnostics
-- no dependency on Google Play Services
+- Android TV không phụ thuộc Google Play Services
+- one-time ADB provisioning rồi tự heal sau boot / wake
+- voice remap, accessibility repair, DPI, private DNS và diagnostics ngay trong launcher
+- video wallpaper local / playlist / folder playlist
+- UI song ngữ English / Tiếng Việt
 
-## Why this fork exists
+## Cá nhân hóa của fork này
 
-Most Android TV launchers handle app browsing well, but stop short when the target device is:
+ATV Launcher không còn là một mirror tối giản của upstream. Bản fork hiện tại ưu tiên:
 
-- a Xiaomi TV or Mi Box with aggressive boot/wake behavior
-- a TV sold without Google certification
-- a device that needs one-time ADB provisioning and then self-healing behavior
-- a setup where voice remapping, accessibility recovery, DPI control, private DNS, or launcher recovery must live inside the launcher itself
+- Xiaomi TV / Mi Box stability
+- launcher recovery khi TV cố quay về home mặc định khác
+- bottom dock home để lộ video wallpaper nhiều hơn
+- Permission Center, backup / restore và settings shell kiểu TV-first
+- tích hợp native system bridge vào cùng app launcher
 
-ATV Launcher is built for that environment.
+## Tính năng chính
 
-## Key capabilities
+### Home & media
 
-### Home experience
-
-- Bottom-dock TV-first home layout with configurable `2 / 3 / 4` visible rows
-- Auto-collapse dock with configurable collapsed state and idle timeout
-- Adjustable card size, icon/media size, corner radius, row spacing, glass intensity, and category title visibility
-- Row-centered DPAD scrolling tuned for remote control use
-- Video wallpaper remains the visual focus instead of being hidden by a full-height grid
-
-### Wallpaper and media
-
-- `gradient`, `image`, and `video` wallpaper modes
-- Video wallpaper from:
-  - single file
-  - multi-file playlist
-  - folder playlist
-- Sequential or shuffle playback
-- Advance on completion or fixed interval switching
-- Mute, dim, blur, fit mode, loop, and auto-resume controls
-- Hybrid file access:
-  - internal local video browser
-  - MediaStore-based browsing
-  - SAF fallback for file or folder selection
-- Persisted URI access so media does not need to be granted again every time
-
-### Voice and accessibility
-
-- Integrated voice button remap with support for:
-  - single press
-  - double press
-  - long press
-  - double press then hold
-- Learning mode for capturing the real remote key
-- Voice launch order:
-  - Google voice search activity if available
-  - `android.speech.action.WEB_SEARCH`
-  - `Intent.ACTION_ASSIST`
-  - `Intent.ACTION_VOICE_COMMAND`
-- Accessibility manager with repair and verification flows
-- Managed accessibility service list with recovery support after boot or wake
+- Bottom dock home với preset số hàng hiển thị, auto-collapse và glass UI
+- Tùy chỉnh card size, icon size, bo góc, khoảng cách hàng, độ trong suốt
+- Wallpaper `gradient | image | video`
+- Video wallpaper từ file đơn, nhiều file hoặc thư mục
+- Playlist sequential / shuffle, on-completion / fixed interval, mute, blur, dim, fit
 
 ### System bridge
 
-- Integrated native services and receivers inside the launcher host
-- Boot, wake, and Xiaomi-specific heal logic
-- Resident core service and diagnostics
-- Permission Center with local ADB flow and setup guidance
-- ADB automation policies:
-  - `off`
-  - `adb_only`
-  - `adb_and_wifi`
-- Optional disable-on-sleep handling with throttled re-apply logic
-- Home guard behavior to defend launcher foreground on devices that try to return to the stock home app
+- Permission Center với flow local ADB và checklist provisioning
+- Voice remap cho remote với learning mode
+- Accessibility manager và repair flow
+- DPI read / apply / reset
+- Private DNS read / apply / reset
+- Resident core, heal service, boot/wake recovery và diagnostics
+- Home guard cho TV có xu hướng trả HOME về launcher gốc
 
-### Device control
+### Data & recovery
 
-- DPI read/apply/reset flow with multiple execution paths
-- Private DNS read/apply/reset
-- Battery optimization guidance
-- Developer options deep links
-- Provisioning checklist and grant health status
+- Backup / restore cấu hình launcher
+- Lưu bố cục home, voice mapping, accessibility management, wallpaper config, ADB policy, DNS, DPI intent
+- Song ngữ English / Tiếng Việt
 
-### Data and recovery
-
-- Backup and restore for launcher configuration
-- Stores layout, wallpaper, voice, accessibility, ADB policy, and system-related preferences
-- Restore reports unresolved apps or missing media instead of silently failing
-
-## Technical profile
+## Hồ sơ kỹ thuật
 
 - Package: `com.atv.launcher`
 - Base: `osrosal/flauncher` tag `v2025.07.001`
 - UI: Flutter
-- Native host: Android / Java 17
-- Min SDK: `28`
-- Target SDK: `35`
-- Release ABI: `armeabi-v7a` only
-- Google Play Services: not required
+- Android host: Java 17
+- `minSdk = 28`
+- `targetSdk = 35`
+- ABI phát hành chính: `armeabi-v7a`
+- Không yêu cầu Google Play Services
 
-## Settings areas
+## Install on TV
 
-The integrated settings shell currently includes:
+### 1. Kết nối ADB tới TV
 
-- Home & Layout
-- Wallpaper & Media
-- Voice & Search
-- Profiles & Security
-- Accessibility Manager
-- System Core
-- Display / DPI
-- Network / Private DNS
-- Permissions & Provisioning
-- Backup & Restore
-- Diagnostics
-- Status Bar
-- Applications
+```bash
+adb connect 192.168.1.111:5555
+adb devices
+```
 
-## Provisioning workflow
+Nếu TV chưa bật ADB / Wireless debugging, mở trong `Developer options` trên TV trước.
 
-The intended deployment model is:
+### 2. Cài APK
 
-1. Install the launcher once with ADB.
-2. Run one-time provisioning for elevated settings access.
-3. Let the launcher verify, heal, and maintain state internally after boot, wake, or package replacement.
+```bash
+adb -s 192.168.1.111:5555 install -r build/app/outputs/flutter-apk/app-debug.apk
+```
 
-The repository includes a helper script:
+Hoặc dùng file phát hành từ GitHub Releases sau khi workflow CI build xong.
+
+### 3. Mở launcher
+
+```bash
+adb -s 192.168.1.111:5555 shell monkey -p com.atv.launcher -c android.intent.category.LAUNCHER 1
+```
+
+### 4. Grant quyền cần thiết
+
+Đường cài đặt nhanh nhất là dùng script provisioning đi kèm:
 
 ```bash
 python provision_atv_launcher.py --serial 192.168.1.111:5555
 ```
 
-What the script can do:
+Script này có thể:
 
-- install the APK
+- cài / cập nhật launcher
 - grant `WRITE_SECURE_SETTINGS`
-- apply helpful appops
+- áp dụng appops cần thiết
 - whitelist battery optimization
-- enable ADB or ADB Wi-Fi when requested
-- verify final provisioning state
+- verify trạng thái provisioning cuối cùng
 
-## Build instructions
+Nếu muốn grant tay:
 
-### Requirements
+```bash
+adb -s 192.168.1.111:5555 shell pm grant com.atv.launcher android.permission.WRITE_SECURE_SETTINGS
+```
+
+Sau đó vào `Permission Center` trong launcher để kiểm tra lại toàn bộ checklist.
+
+### 5. Cập nhật APK
+
+```bash
+adb -s 192.168.1.111:5555 install -r path/to/atv-launcher-armeabi-v7a-debug.apk
+```
+
+### 6. Gỡ launcher nếu cần
+
+```bash
+adb -s 192.168.1.111:5555 uninstall com.atv.launcher
+```
+
+## Build local
+
+### Yêu cầu
 
 - Flutter `3.24.5`
-- Android SDK with platform tools
+- Android SDK + platform tools
 - Java `17`
 
-### Install dependencies
+### Cài dependency
 
 ```bash
 flutter pub get
 ```
 
-### Run tests
+### Kiểm tra
 
 ```bash
 flutter analyze --no-pub
@@ -175,32 +151,23 @@ flutter build apk --debug --target-platform android-arm --no-pub
 flutter build apk --release --target-platform android-arm --no-pub
 ```
 
-## Device focus
+## GitHub Actions / releases
 
-This launcher is primarily tuned for:
+Repo này dùng `main` làm nhánh phát hành tự động.
 
-- Android TV 9 and above
-- Xiaomi TV firmware behavior
-- Mi Box style boot and wake cycles
-- TV devices without Google services
-- remote-first navigation from a DPAD handset
+Trên mỗi push vào `main`, GitHub Actions sẽ:
 
-## Repository status
+- chạy `flutter analyze --no-pub`
+- chạy `flutter test --no-pub`
+- build debug APK Android ARM
+- upload artifact APK
+- tự tạo GitHub Release debug mới kèm file APK
 
-This repository is an actively customized product fork, not a minimal mirror of upstream FLauncher. Expect divergence in:
+## Upstream, credit và license
 
-- settings UX
-- system bridge code
-- native Android services and receivers
-- wallpaper/media architecture
-- provisioning tooling
-- TV-specific stability behavior
+Fork này vẫn giữ credit và GPL của upstream:
 
-## License
+- original project: [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
+- Flutter fork base used here: [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
-This project remains under the upstream `GPL-3.0` license. See [LICENSE](LICENSE).
-
-## Credits
-
-- Original project: [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
-- Fork base used for this work: [osrosal/flauncher](https://github.com/osrosal/flauncher)
+Toàn bộ dự án tiếp tục phát hành theo giấy phép [`GPL-3.0`](LICENSE).

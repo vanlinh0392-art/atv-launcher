@@ -33,21 +33,17 @@ class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
             .lockedPackages
             .length;
         final viewSize = MediaQuery.sizeOf(context);
-        final metricsWideLayout = viewSize.width >= 1080;
-        final splitLayout = viewSize.width >= 1500 && viewSize.height >= 820;
+        final metricsWideLayout =
+            viewSize.width >= 1200 && viewSize.height >= 780;
 
         return ListView(
           key:
               const PageStorageKey<String>(ProfilesSecurityPanelPage.routeName),
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.only(bottom: 16),
           children: [
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: metricsWideLayout ? 4 : 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: metricsWideLayout ? 2.35 : 2.0,
+            SettingsAdaptiveGrid(
+              minChildWidth: metricsWideLayout ? 190 : 240,
+              maxColumns: metricsWideLayout ? 4 : 2,
               children: [
                 SettingsMetricTile(
                   width: double.infinity,
@@ -80,28 +76,11 @@ class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
               ],
             ),
             const SizedBox(height: 14),
-            if (splitLayout)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: const _AppVisibilityCard(),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _LauncherSecurityCard(
-                      security: security,
-                    ),
-                  ),
-                ],
-              )
-            else ...[
-              const _AppVisibilityCard(),
-              const SizedBox(height: 14),
-              _LauncherSecurityCard(
-                security: security,
-              ),
-            ],
+            const _AppVisibilityCard(),
+            const SizedBox(height: 14),
+            _LauncherSecurityCard(
+              security: security,
+            ),
           ],
         );
       },
@@ -208,9 +187,6 @@ class _LauncherSecurityCard extends StatelessWidget {
             title: security.hasPin
                 ? localizations.changeOwnerPinAction
                 : localizations.setOwnerPinAction,
-            subtitle: security.hasPin
-                ? localizations.ownerPinConfirmDescription
-                : localizations.ownerPinSetDescription,
             onPressed: () => _upsertOwnerPin(context),
           ),
           const SizedBox(height: 10),

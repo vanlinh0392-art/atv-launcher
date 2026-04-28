@@ -43,7 +43,7 @@ void main() {
     verify(wallpaperService.pickVideoWallpaper()).called(1);
   });
 
-  testWidgets('fixed interval mode shows switch interval slider',
+  testWidgets('fixed interval mode shows switch interval stepper',
       (tester) async {
     _prepareView(tester);
     final wallpaperService =
@@ -55,6 +55,11 @@ void main() {
     await _pumpWidget(tester, wallpaperService, bridgeService);
 
     expect(find.textContaining('Switch interval'), findsOneWidget);
+    expect(
+      find.byKey(const Key('video_switch_interval_seconds_stepper')),
+      findsOneWidget,
+    );
+    expect(find.byType(Slider), findsNothing);
   });
 }
 

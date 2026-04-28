@@ -17,6 +17,7 @@
  */
 
 import 'package:flauncher/actions.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/material.dart';
 
 class RightPanelDialog extends StatelessWidget {
@@ -31,6 +32,7 @@ class RightPanelDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chromeSpec = SettingsChromeSpec.of(context);
     final viewport = MediaQuery.of(context).size;
     final dialogWidth = width.clamp(720, viewport.width - 48).toDouble();
     return Dialog(
@@ -45,19 +47,24 @@ class RightPanelDialog extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(36),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xC90D2036),
-                Color(0xC9112845),
-                Color(0xC1091523),
+              colors: <Color>[
+                const Color(0xFF0D2036)
+                    .withOpacity(chromeSpec.dialogGradientOpacity),
+                const Color(0xFF112845)
+                    .withOpacity(chromeSpec.dialogGradientOpacity - 0.03),
+                const Color(0xFF091523)
+                    .withOpacity(chromeSpec.dialogGradientOpacity - 0.06),
               ],
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
-            boxShadow: const [
+            border: Border.all(
+              color: Colors.white.withOpacity(chromeSpec.dialogBorderOpacity),
+            ),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x5C000000),
+                color: Colors.black.withOpacity(chromeSpec.dialogShadowOpacity),
                 blurRadius: 36,
                 offset: Offset(-10, 16),
               ),

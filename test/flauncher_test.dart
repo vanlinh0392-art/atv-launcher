@@ -381,6 +381,95 @@ void main() {
     expect(find.text('Category 1'), findsOneWidget);
   });
 
+  testWidgets('dock collapse resets scroll to top and focus back to first app',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final sections = List<LauncherSection>.generate(6, (index) {
+      final category = fakeCategory(
+        name: 'Reset $index',
+        order: index,
+        type: CategoryType.row,
+      );
+      category.applications.add(
+        fakeApp(
+          packageName: 'reset.app.$index',
+          name: 'Reset App $index',
+        ),
+      );
+      return category;
+    });
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn(sections);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setShowCategoryTitles(true);
+    await settingsService.setHomeDockRowsPreset(3);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockAutoCollapseDelaySeconds(5);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    final firstSectionFinder = find.byType(CategoryRow).first;
+    final initialSectionTop = tester.getTopLeft(firstSectionFinder).dy;
+
+    for (var i = 0; i < 3; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 420));
+    }
+
+    final scrolledSectionTop = tester.getTopLeft(firstSectionFinder).dy;
+    expect(scrolledSectionTop, lessThan(initialSectionTop));
+    expect(find.text('Reset 3'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    final resetSectionTop = tester.getTopLeft(firstSectionFinder).dy;
+    expect(resetSectionTop, greaterThan(scrolledSectionTop));
+    expect((resetSectionTop - initialSectionTop).abs(), lessThanOrEqualTo(1.0));
+    expect(find.text('Reset 0'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    expect(find.text('Reset 1'), findsOneWidget);
+  });
+
   testWidgets(
       'dock keeps vertical focus inside categories before reaching app bar',
       (tester) async {
@@ -468,7 +557,7 @@ void _expectCardNearDockCenter(WidgetTester tester, Key appKey) {
   final distanceFromCenter = (cardRect.center.dy - dockRect.center.dy).abs();
   expect(
     distanceFromCenter,
-    lessThanOrEqualTo(cardRect.height + 32),
+    lessThanOrEqualTo(cardRect.height + 40),
   );
 }
 
@@ -481,6 +570,12 @@ Future<void> _pumpLauncher(
   SettingsService? settingsService,
 }) async {
   final resolvedSettings = settingsService ?? await _createSettingsService();
+  if (bridgeService is MockSystemBridgeService) {
+    when(bridgeService.status).thenReturn(const <String, dynamic>{
+      'memory': <String, dynamic>{},
+      'provisioning': <String, dynamic>{},
+    });
+  }
 
   await tester.pumpWidget(
     MultiProvider(

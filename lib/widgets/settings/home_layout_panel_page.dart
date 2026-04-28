@@ -19,6 +19,34 @@ import 'back_button_actions.dart';
 
 class HomeLayoutPanelPage extends StatelessWidget {
   static const String routeName = "home_layout_panel";
+  static const List<int> _dockCollapseDelayOptions = <int>[
+    5,
+    10,
+    15,
+    20,
+    30,
+    45,
+    60,
+  ];
+  static const List<int> _dockGlassIntensityOptions = <int>[
+    0,
+    20,
+    40,
+    60,
+    80,
+    100,
+  ];
+  static const List<int> _appCardLayoutScaleOptions = <int>[
+    70,
+    80,
+    85,
+    90,
+    95,
+    100,
+    105,
+    110,
+    115,
+  ];
 
   const HomeLayoutPanelPage({super.key});
 
@@ -26,341 +54,390 @@ class HomeLayoutPanelPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
 
-    return Consumer<SettingsService>(
-      builder: (context, settingsService, __) => ListView(
-        key: const PageStorageKey<String>(HomeLayoutPanelPage.routeName),
-        children: [
-          SettingsAdaptiveGrid(
-            children: [
-              SettingsMetricTile(
-                label: localizations.appCardHighlightAnimation,
-                value: _boolLabel(localizations,
-                    settingsService.appHighlightAnimationEnabled),
-                icon: Icons.filter_center_focus,
-              ),
-              SettingsMetricTile(
-                label: localizations.appKeyClick,
-                value: _boolLabel(
-                    localizations, settingsService.appKeyClickEnabled),
-                icon: Icons.notifications_active_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.showCategoryTitles,
-                value: _visibilityLabel(
-                    localizations, settingsService.showCategoryTitles),
-                icon: Icons.abc_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.appLanguageTitle,
-                value: _localeModeLabel(
-                  localizations,
-                  settingsService.appLocaleMode,
-                ),
-                icon: Icons.language_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.homeDockHeightTitle,
-                value: settingsService.homeDockRowsPreset.toString(),
-                icon: Icons.view_agenda_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.homeDockCollapsedRowsTitle,
-                value: settingsService.homeDockCollapsedRowsPreset.toString(),
-                icon: Icons.unfold_less_double_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.homeDockAutoCollapseTitle,
-                value: _boolLabel(
-                  localizations,
-                  settingsService.homeDockAutoCollapseEnabled,
-                ),
-                icon: Icons.unfold_less_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.homeDockAutoCollapseDelayTitle,
-                value: '${settingsService.homeDockAutoCollapseDelaySeconds}s',
-                icon: Icons.timer_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.homeDockGlassIntensityTitle,
-                value: '${settingsService.homeDockGlassIntensityPercent}%',
-                icon: Icons.blur_on_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.homeDockRowSpacingTitle,
-                value: '${settingsService.homeDockRowSpacing}dp',
-                icon: Icons.height_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.iconCornerRadiusTitle,
-                value: '${settingsService.appCardCornerRadius}dp',
-                icon: Icons.rounded_corner_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.appCardLayoutSizeTitle,
-                value: '${settingsService.appCardLayoutScalePercent}%',
-                icon: Icons.crop_16_9_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.iconSizeTitle,
-                value: '${settingsService.appCardMediaScalePercent}%',
-                icon: Icons.photo_size_select_large_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          SettingsSurfaceCard(
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
+    return FocusTraversalGroup(
+      policy: WidgetOrderTraversalPolicy(),
+      child: Consumer<SettingsService>(
+        builder: (context, settingsService, __) => ListView(
+          key: const PageStorageKey<String>(HomeLayoutPanelPage.routeName),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            SettingsAdaptiveGrid(
               children: [
-                FilledButton.icon(
-                  onPressed: () => Navigator.of(context)
-                      .pushNamed(ApplicationsPanelPage.routeName),
-                  icon: const Icon(Icons.apps),
-                  label: Text(localizations.applications),
+                SettingsMetricTile(
+                  label: localizations.appCardHighlightAnimation,
+                  value: _boolLabel(localizations,
+                      settingsService.appHighlightAnimationEnabled),
+                  icon: Icons.filter_center_focus,
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () => Navigator.of(context)
-                      .pushNamed(LauncherSectionsPanelPage.routeName),
-                  icon: const Icon(Icons.category_outlined),
-                  label: Text(localizations.launcherSections),
+                SettingsMetricTile(
+                  label: localizations.appKeyClick,
+                  value: _boolLabel(
+                      localizations, settingsService.appKeyClickEnabled),
+                  icon: Icons.notifications_active_outlined,
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () => Navigator.of(context)
-                      .pushNamed(StatusBarPanelPage.routeName),
-                  icon: const Icon(Icons.tips_and_updates_outlined),
-                  label: Text(localizations.statusBar),
+                SettingsMetricTile(
+                  label: localizations.showCategoryTitles,
+                  value: _visibilityLabel(
+                      localizations, settingsService.showCategoryTitles),
+                  icon: Icons.abc_outlined,
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () => context.read<AppsService>().openSettings(),
-                  icon: const Icon(Icons.settings_outlined),
-                  label: Text(localizations.systemSettings),
+                SettingsMetricTile(
+                  label: localizations.appLanguageTitle,
+                  value: _localeModeLabel(
+                    localizations,
+                    settingsService.appLocaleMode,
+                  ),
+                  icon: Icons.language_outlined,
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () async => await _dateTimeFormatDialog(context),
-                  icon: const Icon(Icons.date_range_outlined),
-                  label: Text(localizations.dateAndTimeFormat),
+                SettingsMetricTile(
+                  label: localizations.homeDockHeightTitle,
+                  value: settingsService.homeDockRowsPreset.toString(),
+                  icon: Icons.view_agenda_outlined,
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () async => await _backButtonActionDialog(context),
-                  icon: const Icon(Icons.arrow_back_outlined),
-                  label: Text(localizations.backButtonAction),
+                SettingsMetricTile(
+                  label: localizations.homeDockCollapsedRowsTitle,
+                  value: settingsService.homeDockCollapsedRowsPreset.toString(),
+                  icon: Icons.unfold_less_double_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.homeDockAutoCollapseTitle,
+                  value: _boolLabel(
+                    localizations,
+                    settingsService.homeDockAutoCollapseEnabled,
+                  ),
+                  icon: Icons.unfold_less_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.homeDockAutoCollapseDelayTitle,
+                  value: '${settingsService.homeDockAutoCollapseDelaySeconds}s',
+                  icon: Icons.timer_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.homeDockGlassIntensityTitle,
+                  value: '${settingsService.homeDockGlassIntensityPercent}%',
+                  icon: Icons.blur_on_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.homeDockRowSpacingTitle,
+                  value: '${settingsService.homeDockRowSpacing}dp',
+                  icon: Icons.height_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.iconCornerRadiusTitle,
+                  value: '${settingsService.appCardCornerRadius}dp',
+                  icon: Icons.rounded_corner_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.settingsUiTransparencyTitle,
+                  value: '${settingsService.settingsUiTransparencyPercent}%',
+                  icon: Icons.opacity_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.appCardLayoutSizeTitle,
+                  value: '${settingsService.appCardLayoutScalePercent}%',
+                  icon: Icons.crop_16_9_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.iconSizeTitle,
+                  value: '${settingsService.appCardMediaScalePercent}%',
+                  icon: Icons.photo_size_select_large_outlined,
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 18),
-          SettingsSurfaceCard(
-            child: Column(
-              children: [
-                _SegmentedSettingCard<String>(
-                  segmentedButtonKey: const Key('app_locale_mode_selector'),
-                  title: localizations.appLanguageTitle,
-                  subtitle: localizations.appLanguageDescription,
-                  icon: Icons.language_outlined,
-                  value: settingsService.appLocaleMode,
-                  segments: <ButtonSegment<String>>[
-                    ButtonSegment<String>(
-                      value: SettingsService.appLocaleSystem,
-                      label: Text(localizations.appLanguageSystem),
-                    ),
-                    ButtonSegment<String>(
-                      value: SettingsService.appLocaleEnglish,
-                      label: Text(localizations.appLanguageEnglish),
-                    ),
-                    ButtonSegment<String>(
-                      value: SettingsService.appLocaleVietnamese,
-                      label: Text(localizations.appLanguageVietnamese),
-                    ),
-                  ],
-                  onSelectionChanged: (selection) {
-                    final value = selection.isEmpty
-                        ? SettingsService.appLocaleSystem
-                        : selection.first;
-                    settingsService.setAppLocaleMode(value);
-                  },
-                ),
-                const SizedBox(height: 10),
-                _SegmentedSettingCard(
-                  title: localizations.homeDockHeightTitle,
-                  subtitle: localizations.homeDockHeightDescription,
-                  icon: Icons.view_agenda_outlined,
-                  value: settingsService.homeDockRowsPreset,
-                  segments: const <ButtonSegment<int>>[
-                    ButtonSegment<int>(value: 2, label: Text('2')),
-                    ButtonSegment<int>(value: 3, label: Text('3')),
-                    ButtonSegment<int>(value: 4, label: Text('4')),
-                  ],
-                  onSelectionChanged: (selection) {
-                    final value = selection.isEmpty ? 3 : selection.first;
-                    settingsService.setHomeDockRowsPreset(value);
-                  },
-                ),
-                const SizedBox(height: 10),
-                _SegmentedSettingCard(
-                  segmentedButtonKey:
-                      const Key('home_dock_collapsed_rows_selector'),
-                  title: localizations.homeDockCollapsedRowsTitle,
-                  subtitle: localizations.homeDockCollapsedRowsDescription,
-                  icon: Icons.unfold_less_double_outlined,
-                  value: settingsService.homeDockCollapsedRowsPreset,
-                  segments: const <ButtonSegment<int>>[
-                    ButtonSegment<int>(value: 1, label: Text('1')),
-                    ButtonSegment<int>(value: 2, label: Text('2')),
-                  ],
-                  onSelectionChanged: (selection) {
-                    final value = selection.isEmpty ? 1 : selection.first;
-                    settingsService.setHomeDockCollapsedRowsPreset(value);
-                  },
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: settingsService.homeDockAutoCollapseEnabled,
-                  onChanged: settingsService.setHomeDockAutoCollapseEnabled,
-                  title: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        localizations.homeDockAutoCollapseTitle,
-                        style: Theme.of(context).textTheme.bodyMedium,
+            const SizedBox(height: 18),
+            SettingsSurfaceCard(
+              child: Column(
+                children: [
+                  _SegmentedSettingCard<String>(
+                    key: const Key('home_layout_language_card'),
+                    segmentedButtonKey: const Key('app_locale_mode_selector'),
+                    title: localizations.appLanguageTitle,
+                    subtitle: localizations.appLanguageDescription,
+                    icon: Icons.language_outlined,
+                    value: settingsService.appLocaleMode,
+                    segments: <ButtonSegment<String>>[
+                      ButtonSegment<String>(
+                        value: SettingsService.appLocaleSystem,
+                        label: Text(localizations.appLanguageSystem),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        localizations.homeDockAutoCollapseDescription,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.white70),
+                      ButtonSegment<String>(
+                        value: SettingsService.appLocaleEnglish,
+                        label: Text(localizations.appLanguageEnglish),
+                      ),
+                      ButtonSegment<String>(
+                        value: SettingsService.appLocaleVietnamese,
+                        label: Text(localizations.appLanguageVietnamese),
                       ),
                     ],
+                    onSelectionChanged: (selection) {
+                      final value = selection.isEmpty
+                          ? SettingsService.appLocaleSystem
+                          : selection.first;
+                      settingsService.setAppLocaleMode(value);
+                    },
                   ),
-                  secondary: const Icon(Icons.unfold_less_outlined),
-                ),
-                const SizedBox(height: 10),
-                _DiscreteSliderTile(
-                  sliderKey: const Key('home_dock_auto_collapse_delay_slider'),
-                  title: localizations.homeDockAutoCollapseDelayTitle,
-                  subtitle: localizations.homeDockAutoCollapseDelayDescription,
-                  icon: Icons.timer_outlined,
-                  value: settingsService.homeDockAutoCollapseDelaySeconds,
-                  minimum: SettingsService.homeDockAutoCollapseDelayMin,
-                  maximum: SettingsService.homeDockAutoCollapseDelayMax,
-                  step: SettingsService.homeDockAutoCollapseDelayStep,
-                  suffix: 's',
-                  onChanged:
-                      settingsService.setHomeDockAutoCollapseDelaySeconds,
-                ),
-                const SizedBox(height: 10),
-                _DiscreteSliderTile(
-                  sliderKey: const Key('home_dock_glass_intensity_slider'),
-                  title: localizations.homeDockGlassIntensityTitle,
-                  subtitle: localizations.homeDockGlassIntensityDescription,
-                  icon: Icons.blur_on_outlined,
-                  value: settingsService.homeDockGlassIntensityPercent,
-                  minimum: SettingsService.homeDockGlassIntensityMin,
-                  maximum: SettingsService.homeDockGlassIntensityMax,
-                  step: SettingsService.homeDockGlassIntensityStep,
-                  suffix: '%',
-                  onChanged: settingsService.setHomeDockGlassIntensityPercent,
-                ),
-                const SizedBox(height: 10),
-                _DiscreteSliderTile(
-                  sliderKey: const Key('home_dock_row_spacing_slider'),
-                  title: localizations.homeDockRowSpacingTitle,
-                  subtitle: localizations.homeDockRowSpacingDescription,
-                  icon: Icons.height_outlined,
-                  value: settingsService.homeDockRowSpacing,
-                  minimum: SettingsService.homeDockRowSpacingMin,
-                  maximum: SettingsService.homeDockRowSpacingMax,
-                  step: SettingsService.homeDockRowSpacingStep,
-                  suffix: 'dp',
-                  onChanged: settingsService.setHomeDockRowSpacing,
-                ),
-                const SizedBox(height: 10),
-                _IntegerStepperTile(
-                  title: localizations.iconCornerRadiusTitle,
-                  subtitle: localizations.iconCornerRadiusDescription,
-                  icon: Icons.rounded_corner_outlined,
-                  value: settingsService.appCardCornerRadius,
-                  minimum: 0,
-                  maximum: 24,
-                  suffix: 'dp',
-                  onChanged: settingsService.setAppCardCornerRadius,
-                ),
-                const SizedBox(height: 10),
-                _DiscreteSliderTile(
-                  sliderKey: const Key('app_card_layout_scale_slider'),
-                  title: localizations.appCardLayoutSizeTitle,
-                  subtitle: localizations.appCardLayoutSizeDescription,
-                  icon: Icons.crop_16_9_outlined,
-                  value: settingsService.appCardLayoutScalePercent,
-                  minimum: SettingsService.appCardLayoutScaleMin,
-                  maximum: SettingsService.appCardLayoutScaleMax,
-                  step: SettingsService.appCardLayoutScaleStep,
-                  suffix: '%',
-                  onChanged: settingsService.setAppCardLayoutScalePercent,
-                ),
-                const SizedBox(height: 10),
-                _DiscreteSliderTile(
-                  title: localizations.iconSizeTitle,
-                  subtitle: localizations.iconSizeDescription,
-                  icon: Icons.photo_size_select_large_outlined,
-                  value: settingsService.appCardMediaScalePercent,
-                  minimum: SettingsService.appCardMediaScaleMin,
-                  maximum: SettingsService.appCardMediaScaleMax,
-                  step: SettingsService.appCardMediaScaleStep,
-                  suffix: '%',
-                  onChanged: settingsService.setAppCardMediaScalePercent,
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: settingsService.appHighlightAnimationEnabled,
-                  onChanged: settingsService.setAppHighlightAnimationEnabled,
-                  title: Text(localizations.appCardHighlightAnimation,
-                      style: Theme.of(context).textTheme.bodyMedium),
-                  secondary: const Icon(Icons.filter_center_focus),
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: settingsService.appKeyClickEnabled,
-                  onChanged: settingsService.setAppKeyClickEnabled,
-                  title: Text(localizations.appKeyClick,
-                      style: Theme.of(context).textTheme.bodyMedium),
-                  secondary: const Icon(Icons.notifications_active),
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: settingsService.showCategoryTitles,
-                  onChanged: settingsService.setShowCategoryTitles,
-                  title: Text(localizations.showCategoryTitles,
-                      style: Theme.of(context).textTheme.bodyMedium),
-                  secondary: const Icon(Icons.abc),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          SettingsSurfaceCard(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.tonalIcon(
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (_) => FutureBuilder<PackageInfo>(
-                    future: PackageInfo.fromPlatform(),
-                    builder: (context, snapshot) =>
-                        snapshot.connectionState == ConnectionState.done
-                            ? FLauncherAboutDialog(packageInfo: snapshot.data!)
-                            : const SizedBox.shrink(),
+                  const SizedBox(height: 10),
+                  _SegmentedSettingCard(
+                    title: localizations.homeDockHeightTitle,
+                    subtitle: localizations.homeDockHeightDescription,
+                    icon: Icons.view_agenda_outlined,
+                    value: settingsService.homeDockRowsPreset,
+                    segments: const <ButtonSegment<int>>[
+                      ButtonSegment<int>(value: 2, label: Text('2')),
+                      ButtonSegment<int>(value: 3, label: Text('3')),
+                      ButtonSegment<int>(value: 4, label: Text('4')),
+                    ],
+                    onSelectionChanged: (selection) {
+                      final value = selection.isEmpty ? 3 : selection.first;
+                      settingsService.setHomeDockRowsPreset(value);
+                    },
                   ),
-                ),
-                icon: const Icon(Icons.info_outline),
-                label: Text(localizations.aboutFlauncher),
+                  const SizedBox(height: 10),
+                  _SegmentedSettingCard(
+                    segmentedButtonKey:
+                        const Key('home_dock_collapsed_rows_selector'),
+                    title: localizations.homeDockCollapsedRowsTitle,
+                    subtitle: localizations.homeDockCollapsedRowsDescription,
+                    icon: Icons.unfold_less_double_outlined,
+                    value: settingsService.homeDockCollapsedRowsPreset,
+                    segments: const <ButtonSegment<int>>[
+                      ButtonSegment<int>(value: 1, label: Text('1')),
+                      ButtonSegment<int>(value: 2, label: Text('2')),
+                    ],
+                    onSelectionChanged: (selection) {
+                      final value = selection.isEmpty ? 1 : selection.first;
+                      settingsService.setHomeDockCollapsedRowsPreset(value);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
+                    value: settingsService.homeDockAutoCollapseEnabled,
+                    onChanged: settingsService.setHomeDockAutoCollapseEnabled,
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localizations.homeDockAutoCollapseTitle,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          localizations.homeDockAutoCollapseDescription,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    secondary: const Icon(Icons.unfold_less_outlined),
+                  ),
+                  const SizedBox(height: 10),
+                  _ChoiceSettingCard<int>(
+                    selectorKey:
+                        const Key('home_dock_auto_collapse_delay_selector'),
+                    optionKeyPrefix: 'home_dock_auto_collapse_delay_option',
+                    title: localizations.homeDockAutoCollapseDelayTitle,
+                    subtitle:
+                        localizations.homeDockAutoCollapseDelayDescription,
+                    icon: Icons.timer_outlined,
+                    value: settingsService.homeDockAutoCollapseDelaySeconds,
+                    options: _dockCollapseDelayOptions
+                        .map((value) => _ChoiceOption<int>(
+                              value: value,
+                              label: '${value}s',
+                            ))
+                        .toList(growable: false),
+                    valueLabelBuilder: (value) => '${value}s',
+                    onChanged:
+                        settingsService.setHomeDockAutoCollapseDelaySeconds,
+                  ),
+                  const SizedBox(height: 10),
+                  _ChoiceSettingCard<int>(
+                    selectorKey:
+                        const Key('home_dock_glass_intensity_selector'),
+                    optionKeyPrefix: 'home_dock_glass_intensity_option',
+                    title: localizations.homeDockGlassIntensityTitle,
+                    subtitle: localizations.homeDockGlassIntensityDescription,
+                    icon: Icons.blur_on_outlined,
+                    value: settingsService.homeDockGlassIntensityPercent,
+                    options: _dockGlassIntensityOptions
+                        .map((value) => _ChoiceOption<int>(
+                              value: value,
+                              label: '${value}%',
+                            ))
+                        .toList(growable: false),
+                    valueLabelBuilder: (value) => '${value}%',
+                    onChanged: settingsService.setHomeDockGlassIntensityPercent,
+                  ),
+                  const SizedBox(height: 10),
+                  _StepperSettingCard(
+                    selectorKey: const Key('home_dock_row_spacing_stepper'),
+                    buttonKeyPrefix: 'home_dock_row_spacing',
+                    title: localizations.homeDockRowSpacingTitle,
+                    subtitle: localizations.homeDockRowSpacingDescription,
+                    icon: Icons.height_outlined,
+                    value: settingsService.homeDockRowSpacing,
+                    valueLabelBuilder: (value) => '${value}dp',
+                    minimum: SettingsService.homeDockRowSpacingMin,
+                    maximum: SettingsService.homeDockRowSpacingMax,
+                    step: SettingsService.homeDockRowSpacingStep,
+                    onChanged: settingsService.setHomeDockRowSpacing,
+                  ),
+                  const SizedBox(height: 10),
+                  _StepperSettingCard(
+                    selectorKey: const Key('icon_corner_radius_stepper'),
+                    buttonKeyPrefix: 'icon_corner_radius',
+                    title: localizations.iconCornerRadiusTitle,
+                    subtitle: localizations.iconCornerRadiusDescription,
+                    icon: Icons.rounded_corner_outlined,
+                    value: settingsService.appCardCornerRadius,
+                    valueLabelBuilder: (value) => '${value}dp',
+                    minimum: SettingsService.appCardCornerRadiusMin,
+                    maximum: SettingsService.appCardCornerRadiusMax,
+                    step: 1,
+                    onChanged: settingsService.setAppCardCornerRadius,
+                  ),
+                  const SizedBox(height: 10),
+                  _StepperSettingCard(
+                    selectorKey:
+                        const Key('settings_ui_transparency_stepper'),
+                    buttonKeyPrefix: 'settings_ui_transparency',
+                    title: localizations.settingsUiTransparencyTitle,
+                    subtitle: localizations.settingsUiTransparencyDescription,
+                    icon: Icons.opacity_outlined,
+                    value: settingsService.settingsUiTransparencyPercent,
+                    valueLabelBuilder: (value) => '${value}%',
+                    minimum: SettingsService.settingsUiTransparencyMin,
+                    maximum: SettingsService.settingsUiTransparencyMax,
+                    step: SettingsService.settingsUiTransparencyStep,
+                    onChanged: settingsService.setSettingsUiTransparencyPercent,
+                  ),
+                  const SizedBox(height: 10),
+                  _ChoiceSettingCard<int>(
+                    selectorKey: const Key('app_card_layout_scale_selector'),
+                    optionKeyPrefix: 'app_card_layout_scale_option',
+                    title: localizations.appCardLayoutSizeTitle,
+                    subtitle: localizations.appCardLayoutSizeDescription,
+                    icon: Icons.crop_16_9_outlined,
+                    value: settingsService.appCardLayoutScalePercent,
+                    options: _appCardLayoutScaleOptions
+                        .map((value) => _ChoiceOption<int>(
+                              value: value,
+                              label: '${value}%',
+                            ))
+                        .toList(growable: false),
+                    valueLabelBuilder: (value) => '${value}%',
+                    onChanged: settingsService.setAppCardLayoutScalePercent,
+                  ),
+                  const SizedBox(height: 10),
+                  _StepperSettingCard(
+                    selectorKey: const Key('app_card_media_scale_stepper'),
+                    buttonKeyPrefix: 'app_card_media_scale',
+                    title: localizations.iconSizeTitle,
+                    subtitle: localizations.iconSizeDescription,
+                    icon: Icons.photo_size_select_large_outlined,
+                    value: settingsService.appCardMediaScalePercent,
+                    valueLabelBuilder: (value) => '${value}%',
+                    minimum: SettingsService.appCardMediaScaleMin,
+                    maximum: SettingsService.appCardMediaScaleMax,
+                    step: SettingsService.appCardMediaScaleStep,
+                    onChanged: settingsService.setAppCardMediaScalePercent,
+                  ),
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
+                    value: settingsService.appHighlightAnimationEnabled,
+                    onChanged: settingsService.setAppHighlightAnimationEnabled,
+                    title: Text(localizations.appCardHighlightAnimation,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    secondary: const Icon(Icons.filter_center_focus),
+                  ),
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
+                    value: settingsService.appKeyClickEnabled,
+                    onChanged: settingsService.setAppKeyClickEnabled,
+                    title: Text(localizations.appKeyClick,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    secondary: const Icon(Icons.notifications_active),
+                  ),
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
+                    value: settingsService.showCategoryTitles,
+                    onChanged: settingsService.setShowCategoryTitles,
+                    title: Text(localizations.showCategoryTitles,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    secondary: const Icon(Icons.abc),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 18),
+            SettingsSurfaceCard(
+              child: Column(
+                children: [
+                  _ActionSettingCard(
+                    title: localizations.applications,
+                    icon: Icons.apps_outlined,
+                    onPressed: () async => Navigator.of(context)
+                        .pushNamed(ApplicationsPanelPage.routeName),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionSettingCard(
+                    title: localizations.launcherSections,
+                    icon: Icons.category_outlined,
+                    onPressed: () async => Navigator.of(context)
+                        .pushNamed(LauncherSectionsPanelPage.routeName),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionSettingCard(
+                    title: localizations.statusBar,
+                    subtitle: localizations.statusBarDescription,
+                    icon: Icons.tips_and_updates_outlined,
+                    onPressed: () async => Navigator.of(context)
+                        .pushNamed(StatusBarPanelPage.routeName),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionSettingCard(
+                    title: localizations.systemSettings,
+                    subtitle: localizations.actionOpenSystemSettingsSubtitle,
+                    icon: Icons.settings_outlined,
+                    onPressed: () async =>
+                        context.read<AppsService>().openSettings(),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionSettingCard(
+                    title: localizations.dateAndTimeFormat,
+                    icon: Icons.date_range_outlined,
+                    onPressed: () => _dateTimeFormatDialog(context),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionSettingCard(
+                    title: localizations.backButtonAction,
+                    icon: Icons.arrow_back_outlined,
+                    onPressed: () => _backButtonActionDialog(context),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionSettingCard(
+                    title: localizations.aboutFlauncher,
+                    icon: Icons.info_outline,
+                    onPressed: () async => showDialog(
+                      context: context,
+                      builder: (_) => FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snapshot) => snapshot
+                                    .connectionState ==
+                                ConnectionState.done
+                            ? FLauncherAboutDialog(packageInfo: snapshot.data!)
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -460,13 +537,9 @@ class _SegmentedSettingCardState<T> extends State<_SegmentedSettingCard<T>> {
   @override
   Widget build(BuildContext context) => EnsureVisible(
         alignment: 0.12,
-        child: CallbackShortcuts(
-          bindings: <ShortcutActivator, VoidCallback>{
-            const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                _shiftSelection(-1),
-            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                _shiftSelection(1),
-          },
+        child: Focus(
+          canRequestFocus: false,
+          onKeyEvent: (_, event) => _handleSelectionKeyEvent(event),
           child: FocusableActionDetector(
             onShowFocusHighlight: (value) {
               if (_focused != value) {
@@ -524,62 +597,72 @@ class _SegmentedSettingCardState<T> extends State<_SegmentedSettingCard<T>> {
         ),
       );
 
-  void _shiftSelection(int direction) {
+  KeyEventResult _handleSelectionKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      return _shiftSelection(-1)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      return _shiftSelection(1)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  bool _shiftSelection(int direction) {
     final currentIndex =
         widget.segments.indexWhere((segment) => segment.value == widget.value);
     if (currentIndex < 0) {
-      return;
+      return false;
     }
     final nextIndex =
         (currentIndex + direction).clamp(0, widget.segments.length - 1);
     if (nextIndex == currentIndex) {
-      return;
+      return false;
     }
     widget.onSelectionChanged(<T>{widget.segments[nextIndex].value});
+    return true;
   }
 }
 
-class _IntegerStepperTile extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final int value;
-  final int minimum;
-  final int maximum;
-  final String suffix;
-  final ValueChanged<int> onChanged;
+class _ChoiceOption<T> {
+  final T value;
+  final String label;
 
-  const _IntegerStepperTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
+  const _ChoiceOption({
     required this.value,
-    required this.minimum,
-    required this.maximum,
-    required this.suffix,
-    required this.onChanged,
+    required this.label,
+  });
+}
+
+class _ActionSettingCard extends StatefulWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final Future<void> Function()? onPressed;
+
+  const _ActionSettingCard({
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    this.onPressed,
   });
 
   @override
-  State<_IntegerStepperTile> createState() => _IntegerStepperTileState();
+  State<_ActionSettingCard> createState() => _ActionSettingCardState();
 }
 
-class _IntegerStepperTileState extends State<_IntegerStepperTile> {
+class _ActionSettingCardState extends State<_ActionSettingCard> {
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) {
-    final canDecrease = widget.value > widget.minimum;
-    final canIncrease = widget.value < widget.maximum;
-    return EnsureVisible(
-      alignment: 0.12,
-      child: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-              _shiftValue(-1),
-          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-              _shiftValue(1),
-        },
+  Widget build(BuildContext context) => EnsureVisible(
+        alignment: 0.12,
         child: FocusableActionDetector(
           onShowFocusHighlight: (value) {
             if (_focused != value) {
@@ -590,70 +673,232 @@ class _IntegerStepperTileState extends State<_IntegerStepperTile> {
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 120),
               opacity: _focused ? 1 : 0.96,
-              child: Row(
-                children: [
-                  Icon(widget.icon, color: Colors.white70),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.subtitle,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                      ],
+              child: TextButton(
+                onPressed: widget.onPressed == null
+                    ? null
+                    : () => widget.onPressed!.call(),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(widget.icon, color: Colors.white70),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          if (widget.subtitle != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.subtitle!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.white70),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  ExcludeFocus(
-                    child: FilledButton.tonal(
-                      onPressed: canDecrease
-                          ? () => widget.onChanged(widget.value - 1)
-                          : null,
-                      child: const Icon(Icons.remove),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${widget.value}${widget.suffix}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(width: 12),
-                  ExcludeFocus(
-                    child: FilledButton.tonal(
-                      onPressed: canIncrease
-                          ? () => widget.onChanged(widget.value + 1)
-                          : null,
-                      child: const Icon(Icons.add),
-                    ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    const Icon(Icons.chevron_right, color: Colors.white70),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+}
+
+class _ChoiceSettingCard<T> extends StatefulWidget {
+  final Key? selectorKey;
+  final String? optionKeyPrefix;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final T value;
+  final List<_ChoiceOption<T>> options;
+  final String Function(T value) valueLabelBuilder;
+  final ValueChanged<T> onChanged;
+
+  const _ChoiceSettingCard({
+    super.key,
+    this.selectorKey,
+    this.optionKeyPrefix,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.value,
+    required this.options,
+    required this.valueLabelBuilder,
+    required this.onChanged,
+  });
+
+  @override
+  State<_ChoiceSettingCard<T>> createState() => _ChoiceSettingCardState<T>();
+}
+
+class _ChoiceSettingCardState<T> extends State<_ChoiceSettingCard<T>> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) => EnsureVisible(
+        alignment: 0.12,
+        child: Focus(
+          canRequestFocus: false,
+          onKeyEvent: (_, event) => _handleSelectionKeyEvent(event),
+          child: FocusableActionDetector(
+            onShowFocusHighlight: (value) {
+              if (_focused != value) {
+                setState(() => _focused = value);
+              }
+            },
+            child: SettingsFocusFrame(
+              key: widget.selectorKey,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 120),
+                opacity: _focused ? 1 : 0.96,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(widget.icon, color: Colors.white70),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.title,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.subtitle,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          widget.valueLabelBuilder(widget.value),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    ExcludeFocus(
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: widget.options.map((option) {
+                          final selected = option.value == widget.value;
+                          final button = selected
+                              ? FilledButton(
+                                  onPressed: () =>
+                                      widget.onChanged(option.value),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Text(option.label),
+                                )
+                              : FilledButton.tonal(
+                                  onPressed: () =>
+                                      widget.onChanged(option.value),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Text(option.label),
+                                );
+                          final buttonKeyPrefix = widget.optionKeyPrefix;
+                          if (buttonKeyPrefix == null) {
+                            return button;
+                          }
+                          return KeyedSubtree(
+                            key: ValueKey<String>(
+                              '${buttonKeyPrefix}_${option.value}',
+                            ),
+                            child: button,
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  KeyEventResult _handleSelectionKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      return _shiftSelection(-1)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      return _shiftSelection(1)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    return KeyEventResult.ignored;
   }
 
-  void _shiftValue(int delta) {
-    final next = (widget.value + delta).clamp(widget.minimum, widget.maximum);
-    if (next != widget.value) {
-      widget.onChanged(next);
+  bool _shiftSelection(int direction) {
+    final currentIndex =
+        widget.options.indexWhere((option) => option.value == widget.value);
+    if (currentIndex < 0) {
+      return false;
     }
+    final nextIndex =
+        (currentIndex + direction).clamp(0, widget.options.length - 1);
+    if (nextIndex == currentIndex) {
+      return false;
+    }
+    widget.onChanged(widget.options[nextIndex].value);
+    return true;
   }
 }
 
-class _DiscreteSliderTile extends StatefulWidget {
-  final Key? sliderKey;
+class _StepperSettingCard extends StatefulWidget {
+  final Key? selectorKey;
+  final String? buttonKeyPrefix;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -661,11 +906,12 @@ class _DiscreteSliderTile extends StatefulWidget {
   final int minimum;
   final int maximum;
   final int step;
-  final String suffix;
+  final String Function(int value) valueLabelBuilder;
   final ValueChanged<int> onChanged;
 
-  const _DiscreteSliderTile({
-    this.sliderKey,
+  const _StepperSettingCard({
+    this.selectorKey,
+    this.buttonKeyPrefix,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -673,74 +919,42 @@ class _DiscreteSliderTile extends StatefulWidget {
     required this.minimum,
     required this.maximum,
     required this.step,
-    required this.suffix,
+    required this.valueLabelBuilder,
     required this.onChanged,
   });
 
   @override
-  State<_DiscreteSliderTile> createState() => _DiscreteSliderTileState();
+  State<_StepperSettingCard> createState() => _StepperSettingCardState();
 }
 
-class _DiscreteSliderTileState extends State<_DiscreteSliderTile> {
+class _StepperSettingCardState extends State<_StepperSettingCard> {
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) => EnsureVisible(
-        alignment: 0.12,
-        child: CallbackShortcuts(
-          bindings: <ShortcutActivator, VoidCallback>{
-            const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                _shiftValue(-widget.step),
-            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                _shiftValue(widget.step),
+  Widget build(BuildContext context) {
+    final canDecrease = widget.value > widget.minimum;
+    final canIncrease = widget.value < widget.maximum;
+    return EnsureVisible(
+      alignment: 0.12,
+      child: Focus(
+        canRequestFocus: false,
+        onKeyEvent: (_, event) => _handleStepperKeyEvent(event),
+        child: FocusableActionDetector(
+          onShowFocusHighlight: (value) {
+            if (_focused != value) {
+              setState(() => _focused = value);
+            }
           },
-          child: FocusableActionDetector(
-            onShowFocusHighlight: (value) {
-              if (_focused != value) {
-                setState(() => _focused = value);
-              }
-            },
-            child: AnimatedContainer(
+          child: SettingsFocusFrame(
+            key: widget.selectorKey,
+            child: AnimatedOpacity(
               duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
-                color: _focused
-                    ? const Color(0x1A2F7BF5)
-                    : Colors.white.withOpacity(0.03),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: _focused
-                      ? const Color(0xFF9ED4FF)
-                      : Colors.white.withOpacity(0.05),
-                  width: _focused ? 2.2 : 1,
-                ),
-                boxShadow: _focused
-                    ? const [
-                        BoxShadow(
-                          color: Color(0x4D2A6BD8),
-                          blurRadius: 28,
-                          spreadRadius: 1,
-                          offset: Offset(0, 10),
-                        ),
-                        BoxShadow(
-                          color: Color(0x33000000),
-                          blurRadius: 24,
-                          offset: Offset(0, 12),
-                        ),
-                      ]
-                    : const [
-                        BoxShadow(
-                          color: Color(0x1F000000),
-                          blurRadius: 18,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-              ),
-              padding: const EdgeInsets.all(16),
+              opacity: _focused ? 1 : 0.96,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(widget.icon, color: Colors.white70),
                       const SizedBox(width: 12),
@@ -763,57 +977,114 @@ class _DiscreteSliderTileState extends State<_DiscreteSliderTile> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Text(
-                        '${widget.value}${widget.suffix}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  ExcludeFocus(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 8,
-                        overlayShape: SliderComponentShape.noOverlay,
-                        thumbShape:
-                            const RoundSliderThumbShape(enabledThumbRadius: 10),
-                        inactiveTrackColor: Colors.white24,
-                        activeTrackColor: const Color(0xFF8CCBFF),
-                        thumbColor: const Color(0xFFB7DBFF),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      ExcludeFocus(
+                        child: FilledButton.tonal(
+                          onPressed: canDecrease
+                              ? () => _shiftValue(-widget.step)
+                              : null,
+                          key: widget.buttonKeyPrefix == null
+                              ? null
+                              : ValueKey<String>(
+                                  '${widget.buttonKeyPrefix}_decrease',
+                                ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Icon(Icons.remove),
+                        ),
                       ),
-                      child: Slider(
-                        key: widget.sliderKey ??
-                            const Key('app_card_media_scale_slider'),
-                        value: widget.value.toDouble(),
-                        min: widget.minimum.toDouble(),
-                        max: widget.maximum.toDouble(),
-                        divisions:
-                            ((widget.maximum - widget.minimum) / widget.step)
-                                .round(),
-                        label: '${widget.value}${widget.suffix}',
-                        onChanged: (value) =>
-                            widget.onChanged(_snapValue(value)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.06),
+                            ),
+                          ),
+                          child: Text(
+                            widget.valueLabelBuilder(widget.value),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      ExcludeFocus(
+                        child: FilledButton.tonal(
+                          onPressed: canIncrease
+                              ? () => _shiftValue(widget.step)
+                              : null,
+                          key: widget.buttonKeyPrefix == null
+                              ? null
+                              : ValueKey<String>(
+                                  '${widget.buttonKeyPrefix}_increase',
+                                ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Icon(Icons.add),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 
-  void _shiftValue(int delta) {
+  KeyEventResult _handleStepperKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      return _shiftValue(-widget.step)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      return _shiftValue(widget.step)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  bool _shiftValue(int delta) {
     final next = (widget.value + delta).clamp(widget.minimum, widget.maximum);
     if (next != widget.value) {
       widget.onChanged(next);
+      return true;
     }
-  }
-
-  int _snapValue(double rawValue) {
-    final stepOffset = ((rawValue - widget.minimum) / widget.step).round();
-    return (widget.minimum + (stepOffset * widget.step))
-        .clamp(widget.minimum, widget.maximum);
+    return false;
   }
 }

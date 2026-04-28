@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ensure_visible.dart';
 import 'settings/settings_chrome.dart';
@@ -21,35 +22,48 @@ class RoundedSwitchListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => EnsureVisible(
         alignment: 0.12,
-        child: SettingsFocusFrame(
-          padding: EdgeInsets.zero,
-          child: TextButton(
-            autofocus: autofocus,
-            onPressed: onChanged == null ? null : () => onChanged!(!value),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              backgroundColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22)),
-            ),
-            child: Row(
-              children: [
-                secondary,
-                const SizedBox(width: 12),
-                Expanded(child: title),
-                const SizedBox(width: 8),
-                ExcludeFocus(
-                  child: SizedBox(
-                    height: 18,
-                    child: Switch(
-                      value: value,
-                      onChanged: onChanged,
+        child: CallbackShortcuts(
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.arrowLeft): _toggleValue,
+            const SingleActivator(LogicalKeyboardKey.arrowRight): _toggleValue,
+          },
+          child: SettingsFocusFrame(
+            padding: EdgeInsets.zero,
+            child: TextButton(
+              autofocus: autofocus,
+              onPressed: onChanged == null ? null : _toggleValue,
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                backgroundColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22)),
+              ),
+              child: Row(
+                children: [
+                  secondary,
+                  const SizedBox(width: 12),
+                  Expanded(child: title),
+                  const SizedBox(width: 8),
+                  ExcludeFocus(
+                    child: SizedBox(
+                      height: 18,
+                      child: Switch(
+                        value: value,
+                        onChanged: onChanged,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       );
+
+  void _toggleValue() {
+    if (onChanged != null) {
+      onChanged!(!value);
+    }
+  }
 }

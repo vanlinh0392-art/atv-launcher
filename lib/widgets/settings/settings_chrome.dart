@@ -1,6 +1,56 @@
 import 'dart:math' as math;
 
+import 'package:flauncher/providers/settings_service.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+double _lerpOpacity(double solid, double transparent, double amount) =>
+    solid + ((transparent - solid) * amount);
+
+class SettingsChromeSpec {
+  final double transparencyFraction;
+
+  const SettingsChromeSpec._(this.transparencyFraction);
+
+  factory SettingsChromeSpec.of(BuildContext context) {
+    final settingsService = context.watch<SettingsService?>();
+    final transparencyPercent = settingsService?.settingsUiTransparencyPercent ??
+        SettingsService.settingsUiTransparencyDefault;
+    return SettingsChromeSpec._(
+      (transparencyPercent / 100).clamp(0.0, 1.0),
+    );
+  }
+
+  double get panelSurfaceOpacity =>
+      _lerpOpacity(0.72, 0.16, transparencyFraction);
+
+  double get panelBorderOpacity =>
+      _lerpOpacity(0.08, 0.035, transparencyFraction);
+
+  double get panelShadowOpacity =>
+      _lerpOpacity(0.16, 0.06, transparencyFraction);
+
+  double get focusFillOpacity =>
+      _lerpOpacity(0.16, 0.05, transparencyFraction);
+
+  double get focusBaseOpacity =>
+      _lerpOpacity(0.07, 0.015, transparencyFraction);
+
+  double get metricTileOpacity =>
+      _lerpOpacity(0.04, 0.012, transparencyFraction);
+
+  double get metricBorderOpacity =>
+      _lerpOpacity(0.055, 0.02, transparencyFraction);
+
+  double get dialogGradientOpacity =>
+      _lerpOpacity(0.82, 0.28, transparencyFraction);
+
+  double get dialogBorderOpacity =>
+      _lerpOpacity(0.08, 0.03, transparencyFraction);
+
+  double get dialogShadowOpacity =>
+      _lerpOpacity(0.36, 0.14, transparencyFraction);
+}
 
 class SettingsContentView extends StatelessWidget {
   final String title;
@@ -49,32 +99,35 @@ class SettingsSurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chromeSpec = SettingsChromeSpec.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0x8F10233A),
+        color: const Color(0xFF10233A).withOpacity(chromeSpec.panelSurfaceOpacity),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: highlighted
               ? const Color(0xFF9ED4FF)
-              : Colors.white.withOpacity(0.06),
+              : Colors.white.withOpacity(chromeSpec.panelBorderOpacity),
           width: highlighted ? 2.2 : 1.0,
         ),
         boxShadow: highlighted
-            ? const [
+            ? [
                 BoxShadow(
-                  color: Color(0x332A6BD8),
+                  color: const Color(0xFF2A6BD8)
+                      .withOpacity(chromeSpec.panelShadowOpacity + 0.06),
                   blurRadius: 18,
                   offset: Offset(0, 10),
                 ),
                 BoxShadow(
-                  color: Color(0x1F000000),
+                  color: Colors.black
+                      .withOpacity(chromeSpec.panelShadowOpacity + 0.02),
                   blurRadius: 16,
                   offset: Offset(0, 8),
                 ),
               ]
-            : const [
+            : [
                 BoxShadow(
-                  color: Color(0x16000000),
+                  color: Colors.black.withOpacity(chromeSpec.panelShadowOpacity),
                   blurRadius: 14,
                   offset: Offset(0, 8),
                 ),
@@ -169,6 +222,7 @@ class _SettingsFocusFrameState extends State<SettingsFocusFrame> {
   @override
   Widget build(BuildContext context) {
     final borderRadius = widget.borderRadius;
+    final chromeSpec = SettingsChromeSpec.of(context);
     return Focus(
       canRequestFocus: false,
       onFocusChange: (value) {
@@ -180,30 +234,35 @@ class _SettingsFocusFrameState extends State<SettingsFocusFrame> {
         duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color: _focused ? const Color(0x162F7BF5) : widget.baseColor,
+          color: _focused
+              ? const Color(0xFF2F7BF5).withOpacity(chromeSpec.focusFillOpacity)
+              : Colors.white.withOpacity(chromeSpec.focusBaseOpacity),
           borderRadius: borderRadius,
           border: Border.all(
             color: _focused
                 ? const Color(0xFF9ED4FF)
-                : Colors.white.withOpacity(0.04),
+                : Colors.white.withOpacity(chromeSpec.panelBorderOpacity),
             width: _focused ? 2.4 : 1,
           ),
           boxShadow: _focused
-              ? const [
+              ? [
                   BoxShadow(
-                    color: Color(0x2D2A6BD8),
+                    color: const Color(0xFF2A6BD8)
+                        .withOpacity(chromeSpec.panelShadowOpacity + 0.02),
                     blurRadius: 14,
                     offset: Offset(0, 7),
                   ),
                   BoxShadow(
-                    color: Color(0x18000000),
+                    color: Colors.black
+                        .withOpacity(chromeSpec.panelShadowOpacity),
                     blurRadius: 12,
                     offset: Offset(0, 6),
                   ),
                 ]
-              : const [
+              : [
                   BoxShadow(
-                    color: Color(0x12000000),
+                    color: Colors.black
+                        .withOpacity(chromeSpec.panelShadowOpacity - 0.01),
                     blurRadius: 12,
                     offset: Offset(0, 6),
                   ),
@@ -259,13 +318,16 @@ class SettingsMetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chromeSpec = SettingsChromeSpec.of(context);
     return Container(
       width: width,
       padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.028),
+        color: Colors.white.withOpacity(chromeSpec.metricTileOpacity),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.045)),
+        border: Border.all(
+          color: Colors.white.withOpacity(chromeSpec.metricBorderOpacity),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

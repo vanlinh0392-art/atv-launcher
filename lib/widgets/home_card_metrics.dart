@@ -4,7 +4,7 @@ import 'package:flauncher/models/category.dart';
 
 const double homeDockScrollTopPadding = 12.0;
 const double homeDockScrollBottomPadding = 12.0;
-const double homeRowSpacingDefault = 12.0;
+const double homeRowSpacingDefault = 8.0;
 const double homeCategorySectionGap = 16.0;
 const double homeGridHorizontalPadding = 32.0;
 const double homeGridSpacing = 16.0;

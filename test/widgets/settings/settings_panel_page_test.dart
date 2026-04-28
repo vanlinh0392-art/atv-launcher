@@ -90,7 +90,7 @@ void main() {
     expect(find.text('Grant via local ADB'), findsOneWidget);
   });
 
-  testWidgets('keeps focus on the rail until OK enters the detail pane',
+  testWidgets('auto focuses Home & Layout detail pane on open',
       (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
@@ -104,6 +104,42 @@ void main() {
       appsService: appsService,
       wallpaperService: wallpaperService,
       bridgeService: bridgeService,
+    );
+
+    expect(find.text('App language'), findsAtLeastNWidgets(1));
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      isNot(contains('settings_rail_')),
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isTrue,
+    );
+
+    for (var index = 0; index < 4; index++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      final label = tester.binding.focusManager.primaryFocus?.debugLabel ?? '';
+      if (label.contains('settings_rail_0')) {
+        break;
+      }
+    }
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_rail_0'),
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isFalse,
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);

@@ -150,6 +150,8 @@
     "homeDockRowSpacingDescription": "Adjust the vertical gap between HOME icon rows while keeping the visible row count exact.",
     "iconCornerRadiusDescription": "Round only the home app cards without changing the settings cards.",
     "iconCornerRadiusTitle": "Icon corner radius",
+    "settingsUiTransparencyTitle": "Settings transparency",
+    "settingsUiTransparencyDescription": "Adjust how transparent the ATV Launcher settings surfaces and panel shell should look.",
     "appCardLayoutSizeTitle": "Card size",
     "appCardLayoutSizeDescription": "Scale the full home app card inside each fixed slot without changing row count or dock layout.",
     "iconSizeTitle": "Icon size",
@@ -635,7 +637,7 @@
     "ambientModeAction": "Start ambient mode",
     "actionStartAmbientModeSubtitle": "Start the built-in screensaver or ambient mode immediately.",
     "actionRepairAccessibilitySubtitle": "Run the launcher accessibility repair flow now.",
-    "textAboutDialog": "FLauncher is an open-source alternative launcher for Android TV.\nSource code available at {repoUrl}.\n\nLogo by Katie (@fureturoe), design by @FXCostanzo.",
+    "textAboutDialog": "ATV Launcher is a personal Android TV launcher maintained by xfire0392-netizen.\nSource code available at {repoUrl}.\n\nBuilt on top of FLauncher by Etienne Fesser and the Flutter fork by osrosal. Logo by Katie (@fureturoe), original design by @FXCostanzo.",
     "@textAboutDialog": {
         "placeholders": {
             "repoUrl": {

@@ -41,6 +41,7 @@ const _showCategoryTitles = "show_category_titles";
 const _showDateInStatusBar = "show_date_in_status_bar";
 const _showRamInStatusBar = "show_ram_in_status_bar";
 const _statusBarClockScalePercent = "status_bar_clock_scale_percent";
+const _settingsUiTransparencyPercent = "settings_ui_transparency_percent";
 const _showTimeInStatusBar = "show_time_in_status_bar";
 const _timeFormat = "time_format";
 const _appCardCornerRadius = "app_card_corner_radius";
@@ -71,23 +72,32 @@ const _backupLastRestoreSummary = "backup_last_restore_summary";
 const _backupLastRestoreAt = "backup_last_restore_at";
 
 class SettingsService extends ChangeNotifier {
-  static final defaultDateFormat = "EEEE d";
-  static final defaultTimeFormat = "H:mm";
+  static const String defaultDateFormat = "E d/M";
+  static const String defaultTimeFormat = "H:mm";
   static const String appLocaleSystem = "system";
   static const String appLocaleEnglish = "en";
   static const String appLocaleVietnamese = "vi";
+  static const String appLocaleDefault = appLocaleVietnamese;
+  static const int homeDockRowsDefault = 3;
   static const int appCardLayoutScaleMin = 70;
   static const int appCardLayoutScaleMax = 115;
-  static const int appCardLayoutScaleDefault = 85;
+  static const int appCardLayoutScaleDefault = 90;
   static const int appCardLayoutScaleStep = 5;
   static const int appCardMediaScaleMin = 80;
   static const int appCardMediaScaleMax = 125;
-  static const int appCardMediaScaleDefault = 100;
+  static const int appCardMediaScaleDefault = 110;
   static const int appCardMediaScaleStep = 5;
+  static const int appCardCornerRadiusMin = 0;
+  static const int appCardCornerRadiusMax = 40;
+  static const int appCardCornerRadiusDefault = 24;
   static const int statusBarClockScaleMin = 100;
   static const int statusBarClockScaleMax = 180;
   static const int statusBarClockScaleDefault = 100;
   static const int statusBarClockScaleStep = 10;
+  static const int settingsUiTransparencyMin = 0;
+  static const int settingsUiTransparencyMax = 90;
+  static const int settingsUiTransparencyDefault = 20;
+  static const int settingsUiTransparencyStep = 5;
   static const int homeDockGlassIntensityMin = 0;
   static const int homeDockGlassIntensityMax = 100;
   static const int homeDockGlassIntensityDefault = 0;
@@ -99,11 +109,12 @@ class SettingsService extends ChangeNotifier {
   static const int homeDockAutoCollapseDelayStep = 5;
   static const int homeDockCollapsedRowsMin = 1;
   static const int homeDockCollapsedRowsMax = 2;
-  static const int homeDockCollapsedRowsDefault = 1;
-  static const int homeDockRowSpacingMin = 4;
-  static const int homeDockRowSpacingMax = 28;
-  static const int homeDockRowSpacingDefault = 12;
-  static const int homeDockRowSpacingStep = 2;
+  static const int homeDockCollapsedRowsDefault = 2;
+  static const int homeDockRowSpacingMin = 0;
+  static const int homeDockRowSpacingMax = 24;
+  static const int homeDockRowSpacingDefault = 2;
+  static const int homeDockRowSpacingStep = 1;
+  static const bool showRamInStatusBarDefault = true;
 
   final SharedPreferences _sharedPreferences;
 
@@ -123,11 +134,16 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.getBool(_showDateInStatusBar) ?? true;
 
   bool get showRamInStatusBar =>
-      _sharedPreferences.getBool(_showRamInStatusBar) ?? false;
+      _sharedPreferences.getBool(_showRamInStatusBar) ??
+      showRamInStatusBarDefault;
 
   int get statusBarClockScalePercent => _normalizeStatusBarClockScale(
       _sharedPreferences.getInt(_statusBarClockScalePercent) ??
           statusBarClockScaleDefault);
+
+  int get settingsUiTransparencyPercent => _normalizeSettingsUiTransparency(
+      _sharedPreferences.getInt(_settingsUiTransparencyPercent) ??
+          settingsUiTransparencyDefault);
 
   bool get showTimeInStatusBar =>
       _sharedPreferences.getBool(_showTimeInStatusBar) ?? true;
@@ -142,7 +158,8 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.getString(_dateFormat) ?? defaultDateFormat;
 
   int get homeDockRowsPreset =>
-      (_sharedPreferences.getInt(_homeDockRowsPreset) ?? 3).clamp(2, 4);
+      (_sharedPreferences.getInt(_homeDockRowsPreset) ?? homeDockRowsDefault)
+          .clamp(2, 4);
 
   int get homeDockCollapsedRowsPreset => _normalizeHomeDockCollapsedRows(
         _sharedPreferences.getInt(_homeDockCollapsedRowsPreset) ??
@@ -178,13 +195,15 @@ class SettingsService extends ChangeNotifier {
       );
 
   String get appLocaleMode => _sanitizeAppLocaleMode(
-      _sharedPreferences.getString(_appLocaleMode) ?? appLocaleSystem);
+      _sharedPreferences.getString(_appLocaleMode) ?? appLocaleDefault);
 
   String get timeFormat =>
       _sharedPreferences.getString(_timeFormat) ?? defaultTimeFormat;
 
   int get appCardCornerRadius =>
-      (_sharedPreferences.getInt(_appCardCornerRadius) ?? 8).clamp(0, 24);
+      (_sharedPreferences.getInt(_appCardCornerRadius) ??
+              appCardCornerRadiusDefault)
+          .clamp(appCardCornerRadiusMin, appCardCornerRadiusMax);
 
   int get appCardLayoutScalePercent => _normalizeAppCardLayoutScale(
       _sharedPreferences.getInt(_appCardLayoutScalePercent) ??
@@ -373,12 +392,23 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setSettingsUiTransparencyPercent(int value) async {
+    await _sharedPreferences.setInt(
+      _settingsUiTransparencyPercent,
+      _normalizeSettingsUiTransparency(value),
+    );
+    notifyListeners();
+  }
+
   Future<void> setShowTimeInStatusBar(bool show) async {
     return set(_showTimeInStatusBar, show);
   }
 
   Future<void> setAppCardCornerRadius(int value) async {
-    await _sharedPreferences.setInt(_appCardCornerRadius, value.clamp(0, 24));
+    await _sharedPreferences.setInt(
+      _appCardCornerRadius,
+      value.clamp(appCardCornerRadiusMin, appCardCornerRadiusMax),
+    );
     notifyListeners();
   }
 
@@ -534,6 +564,7 @@ class SettingsService extends ChangeNotifier {
       'homeDockRowSpacing': homeDockRowSpacing,
       'appLocaleMode': appLocaleMode,
       'statusBarClockScalePercent': statusBarClockScalePercent,
+      'settingsUiTransparencyPercent': settingsUiTransparencyPercent,
       'timeFormat': timeFormat,
       'appCardCornerRadius': appCardCornerRadius,
       'appCardLayoutScalePercent': appCardLayoutScalePercent,
@@ -588,10 +619,12 @@ class SettingsService extends ChangeNotifier {
         _readString(data, 'backButtonAction', backButtonAction),
       ),
       _sharedPreferences.setString(
-          _dateFormat, _readString(data, 'dateFormat', dateFormat)),
+        _dateFormat,
+        _readString(data, 'dateFormat', defaultDateFormat),
+      ),
       _sharedPreferences.setInt(
         _homeDockRowsPreset,
-        _readInt(data, 'homeDockRowsPreset', homeDockRowsPreset)
+        _readInt(data, 'homeDockRowsPreset', homeDockRowsDefault)
             .clamp(2, 4)
             .toInt(),
       ),
@@ -644,7 +677,7 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.setString(
         _appLocaleMode,
         _sanitizeAppLocaleMode(
-          _readString(data, 'appLocaleMode', appLocaleSystem),
+          _readString(data, 'appLocaleMode', appLocaleDefault),
         ),
       ),
       _sharedPreferences.setInt(
@@ -657,12 +690,28 @@ class SettingsService extends ChangeNotifier {
           ),
         ),
       ),
+      _sharedPreferences.setInt(
+        _settingsUiTransparencyPercent,
+        _normalizeSettingsUiTransparency(
+          _readInt(
+            data,
+            'settingsUiTransparencyPercent',
+            settingsUiTransparencyDefault,
+          ),
+        ),
+      ),
       _sharedPreferences.setString(
-          _timeFormat, _readString(data, 'timeFormat', timeFormat)),
+        _timeFormat,
+        _readString(data, 'timeFormat', defaultTimeFormat),
+      ),
       _sharedPreferences.setInt(
         _appCardCornerRadius,
-        _readInt(data, 'appCardCornerRadius', appCardCornerRadius)
-            .clamp(0, 24)
+        _readInt(
+          data,
+          'appCardCornerRadius',
+          appCardCornerRadiusDefault,
+        )
+            .clamp(appCardCornerRadiusMin, appCardCornerRadiusMax)
             .toInt(),
       ),
       _sharedPreferences.setInt(
@@ -695,7 +744,7 @@ class SettingsService extends ChangeNotifier {
       ),
       _sharedPreferences.setBool(
         _showRamInStatusBar,
-        _readBool(data, 'showRamInStatusBar', showRamInStatusBar),
+        _readBool(data, 'showRamInStatusBar', showRamInStatusBarDefault),
       ),
       _sharedPreferences.setBool(
         _showTimeInStatusBar,
@@ -848,6 +897,15 @@ class SettingsService extends ChangeNotifier {
     final offset = normalized - statusBarClockScaleMin;
     final snappedStep = (offset / statusBarClockScaleStep).round();
     return statusBarClockScaleMin + (snappedStep * statusBarClockScaleStep);
+  }
+
+  static int _normalizeSettingsUiTransparency(int value) {
+    final normalized =
+        value.clamp(settingsUiTransparencyMin, settingsUiTransparencyMax);
+    final offset = normalized - settingsUiTransparencyMin;
+    final snappedStep = (offset / settingsUiTransparencyStep).round();
+    return settingsUiTransparencyMin +
+        (snappedStep * settingsUiTransparencyStep);
   }
 
   static int _normalizeHomeDockGlassIntensity(int value) {

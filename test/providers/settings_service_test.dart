@@ -112,8 +112,15 @@ void main() async {
         settingsService.homeDockRowSpacing,
         SettingsService.homeDockRowSpacingDefault,
       );
-      expect(settingsService.appLocaleMode, SettingsService.appLocaleSystem);
-      expect(settingsService.appCardCornerRadius, 8);
+      expect(settingsService.appLocaleMode, SettingsService.appLocaleDefault);
+      expect(
+        settingsService.settingsUiTransparencyPercent,
+        SettingsService.settingsUiTransparencyDefault,
+      );
+      expect(
+        settingsService.appCardCornerRadius,
+        SettingsService.appCardCornerRadiusDefault,
+      );
       expect(
         settingsService.appCardLayoutScalePercent,
         SettingsService.appCardLayoutScaleDefault,
@@ -122,7 +129,10 @@ void main() async {
         settingsService.appCardMediaScalePercent,
         SettingsService.appCardMediaScaleDefault,
       );
-      expect(settingsService.showRamInStatusBar, false);
+      expect(
+        settingsService.showRamInStatusBar,
+        SettingsService.showRamInStatusBarDefault,
+      );
       expect(
         settingsService.statusBarClockScalePercent,
         SettingsService.statusBarClockScaleDefault,
@@ -138,6 +148,7 @@ void main() async {
         'homeDockGlassIntensityPercent': 65,
         'homeDockRowSpacing': 8,
         'appLocaleMode': 'vi',
+        'settingsUiTransparencyPercent': 70,
         'appCardCornerRadius': 18,
         'appCardLayoutScalePercent': 95,
         'appCardMediaScalePercent': 125,
@@ -156,6 +167,7 @@ void main() async {
       expect(settingsService.homeDockRowSpacing, 8);
       expect(
           settingsService.appLocaleMode, SettingsService.appLocaleVietnamese);
+      expect(settingsService.settingsUiTransparencyPercent, 70);
       expect(settingsService.appCardCornerRadius, 18);
       expect(settingsService.appCardLayoutScalePercent, 95);
       expect(settingsService.appCardMediaScalePercent, 125);
@@ -169,6 +181,7 @@ void main() async {
       expect(backup['homeDockGlassIntensityPercent'], 65);
       expect(backup['homeDockRowSpacing'], 8);
       expect(backup['appLocaleMode'], SettingsService.appLocaleVietnamese);
+      expect(backup['settingsUiTransparencyPercent'], 70);
       expect(backup['appCardCornerRadius'], 18);
       expect(backup['appCardLayoutScalePercent'], 95);
       expect(backup['appCardMediaScalePercent'], 125);
@@ -204,7 +217,11 @@ void main() async {
         settingsService.homeDockRowSpacing,
         SettingsService.homeDockRowSpacingDefault,
       );
-      expect(settingsService.appLocaleMode, SettingsService.appLocaleSystem);
+      expect(settingsService.appLocaleMode, SettingsService.appLocaleDefault);
+      expect(
+        settingsService.settingsUiTransparencyPercent,
+        SettingsService.settingsUiTransparencyDefault,
+      );
       expect(
         settingsService.appCardLayoutScalePercent,
         SettingsService.appCardLayoutScaleDefault,
@@ -318,12 +335,29 @@ void main() async {
       );
 
       await settingsService.setHomeDockRowSpacing(9);
-      expect(settingsService.homeDockRowSpacing, 10);
+      expect(settingsService.homeDockRowSpacing, 9);
 
       await settingsService.setHomeDockRowSpacing(1);
       expect(
         settingsService.homeDockRowSpacing,
-        SettingsService.homeDockRowSpacingMin,
+        1,
+      );
+    });
+
+    test("settings transparency snaps to supported range and steps", () async {
+      await settingsService.setSettingsUiTransparencyPercent(96);
+      expect(
+        settingsService.settingsUiTransparencyPercent,
+        SettingsService.settingsUiTransparencyMax,
+      );
+
+      await settingsService.setSettingsUiTransparencyPercent(34);
+      expect(settingsService.settingsUiTransparencyPercent, 35);
+
+      await settingsService.setSettingsUiTransparencyPercent(1);
+      expect(
+        settingsService.settingsUiTransparencyPercent,
+        0,
       );
     });
   });
