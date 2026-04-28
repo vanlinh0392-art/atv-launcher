@@ -32,29 +32,32 @@ class AddToCategoryDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Selector<AppsService, List<Category>>(
         selector: (_, appsService) => appsService.categories
-            .where((category) => !category.applications.any((application) => application.packageName == selectedApplication.packageName))
+            .where((category) => !category.applications.any((application) =>
+                application.packageName == selectedApplication.packageName))
             .toList(),
         builder: (context, categories, _) {
           AppLocalizations localizations = AppLocalizations.of(context)!;
 
           return SimpleDialog(
-          title: Text(localizations.withEllipsisAddTo),
-          contentPadding: EdgeInsets.all(16),
-          children: categories
-              .map(
-                (category) => Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    onTap: () async {
-                      await context.read<AppsService>().addToCategory(selectedApplication, category);
-                      Navigator.of(context).pop();
-                    },
-                    title: Text(category.name),
+            title: Text(localizations.withEllipsisAddTo),
+            contentPadding: EdgeInsets.all(16),
+            children: categories
+                .map(
+                  (category) => Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      onTap: () async {
+                        await context
+                            .read<AppsService>()
+                            .addToCategory(selectedApplication, category);
+                        Navigator.of(context).pop();
+                      },
+                      title: Text(category.name),
+                    ),
                   ),
-                ),
-              )
-              .toList(),
-        );
+                )
+                .toList(),
+          );
         },
       );
 }

@@ -45,13 +45,18 @@ secretProperties.setProperty("signing_key_password", "${System.getenv('FLAUNCHER
 secretProperties.setProperty("signing_key_alias", "${System.getenv('FLAUNCHER_SIGNING_KEY_ALIAS')}")
 
 android {
+    namespace 'com.atv.launcher'
+    compileSdk 35
+
     defaultConfig {
-        applicationId "me.efesser.flauncher"
-        compileSdk 35
-        minSdk 21
+        applicationId "com.atv.launcher"
+        minSdk 28
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        ndk {
+            abiFilters "armeabi-v7a"
+        }
     }
 
     signingConfigs {
@@ -80,7 +85,9 @@ android {
         abi {
             // https://stackoverflow.com/a/39950584/21037183
             enable gradle.startParameter.taskNames.any { it.contains("assembleRelease") }
-            universalApk true
+            reset()
+            include "armeabi-v7a"
+            universalApk false
         }
     }
 
@@ -88,10 +95,13 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
-    namespace 'me.efesser.flauncher'
 }
 
 flutter {
     source '../..'
+}
+
+dependencies {
+    implementation "androidx.media3:media3-exoplayer:1.5.1"
+    implementation "androidx.media3:media3-ui:1.5.1"
 }

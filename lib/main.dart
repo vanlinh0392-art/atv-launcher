@@ -23,7 +23,10 @@ import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/network_service.dart';
+import 'package:flauncher/providers/profile_security_service.dart';
+import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
+import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -40,22 +43,22 @@ Future<void> main() async {
   final fLauncherChannel = FLauncherChannel();
   final fLauncherDatabase = FLauncherDatabase(connect());
 
-  runApp(MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-            create: (_) => SettingsService(sharedPreferences),
-            lazy: false),
-        ChangeNotifierProvider(create: (_) => AppsService(fLauncherChannel, fLauncherDatabase)),
-        ChangeNotifierProvider(create: (_) => LauncherState()),
-        ChangeNotifierProvider(create: (_) => NetworkService(fLauncherChannel)),
-        ChangeNotifierProvider(
-            create: (context) {
-              SettingsService settingsService = Provider.of(context, listen: false);
-              return WallpaperService(fLauncherChannel, settingsService);
-            }
-        ),
-      ],
-      child: FLauncherApp()
-    )
-  );
+  runApp(MultiProvider(providers: [
+    ChangeNotifierProvider(
+        create: (_) => SettingsService(sharedPreferences), lazy: false),
+    ChangeNotifierProvider(
+        create: (_) => ProfileSecurityService(sharedPreferences), lazy: false),
+    ChangeNotifierProvider(
+        create: (_) => AppsService(fLauncherChannel, fLauncherDatabase)),
+    ChangeNotifierProvider(create: (_) => LauncherState()),
+    ChangeNotifierProvider(create: (_) => NetworkService(fLauncherChannel)),
+    ChangeNotifierProvider(
+        create: (_) => SystemBridgeService(fLauncherChannel)),
+    ChangeNotifierProvider(
+        create: (_) => SearchService(sharedPreferences, fLauncherChannel)),
+    ChangeNotifierProvider(create: (context) {
+      SettingsService settingsService = Provider.of(context, listen: false);
+      return WallpaperService(fLauncherChannel, settingsService);
+    }),
+  ], child: FLauncherApp()));
 }

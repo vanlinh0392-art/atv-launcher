@@ -1,0 +1,134 @@
+import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+class DensityPanelPage extends StatefulWidget {
+  static const String routeName = "density_panel";
+
+  const DensityPanelPage({super.key});
+
+  @override
+  State<DensityPanelPage> createState() => _DensityPanelPageState();
+}
+
+class _DensityPanelPageState extends State<DensityPanelPage> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final density = context
+            .read<SystemBridgeService>()
+            .densityStatus['currentDensity']
+            ?.toString() ??
+        '';
+    _controller = TextEditingController(text: density);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+
+    return Consumer<SystemBridgeService>(
+      builder: (context, bridgeService, _) {
+        final status = bridgeService.densityStatus;
+
+        return ListView(
+          key: const PageStorageKey<String>(DensityPanelPage.routeName),
+          children: [
+            SettingsAdaptiveGrid(
+              children: [
+                SettingsMetricTile(
+                  label: localizations.currentDpi,
+                  value: status['currentDensity']?.toString() ?? '-',
+                  icon: Icons.monitor_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.factoryDpi,
+                  value: status['factoryDensity']?.toString() ?? '-',
+                  icon: Icons.settings_backup_restore_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.overrideLabel,
+                  value: status['overrideDensity']?.toString() ?? '-',
+                  icon: Icons.tune_outlined,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            SettingsSurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.alt_route_outlined),
+                    title: Text(localizations.executionPathLabel),
+                    subtitle: Text(status['executionPath']?.toString() ?? '-'),
+                  ),
+                  TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                        labelText: localizations.customDpiRange),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () async {
+                          final density = int.tryParse(_controller.text.trim());
+                          if (density == null) {
+                            _showMessage(context, localizations.enterValidDpi);
+                            return;
+                          }
+                          _showMessage(
+                            context,
+                            (await bridgeService
+                                        .applyDensity(density))['message']
+                                    ?.toString() ??
+                                localizations.densityUpdated,
+                          );
+                        },
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: Text(localizations.applyLabel),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () async => _showMessage(
+                          context,
+                          (await bridgeService.resetDensity())['message']
+                                  ?.toString() ??
+                              localizations.densityReset,
+                        ),
+                        icon: const Icon(Icons.restart_alt),
+                        label: Text(localizations.reset),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showMessage(BuildContext context, String message) {
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+}

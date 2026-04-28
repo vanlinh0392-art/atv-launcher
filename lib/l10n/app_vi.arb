@@ -1,0 +1,658 @@
+﻿{
+    "@@locale": "vi",
+    "backupProfilesChip": "{count} bộ bảo mật app",
+    "@backupProfilesChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "backupSearchChip": "{count} mục tìm kiếm gần đây",
+    "@backupSearchChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "settingsDestinationProfilesTitle": "Bảo mật ứng dụng",
+    "settingsDestinationProfilesSubtitle": "Khóa app, ẩn app và bảo vệ cài đặt launcher bằng PIN",
+    "ownerProfileName": "Chủ máy",
+    "guestProfileName": "Khách",
+    "kidsProfileName": "Trẻ em",
+    "ownerProfileDescription": "Toàn quyền launcher, provisioning và công cụ hệ thống.",
+    "guestProfileDescription": "Hồ sơ dùng chung với lọc hiển thị ứng dụng và khóa app tùy chọn.",
+    "kidsProfileDescription": "Hồ sơ an toàn hơn cho ứng dụng đã chọn với cơ chế ẩn và khóa.",
+    "activeProfileLabel": "Hồ sơ đang dùng",
+    "ownerPinStatusLabel": "PIN chủ máy",
+    "hiddenAppsProfileLabel": "Ứng dụng đang ẩn",
+    "lockedAppsProfileLabel": "Ứng dụng đang khóa",
+    "profilePinSet": "Đã cấu hình",
+    "profilePinNotSet": "Chưa đặt",
+    "profileActiveNow": "Đang hoạt động",
+    "profileSwitchNowAction": "Chuyển ngay",
+    "renameProfileAction": "Đổi tên hồ sơ",
+    "manageHiddenAppsAction": "Quản lý app ẩn",
+    "manageHiddenAppsDescription": "Ẩn ứng dụng khỏi màn hình chính, danh sách cài đặt và kết quả tìm kiếm.",
+    "manageHiddenAppsDialogTitle": "Ứng dụng đang ẩn",
+    "manageLockedAppsAction": "Quản lý app khóa",
+    "manageLockedAppsDescription": "Yêu cầu PIN chủ máy trước khi mở các ứng dụng đã chọn.",
+    "manageLockedAppsDialogTitle": "Ứng dụng đang khóa",
+    "settingsLockTitle": "Khóa phần cài đặt launcher",
+    "settingsLockSubtitle": "Yêu cầu PIN chủ máy trước khi mở cài đặt nhạy cảm hoặc app bị khóa.",
+    "setOwnerPinAction": "Đặt PIN chủ máy",
+    "changeOwnerPinAction": "Đổi PIN chủ máy",
+    "clearOwnerPinAction": "Xóa PIN chủ máy",
+    "clearOwnerPinDescription": "Xóa PIN 4 số hiện tại.",
+    "enterCurrentOwnerPinTitle": "Nhập PIN chủ máy hiện tại",
+    "enterCurrentOwnerPinDescription": "Nhập đúng PIN 4 số hiện tại trước khi tiếp tục.",
+    "profileTypesTitle": "Các hồ sơ",
+    "enableProfileTitle": "Bật hồ sơ",
+    "unlockProfileTitle": "Mở khóa hồ sơ chủ máy",
+    "unlockProfileDescription": "Nhập PIN chủ máy để chuyển lại sang hồ sơ chủ máy.",
+    "ownerPinRequiredMessage": "Hãy đặt PIN chủ máy trước khi dùng ứng dụng bị khóa hoặc cài đặt launcher được bảo vệ.",
+    "unlockAction": "Mở khóa",
+    "invalidPinMessage": "PIN không đúng.",
+    "unlockSettingsTitle": "Mở khóa cài đặt",
+    "unlockSettingsDescription": "Nhập PIN chủ máy để mở phần cài đặt ATV Launcher được bảo vệ.",
+    "unlockAppTitle": "Mở khóa ứng dụng",
+    "unlockAppDescription": "Nhập PIN chủ máy để mở {appName}.",
+    "@unlockAppDescription": {
+        "placeholders": {
+            "appName": {
+                "type": "String"
+            }
+        }
+    },
+    "ownerPinSetTitle": "Nhập PIN chủ máy mới",
+    "ownerPinSetDescription": "Chọn mã PIN 4 số cho cài đặt được bảo vệ và ứng dụng bị khóa.",
+    "ownerPinConfirmTitle": "Xác nhận PIN chủ máy",
+    "ownerPinConfirmDescription": "Nhập lại đúng mã PIN 4 số để xác nhận.",
+    "pinsDidNotMatchMessage": "Hai lần nhập PIN không khớp.",
+    "ownerPinSavedMessage": "Đã lưu PIN chủ máy.",
+    "ownerPinClearedMessage": "Đã xóa PIN chủ máy.",
+    "clearAction": "Xóa",
+    "backspaceAction": "Xóa lùi",
+    "cancel": "Hủy",
+    "closeAction": "Đóng",
+    "profileNameDialogTitle": "Đổi tên hồ sơ",
+    "profileNameFieldLabel": "Tên hồ sơ",
+    "manageHiddenAppsForProfile": "Ứng dụng ẩn cho {profileName}",
+    "@manageHiddenAppsForProfile": {
+        "placeholders": {
+            "profileName": {
+                "type": "String"
+            }
+        }
+    },
+    "manageLockedAppsForProfile": "Ứng dụng khóa cho {profileName}",
+    "@manageLockedAppsForProfile": {
+        "placeholders": {
+            "profileName": {
+                "type": "String"
+            }
+        }
+    },
+    "filterAppsHint": "Lọc theo tên app hoặc package",
+    "noAppsMatchFilter": "Không có ứng dụng nào khớp bộ lọc hiện tại.",
+    "sensitiveActionsLockedHint": "Các hành động nhạy cảm chỉ hiện sau khi mở khóa bảo mật launcher.",
+    "searchHint": "Mở tìm kiếm bằng giọng nói",
+    "searchRecentMetric": "Truy vấn gần đây",
+    "searchInputsMetric": "Nguồn vào TV",
+    "searchMediaMetric": "Media đã lập chỉ mục",
+    "searchDefaultModeMetric": "Chế độ tìm kiếm mặc định",
+    "searchRecentTitle": "Lần tìm gần đây",
+    "searchFilterAll": "Tất cả",
+    "searchFilterApps": "Ứng dụng",
+    "searchFilterSettings": "Cài đặt",
+    "searchFilterInputs": "Nguồn vào",
+    "searchFilterMedia": "Media",
+    "searchFilterActions": "Tác vụ",
+    "noSearchResults": "Không có kết quả phù hợp.",
+    "genericInputLabel": "Nguồn vào TV",
+    "openUniversalSearchAction": "Mở tìm kiếm tổng hợp",
+    "showRecentSearchesTitle": "Hiện tìm kiếm gần đây",
+    "refreshSearchSourcesAction": "Làm mới nguồn tìm kiếm",
+    "searchSourcesRefreshed": "Đã làm mới nguồn tìm kiếm.",
+    "clearSearchHistoryAction": "Xóa lịch sử tìm kiếm",
+    "searchHistoryClearedMessage": "Đã xóa lịch sử tìm kiếm.",
+    "testSpeechCaptureAction": "Thử nhận giọng nói",
+    "speechCaptureNoTextMessage": "Không nhận được văn bản giọng nói.",
+    "speechCapturedMessage": "Đã nhận: {text}",
+    "@speechCapturedMessage": {
+        "placeholders": {
+            "text": {
+                "type": "String"
+            }
+        }
+    },
+    "searchModeLocalOverlay": "Overlay cục bộ",
+    "searchModeGoogleVoice": "Google voice",
+    "searchModeSystemAssist": "Trợ lý hệ thống",
+    "actionOpenSystemSettingsSubtitle": "Mở thẳng phần cài đặt hệ thống Android.",
+    "ambientModeAction": "Khởi chạy ambient mode",
+    "actionStartAmbientModeSubtitle": "Mở ngay screensaver hoặc ambient mode tích hợp.",
+    "actionRepairAccessibilitySubtitle": "Chạy lại luồng sửa trợ năng của launcher ngay bây giờ.",    "aboutFlauncher": "Giới thiệu ATV Launcher",
+    "addCategory": "Thêm danh mục",
+    "addSection": "Thêm mục",
+    "alphabetical": "Theo bảng chữ cái",
+    "appCardHighlightAnimation": "Hiệu ứng nhấn sáng thẻ ứng dụng",
+    "appInfo": "Thông tin ứng dụng",
+    "appKeyClick": "Âm thanh khi bấm phím",
+    "appTitle": "ATV Launcher",
+    "applications": "Ứng dụng",
+    "autoHideAppBar": "Tự động ẩn thanh trạng thái",
+    "backButtonAction": "Hành động nút quay lại",
+    "category": "Danh mục",
+    "categories": "Danh mục",
+    "columnCount": "Số cột",
+    "date": "Ngày",
+    "dateAndTimeFormat": "Định dạng ngày giờ",
+    "delete": "Xóa",
+    "dialogOptionBackButtonActionDoNothing": "Không làm gì",
+    "dialogOptionBackButtonActionShowScreensaver": "Mở trình bảo vệ màn hình",
+    "dialogOptionBackButtonActionShowClock": "Hiển thị đồng hồ",
+    "dialogTextNoFileExplorer": "Vui lòng cài trình quản lý tệp để chọn ảnh.",
+    "dialogTitleBackButtonAction": "Chọn hành động của nút quay lại",
+    "disambiguateCategoryTitle": "{title} (Danh mục)",
+    "@disambiguateCategoryTitle": {
+        "placeholders": {
+            "title": {
+                "type": "String"
+            }
+        }
+    },
+    "formattedDate": "Ngày hiển thị: {dateString}",
+    "@formattedDate": {
+        "placeholders": {
+            "dateString": {
+                "type": "String"
+            }
+        }
+    },
+    "formattedTime": "Giờ hiển thị: {timeString}",
+    "@formattedTime": {
+        "placeholders": {
+            "timeString": {
+                "type": "String"
+            }
+        }
+    },
+    "gradient": "Chuyển sắc",
+    "grid": "Lưới",
+    "height": "Chiều cao",
+    "hide": "Ẩn",
+    "hiddenApplications": "Ứng dụng đã ẩn",
+    "launcherSections": "Mục trên màn hình chính",
+    "layout": "Bố cục",
+    "loading": "Đang tải",
+    "manual": "Thủ công",
+    "modifySection": "Sửa mục",
+    "mustNotBeEmpty": "Không được để trống",
+    "name": "Tên",
+    "newSection": "Mục mới",
+    "noDateFormatSpecified": "Chưa đặt định dạng ngày",
+    "noTimeFormatSpecified": "Chưa đặt định dạng giờ",
+    "nonTvApplications": "Ứng dụng không dành cho TV",
+    "open": "Mở",
+    "orSelectFormatSpecifiers": "Hoặc chọn ký hiệu định dạng",
+    "picture": "Ảnh",
+    "removeFrom": "Xóa khỏi {name}",
+    "@removeFrom": {
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "renameCategory": "Đổi tên danh mục",
+    "reorder": "Sắp xếp lại",
+    "row": "Hàng",
+    "rowHeight": "Chiều cao hàng",
+    "save": "Lưu",
+    "spacer": "Khoảng cách",
+    "spacerMaxHeightRequirement": "Phải lớn hơn 0 và nhỏ hơn hoặc bằng 500",
+    "statusBar": "Thanh trạng thái",
+    "settings": "Cài đặt",
+    "show": "Hiện",
+    "showCategoryTitles": "Hiện tiêu đề danh mục",
+    "showRamInStatusBar": "Hiện RAM trên thanh trạng thái",
+    "sort": "Sắp xếp",
+    "settingStateOff": "Tắt",
+    "settingStateOn": "Bật",
+    "settingVisibilityHidden": "Ẩn",
+    "settingVisibilityShown": "Hiện",
+    "settingsControlCenterTitle": "Trung tâm điều khiển",
+    "settingsDestinationAccessibilitySubtitle": "Theo dõi dịch vụ được quản lý và sửa trạng thái suy giảm",
+    "settingsDestinationAccessibilityTitle": "Quản lý trợ năng",
+    "settingsDestinationBackupSubtitle": "Xuất, xem trước và khôi phục cấu hình launcher",
+    "settingsDestinationBackupTitle": "Sao lưu & Khôi phục",
+    "settingsDestinationDensitySubtitle": "Kiểm tra và thay đổi mật độ hiển thị với fallback an toàn",
+    "settingsDestinationDensityTitle": "Hiển thị / DPI",
+    "settingsDestinationDiagnosticsSubtitle": "Báo cáo nhanh cho debug và audit cấp quyền",
+    "settingsDestinationDiagnosticsTitle": "Chẩn đoán",
+    "settingsDestinationHomeSubtitle": "Cấu trúc launcher, thanh trạng thái, cách hiển thị ứng dụng",
+    "settingsDestinationHomeTitle": "Màn hình chính & Bố cục",
+    "settingsDestinationPermissionsSubtitle": "Cấp quyền một lần, wizard local ADB và special access",
+    "settingsDestinationPermissionsTitle": "Quyền & Provisioning",
+    "settingsDestinationPrivateDnsSubtitle": "Cấu hình chế độ DNS và kiểm tra lưu trạng thái",
+    "settingsDestinationPrivateDnsTitle": "Mạng / Private DNS",
+    "settingsDestinationSystemCoreSubtitle": "Tự động ADB, whitelist pin và tình trạng core",
+    "settingsDestinationSystemCoreTitle": "System Core",
+    "settingsDestinationVoiceSubtitle": "Map nút giọng nói trên remote và fallback tìm kiếm",
+    "settingsDestinationVoiceTitle": "Giọng nói & Tìm kiếm",
+    "settingsDestinationWallpaperSubtitle": "Nền chuyển sắc, ảnh, video, thư mục và playlist",
+    "settingsDestinationWallpaperTitle": "Hình nền & Media",
+    "settingsShellSubtitle": "Điều khiển TV-first cho system bridge, media hình nền, provisioning và cơ chế tự phục hồi.",
+    "settingsShellTitle": "Cài đặt ATV Launcher",
+    "systemSettings": "Cài đặt hệ thống",
+    "statusBarDescription": "Chọn thông tin chẩn đoán và đồng hồ cần hiển thị mà không che quá nhiều hình nền.",
+    "grantChipHealthy": "Quyền đã sẵn sàng",
+    "grantChipMissing": "{count} quyền quan trọng còn thiếu",
+    "@grantChipMissing": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "grantChipRecommended": "{count} quyền khuyến nghị còn thiếu",
+    "@grantChipRecommended": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "homeDockHeightDescription": "Giữ launcher neo ở cạnh dưới và chọn số hàng hiển thị mặc định.",
+    "homeDockHeightTitle": "Chiều cao dock dưới",
+    "homeDockCollapsedRowsTitle": "Số hàng khi thu gọn",
+    "homeDockCollapsedRowsDescription": "Chọn HOME sẽ tự co về 1 hàng hay 2 hàng sau thời gian chờ không thao tác.",
+"iconCornerRadiusDescription": "Bo góc chỉ cho thẻ ứng dụng ở màn hình chính, không đổi thẻ settings.",
+    "iconCornerRadiusTitle": "Bo góc icon",
+    "appCardLayoutSizeTitle": "Kích thước thẻ",
+    "appCardLayoutSizeDescription": "Phóng to hoặc thu nhỏ toàn bộ thẻ ứng dụng trong từng ô cố định mà không đổi số hàng hay bố cục dock.",
+    "ramChipLabel": "RAM trống {value}",
+    "@ramChipLabel": {
+        "placeholders": {
+            "value": {
+                "type": "String"
+            }
+        }
+    },
+    "ramChipUnavailable": "Không đọc được RAM",
+    "currentLabel": "hiện tại",
+    "modeSettingLabel": "Chế độ",
+    "sourceLabel": "Nguồn",
+    "grantedLabel": "Đã cấp",
+    "missingLabel": "Thiếu",
+    "yesLabel": "Có",
+    "noLabel": "Không",
+    "permissionHealthLabel": "Tình trạng quyền",
+    "requiredMissingLabel": "Thiếu bắt buộc",
+    "recommendedMissingLabel": "Thiếu khuyến nghị",
+    "provisioningWizardTitle": "Wizard cấp quyền",
+    "provisioningWizardDescription": "Hướng dẫn người dùng mở Tùy chọn nhà phát triển khi cần, sau đó chạy local ADB grant và xác minh trạng thái launcher.",
+    "grantViaLocalAdb": "Cấp qua local ADB",
+    "grantMediaAccess": "Cấp quyền media",
+    "openDeveloperOptions": "Mở tùy chọn nhà phát triển",
+    "batteryAccess": "Quyền pin",
+    "overlayAccess": "Quyền nổi",
+    "writeSettingsAccess": "Ghi cài đặt",
+    "requirementChecklistTitle": "Danh sách yêu cầu",
+    "pcProvisioningCommandsTitle": "Lệnh provisioning trên PC",
+    "wizardStepOpenDeveloperOptions": "Mở Tùy chọn nhà phát triển nếu ADB đang tắt.",
+    "wizardStepGrantWss": "Cấp WRITE_SECURE_SETTINGS bằng local ADB hoặc ADB từ PC.",
+    "wizardStepGrantMediaAccess": "Cấp quyền thư viện video để launcher có thể duyệt trực tiếp bộ nhớ TV.",
+    "wizardStepAllowOverlayAndWriteSettings": "Cho phép overlay và WRITE_SETTINGS nếu firmware của bạn yêu cầu.",
+    "wizardStepWhitelistBattery": "Đưa launcher vào danh sách bỏ qua tối ưu pin trên TV Xiaomi.",
+    "wizardStepSelectAdbPolicy": "Chọn chính sách tự động ADB dùng lâu dài.",
+    "requirementWriteSecureSettingsLabel": "WRITE_SECURE_SETTINGS",
+    "requirementWriteSecureSettingsGuidance": "Cấp một lần bằng ADB hoặc device owner",
+    "requirementWriteSettingsLabel": "WRITE_SETTINGS",
+    "requirementWriteSettingsGuidance": "Mở trang ghi cài đặt nếu đang thiếu",
+    "requirementSystemAlertWindowLabel": "SYSTEM_ALERT_WINDOW",
+    "requirementSystemAlertWindowGuidance": "Tùy chọn cho các công cụ overlay trong tương lai",
+    "requirementIgnoreBatteryLabel": "Bỏ qua tối ưu pin",
+    "requirementIgnoreBatteryGuidance": "Khuyến nghị để ổn định hơn trên TV Xiaomi",
+    "requirementPostNotificationsLabel": "POST_NOTIFICATIONS",
+    "requirementPostNotificationsGuidance": "Để thông báo foreground service luôn hiển thị",
+    "requirementDeviceOwnerLabel": "Device owner",
+    "requirementDeviceOwnerGuidance": "Lộ trình tăng cường tùy chọn cho thiết bị mới hoặc đã reset",
+    "requirementAdbEnabledLabel": "ADB",
+    "requirementAdbEnabledGuidance": "Cần cho fallback local ADB một lần",
+    "requirementAdbWifiEnabledLabel": "ADB Wi‑Fi",
+    "requirementAdbWifiEnabledGuidance": "Hữu ích cho fallback DPI/DNS bằng local ADB",
+    "requirementMediaReadLabel": "Quyền thư viện video",
+    "requirementMediaReadGuidance": "Dùng hộp thoại trong app, wizard local ADB hoặc ADB từ PC để cấp",
+    "actionCompleted": "Đã thực hiện xong.",
+    "actionDidNotComplete": "Chưa thực hiện xong.",
+    "healthHealthy": "Ổn định",
+    "healthNeedsReview": "Cần kiểm tra",
+    "healthActionNeeded": "Cần xử lý",
+    "healthDegraded": "Suy giảm",
+    "healthMissingWss": "Thiếu WSS",
+    "healthRepairing": "Đang sửa",
+    "adbLabel": "ADB",
+    "adbWifiLabel": "ADB Wi‑Fi",
+    "coreHealthLabel": "Tình trạng core",
+    "adbAutomationPolicyTitle": "Chính sách tự động ADB",
+    "adbPolicyOff": "Tắt",
+    "adbPolicyAdbOnly": "Chỉ ADB",
+    "adbPolicyAdbAndWifi": "ADB + Wi‑Fi",
+    "disableAdbOnSleepTitle": "Tắt ADB khi ngủ",
+    "disableAdbOnSleepSubtitle": "Tự bật lại khi thức dậy hoặc khởi động mà không ghi lặp lại quá nhiều.",
+    "enableNow": "Bật ngay",
+    "disableNow": "Tắt ngay",
+    "runHealNow": "Chạy heal ngay",
+    "coreSnapshotTitle": "Ảnh chụp System Core",
+    "batteryOptimizationIgnored": "Được bỏ qua tối ưu pin",
+    "deviceOwner": "Device owner",
+    "accessibilityMaster": "Công tắc trợ năng chính",
+    "managedAccessibilityPackages": "Gói trợ năng được quản lý",
+    "lastRecoveryReason": "Lý do phục hồi gần nhất",
+    "lastSuccess": "Lần thành công gần nhất",
+    "lastAdbPolicyApply": "Lần áp dụng ADB gần nhất",
+    "lastAdbReason": "Lý do ADB gần nhất",
+    "lastAdbState": "Trạng thái ADB gần nhất",
+    "missingServices": "Dịch vụ còn thiếu",
+    "developerOptions": "Tùy chọn nhà phát triển",
+    "batterySettings": "Cài đặt pin",
+    "voiceModeLabel": "Chế độ giọng nói",
+    "keyCodeLabel": "Mã phím",
+    "accessibilityLabel": "Trợ năng",
+    "interceptRemoteVoiceKey": "Chặn nút giọng nói trên remote",
+    "pressMode": "Kiểu bấm",
+    "defaultProfile": "Profile mặc định",
+    "learningModeActive": "Đang ở chế độ học",
+    "learningModeHint": "Hãy bấm nút giọng nói trên remote ngay để lấy mã phím thật.",
+    "learnRemoteKey": "Học nút remote",
+    "testVoiceLaunch": "Thử mở tìm kiếm giọng nói",
+    "resetXiaomiDefault": "Khôi phục mặc định Xiaomi",
+    "repairAccessibility": "Sửa trợ năng",
+    "openAccessibilitySettings": "Mở cài đặt trợ năng",
+    "voiceModeSinglePress": "Bấm một lần",
+    "voiceModeDoublePress": "Bấm hai lần",
+    "voiceModeLongPress": "Nhấn giữ",
+    "voiceModeDoublePressHold": "Bấm hai lần rồi giữ",
+    "lastExport": "Lần xuất gần nhất",
+    "lastImport": "Lần nhập gần nhất",
+    "lastRestore": "Lần khôi phục gần nhất",
+    "exportBackup": "Xuất sao lưu",
+    "previewBackup": "Xem trước sao lưu",
+    "restoreLauncherOnly": "Chỉ khôi phục launcher",
+    "restoreWithSystemSettings": "Khôi phục kèm thiết lập hệ thống",
+    "backupPreviewEmptyState": "Hãy chọn một bản sao lưu để xem trước nội dung trước khi khôi phục.",
+    "backupExportCancelled": "Đã hủy xuất sao lưu.",
+    "backupExportedTo": "Đã xuất sao lưu tới {displayName}.",
+    "@backupExportedTo": {
+        "placeholders": {
+            "displayName": {
+                "type": "String"
+            }
+        }
+    },
+    "backupExportFailed": "Xuất sao lưu thất bại: {error}",
+    "@backupExportFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "backupPreviewCancelled": "Đã hủy xem trước sao lưu.",
+    "backupPreviewLoadedFrom": "Đã nạp bản xem trước từ {displayName}.",
+    "@backupPreviewLoadedFrom": {
+        "placeholders": {
+            "displayName": {
+                "type": "String"
+            }
+        }
+    },
+    "backupPreviewFailed": "Xem trước sao lưu thất bại: {error}",
+    "@backupPreviewFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "restoreCompleted": "Khôi phục hoàn tất.",
+    "restoreCompletedWithMissingApps": "Khôi phục hoàn tất, thiếu {count} ứng dụng.",
+    "@restoreCompletedWithMissingApps": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "missingAppsList": "Ứng dụng thiếu: {names}",
+    "@missingAppsList": {
+        "placeholders": {
+            "names": {
+                "type": "String"
+            }
+        }
+    },
+    "backupRestoreFailed": "Khôi phục sao lưu thất bại: {error}",
+    "@backupRestoreFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "voiceModeRestored": "Đã khôi phục chế độ giọng nói.",
+    "voiceModeRestoreFailedPrefix": "Khôi phục chế độ giọng nói thất bại",
+    "adbAutomationRestored": "Đã khôi phục tự động ADB.",
+    "adbAutomationRestoreFailedPrefix": "Khôi phục tự động ADB thất bại",
+    "densityOverrideRestored": "Đã khôi phục DPI ghi đè.",
+    "densityRestoreFailedPrefix": "Khôi phục DPI thất bại",
+    "privateDnsRestored": "Đã khôi phục Private DNS.",
+    "privateDnsRestoreFailedPrefix": "Khôi phục Private DNS thất bại",
+    "managedAccessibilityReconciled": "Đã đồng bộ danh sách trợ năng được quản lý.",
+    "accessibilityCleanupFailed": "Dọn danh sách trợ năng thất bại cho {packageName}",
+    "@accessibilityCleanupFailed": {
+        "placeholders": {
+            "packageName": {
+                "type": "String"
+            }
+        }
+    },
+    "accessibilityRestoreFailed": "Khôi phục trợ năng thất bại cho {packageName}",
+    "@accessibilityRestoreFailed": {
+        "placeholders": {
+            "packageName": {
+                "type": "String"
+            }
+        }
+    },
+    "restoreFailureLine": "{prefix}: {detail}",
+    "@restoreFailureLine": {
+        "placeholders": {
+            "prefix": {
+                "type": "String"
+            },
+            "detail": {
+                "type": "String"
+            }
+        }
+    },
+    "backupEmptyFileError": "Tệp sao lưu đã chọn đang trống.",
+    "backupInvalidJsonError": "Bản sao lưu đã chọn không phải JSON hợp lệ.",
+    "backupInvalidSignatureError": "Tệp đã chọn không phải bản sao lưu ATV Launcher.",
+    "backupInvalidStructureError": "Bản sao lưu đang thiếu dữ liệu launcher bắt buộc hoặc có cấu trúc không được hỗ trợ.",
+    "backupOwnerPinNotRestoredNotice": "PIN chủ máy không được đưa vào bản sao lưu. Hãy đặt PIN mới trên thiết bị này nếu bạn muốn bảo vệ ứng dụng bị khóa và bảo mật launcher.",
+    "selectedBackup": "Bản sao lưu đã chọn",
+    "backupVersionChip": "Phiên bản {version}",
+    "@backupVersionChip": {
+        "placeholders": {
+            "version": {
+                "type": "String"
+            }
+        }
+    },
+    "backupSectionsChip": "{count} mục",
+    "@backupSectionsChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "backupManagedPackagesChip": "{count} gói trợ năng được quản lý",
+    "@backupManagedPackagesChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "currentDpi": "DPI hiện tại",
+    "factoryDpi": "DPI gốc",
+    "overrideLabel": "Ghi đè",
+    "executionPathLabel": "Đường thực thi",
+    "customDpiRange": "DPI tùy chỉnh (120-640)",
+    "enterValidDpi": "Hãy nhập DPI hợp lệ.",
+    "densityUpdated": "Đã cập nhật DPI.",
+    "applyLabel": "Áp dụng",
+    "reset": "Đặt lại",
+    "densityReset": "Đã đặt lại DPI.",
+    "reportLines": "Số dòng báo cáo",
+    "refreshLabel": "Làm mới",
+    "copyReport": "Sao chép báo cáo",
+    "hostnameLabel": "Hostname",
+    "accessPathLabel": "Đường truy cập",
+    "localAdbLabel": "Local ADB",
+    "privateDnsHostname": "Hostname Private DNS",
+    "privateDnsUpdated": "Đã cập nhật Private DNS.",
+    "applyHost": "Áp dụng hostname",
+    "privateDnsDisabled": "Đã tắt Private DNS.",
+    "turnOff": "Tắt",
+    "privateDnsReset": "Đã đặt lại Private DNS.",
+    "wssLabel": "WSS",
+    "masterSwitch": "Công tắc chính",
+    "managedApps": "Ứng dụng được quản lý",
+    "guardianVerifyResult": "Kết quả guardian verify",
+    "repairLabel": "Sửa",
+    "grantWssViaLocalAdb": "Cấp WSS qua local ADB",
+    "removeLabel": "Gỡ",
+    "manageLabel": "Quản lý",
+    "noService": "Không có service",
+    "mediaAccess": "Quyền media",
+    "playlistSize": "Số video trong playlist",
+    "grantVideoLibraryAccessHint": "Hãy cấp quyền thư viện video nếu bạn muốn duyệt trực tiếp bộ nhớ TV mà không cần app quản lý tệp riêng.",
+    "grantAccess": "Cấp quyền",
+    "sourceSelectionTitle": "Chọn nguồn",
+    "singleVideo": "Một video",
+    "pickMultipleVideos": "Chọn nhiều video",
+    "pickFolder": "Chọn thư mục",
+    "browseTvStorage": "Duyệt bộ nhớ TV",
+    "folderNameLabel": "Thư mục: {name}",
+    "@folderNameLabel": {
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "playlistBehaviourTitle": "Hành vi playlist",
+    "sequentialOrder": "Tuần tự",
+    "shuffleOrder": "Ngẫu nhiên",
+    "onCompletion": "Khi phát xong",
+    "fixedInterval": "Khoảng thời gian cố định",
+    "loopPlaylist": "Lặp playlist",
+    "switchIntervalSeconds": "Đổi video sau {seconds} giây",
+    "@switchIntervalSeconds": {
+        "placeholders": {
+            "seconds": {
+                "type": "int"
+            }
+        }
+    },
+    "playbackAppearanceTitle": "Hiển thị khi phát",
+    "loopSingleVideo": "Lặp video đơn",
+    "muteVideo": "Tắt tiếng video",
+    "autoResumeOnHome": "Tự tiếp tục khi về HOME",
+    "videoFitLabel": "Kiểu hiển thị video",
+    "videoBlurLabel": "Độ mờ video",
+    "dimOverlayPercent": "Lớp tối {percent}%",
+    "@dimOverlayPercent": {
+        "placeholders": {
+            "percent": {
+                "type": "int"
+            }
+        }
+    },
+    "videoLibraryAccessGranted": "Đã cấp quyền thư viện video.",
+    "videoLibraryAccessNotGranted": "Chưa cấp quyền thư viện video.",
+    "mediaPermissionMissingUseSaf": "Thiếu quyền media. Hãy dùng bộ chọn SAF hoặc cấp quyền video trước.",
+    "browseTvStorageTitle": "Duyệt bộ nhớ TV",
+    "browseTvStorageDescription": "Chọn một thư mục MediaStore để xoay theo thư mục, hoặc chọn nhanh một file gần đây.",
+    "foldersLabel": "Thư mục",
+    "genericFolder": "Thư mục",
+    "videoCount": "{count} video",
+    "@videoCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "recentVideos": "Video gần đây",
+    "genericVideo": "Video",
+    "wallpaperModeGradient": "Chuyển sắc",
+    "wallpaperModeImage": "Ảnh",
+    "wallpaperModeVideo": "Video",
+    "videoSourceSingleFile": "Một tệp",
+    "videoSourceMultipleFiles": "Nhiều tệp",
+    "videoSourceFolder": "Playlist thư mục",
+    "privateDnsModeOff": "Tắt",
+    "privateDnsModeOpportunistic": "Cơ hội",
+    "privateDnsModeHostname": "Hostname",
+    "videoFitCenterCrop": "Cắt giữa",
+    "videoFitFit": "Vừa khung",
+    "videoFitFill": "Lấp đầy",
+    "videoBlurOff": "Tắt",
+    "videoBlurLow": "Thấp",
+    "videoBlurMedium": "Trung bình",
+    "videoBlurHigh": "Cao",
+    "textAboutDialog": "FLauncher là launcher mã nguồn mở thay thế cho Android TV.\nMã nguồn tại {repoUrl}.\n\nLogo bởi Katie (@fureturoe), thiết kế bởi @FXCostanzo.",
+    "@textAboutDialog": {
+        "placeholders": {
+            "repoUrl": {
+                "type": "String"
+            }
+        }
+    },
+    "textEmptyCategory": "Danh mục này đang trống.",
+    "time": "Giờ",
+    "titleStatusBarSettingsPage": "Chọn thông tin hiển thị trên thanh trạng thái",
+    "tvApplications": "Ứng dụng TV",
+    "type": "Loại",
+    "typeInTheDateFormat": "Nhập định dạng ngày",
+    "typeInTheHourFormat": "Nhập định dạng giờ",
+    "uninstall": "Gỡ cài đặt",
+    "wallpaper": "Hình nền",
+    "withEllipsisAddTo": "Thêm vào...",
+    "appLanguageTitle": "Ngôn ngữ ứng dụng",
+    "appLanguageDescription": "Dùng theo ngôn ngữ của TV hoặc khóa launcher sang English hay Tiếng Việt.",
+    "appLanguageSystem": "Theo hệ thống",
+    "appLanguageEnglish": "English",
+    "appLanguageVietnamese": "Tiếng Việt",
+    "iconSizeTitle": "Kích thước icon",
+    "iconSizeDescription": "Chỉ thay đổi phần banner hoặc hình icon bên trong từng thẻ ứng dụng, không đổi bố cục thẻ.",
+"homeDockAutoCollapseTitle": "Tự co dock",
+"homeDockAutoCollapseDescription": "Sau khoảng chờ đã đặt mà không có thao tác DPAD, HOME sẽ tự co về còn một hàng hiển thị.",
+"homeDockAutoCollapseDelayTitle": "Thời gian tự co dock",
+"homeDockAutoCollapseDelayDescription": "Chọn thời gian HOME chờ không có thao tác DPAD trước khi tự co dock.",
+"homeDockGlassIntensityTitle": "Độ trong suốt glass",
+    "homeDockGlassIntensityDescription": "Điều chỉnh độ mạnh của lớp liquid glass và blur. Đặt 0% để dock trong suốt hoàn toàn.",
+    "homeDockRowSpacingTitle": "Khoảng cách giữa hàng",
+    "homeDockRowSpacingDescription": "Chỉnh khoảng hở dọc giữa các hàng icon ở HOME mà vẫn giữ đúng số hàng hiển thị.",
+    "homeDockBlurTitle": "Nền mờ quanh vùng app",
+    "homeDockBlurDescription": "Bật hiệu ứng blur/kính cho dock HOME. Tắt để video hình nền lộ ra nhiều hơn.",
+    "dateAndTimeScaleTitle": "Cỡ ngày giờ",
+    "dateAndTimeScaleDescription": "Phóng to hoặc thu nhỏ ngày và giờ trên thanh trạng thái."
+}

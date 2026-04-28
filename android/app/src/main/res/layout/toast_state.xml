@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/toast_text"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_toast_chip"
+    android:ellipsize="end"
+    android:maxLines="1"
+    android:paddingLeft="18dp"
+    android:paddingTop="10dp"
+    android:paddingRight="18dp"
+    android:paddingBottom="10dp"
+    android:textColor="#F7FAFC"
+    android:textSize="13sp" />
+

@@ -25,59 +25,61 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../models/category.dart';
 
-class LauncherSectionsPanelPage extends StatelessWidget
-{
+class LauncherSectionsPanelPage extends StatelessWidget {
   static const String routeName = "launcher_sections_panel";
 
   @override
   Widget build(BuildContext context) {
     AppLocalizations localizations = AppLocalizations.of(context)!;
     return Column(
-        children: [
-          Text(localizations.launcherSections, style: Theme.of(context).textTheme.titleLarge),
-          Divider(),
-          Consumer<AppsService>(
-            builder: (_, service, __) {
-              List<LauncherSection> sections = service.launcherSections;
+      children: [
+        Text(localizations.launcherSections,
+            style: Theme.of(context).textTheme.titleLarge),
+        Divider(),
+        Consumer<AppsService>(
+          builder: (_, service, __) {
+            List<LauncherSection> sections = service.launcherSections;
 
-              return Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: sections.indexed.map((tuple) {
-                      int index = tuple.$1;
-                      bool last = index == sections.length - 1;
+            return Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: sections.indexed.map((tuple) {
+                    int index = tuple.$1;
+                    bool last = index == sections.length - 1;
 
-                      return _section(context, sections[index], index, last, index == 0);
-                    }).toList(),
-                  ),
+                    return _section(
+                        context, sections[index], index, last, index == 0);
+                  }).toList(),
                 ),
-              );
-            },
-          ),
-          SizedBox(height: 4, width: 0),
-          TextButton.icon(
-            icon: Icon(Icons.add),
-            label: Text(localizations.addSection),
-            onPressed: () {
-              Navigator.pushNamed(context, LauncherSectionPanelPage.routeName);
-            },
-          ),
-        ],
-      );
+              ),
+            );
+          },
+        ),
+        SizedBox(height: 4, width: 0),
+        TextButton.icon(
+          icon: Icon(Icons.add),
+          label: Text(localizations.addSection),
+          onPressed: () {
+            Navigator.pushNamed(context, LauncherSectionPanelPage.routeName);
+          },
+        ),
+      ],
+    );
   }
 
-  Widget _section(BuildContext context, LauncherSection section, int index, bool last, bool autofocus) {
+  Widget _section(BuildContext context, LauncherSection section, int index,
+      bool last, bool autofocus) {
     AppLocalizations localizations = AppLocalizations.of(context)!;
 
     String title = localizations.spacer;
     if (section is Category) {
       title = section.name;
-      
+
       if (title == localizations.spacer) {
         title = localizations.disambiguateCategoryTitle(title);
       }
     }
-    
+
     return Padding(
       //key: Key(section.order.toString()),
       padding: EdgeInsets.only(bottom: 8),
@@ -95,13 +97,15 @@ class LauncherSectionsPanelPage extends StatelessWidget
                   constraints: BoxConstraints(),
                   splashRadius: 20,
                   icon: Icon(Icons.arrow_upward),
-                  onPressed: index > 0 ? () => _move(context, index, index - 1) : null,
+                  onPressed:
+                      index > 0 ? () => _move(context, index, index - 1) : null,
                 ),
                 IconButton(
                   constraints: BoxConstraints(),
                   splashRadius: 20,
                   icon: Icon(Icons.arrow_downward),
-                  onPressed: last ? null : () => _move(context, index, index + 1),
+                  onPressed:
+                      last ? null : () => _move(context, index, index + 1),
                 ),
                 IconButton(
                   autofocus: autofocus,
@@ -109,7 +113,9 @@ class LauncherSectionsPanelPage extends StatelessWidget
                   splashRadius: 20,
                   icon: Icon(Icons.settings),
                   onPressed: () {
-                    Navigator.pushNamed(context, LauncherSectionPanelPage.routeName, arguments: index);
+                    Navigator.pushNamed(
+                        context, LauncherSectionPanelPage.routeName,
+                        arguments: index);
                   },
                 ),
               ],

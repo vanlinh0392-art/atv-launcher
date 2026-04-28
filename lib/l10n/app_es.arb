@@ -83,8 +83,73 @@
     "statusBar": "Barra de estado",
     "settings": "Ajustes",
     "show": "Mostrar",
+    "showRamInStatusBar": "Mostrar RAM en la barra de estado",
     "showCategoryTitles": "Mostrar títulos de categorías",
     "sort": "Orden",
+    "settingStateOff": "Desactivado",
+    "settingStateOn": "Activado",
+    "settingVisibilityHidden": "Oculto",
+    "settingVisibilityShown": "Visible",
+    "settingsControlCenterTitle": "Centro de control",
+    "settingsDestinationAccessibilitySubtitle": "Supervise servicios administrados y repare estados degradados",
+    "settingsDestinationAccessibilityTitle": "Administrador de accesibilidad",
+    "settingsDestinationBackupSubtitle": "Exporte, previsualice y restaure la configuracion del launcher",
+    "settingsDestinationBackupTitle": "Copia y restauracion",
+    "settingsDestinationDensitySubtitle": "Inspeccione y ajuste la densidad con rutas seguras",
+    "settingsDestinationDensityTitle": "Pantalla / DPI",
+    "settingsDestinationDiagnosticsSubtitle": "Informes para depuracion y auditorias de provision",
+    "settingsDestinationDiagnosticsTitle": "Diagnosticos",
+    "settingsDestinationHomeSubtitle": "Estructura del launcher, barra de estado y presentacion de apps",
+    "settingsDestinationHomeTitle": "Inicio y diseno",
+    "settingsDestinationPermissionsSubtitle": "Permisos de una sola vez, asistente ADB local y accesos especiales",
+    "settingsDestinationPermissionsTitle": "Permisos y provision",
+    "settingsDestinationPrivateDnsSubtitle": "Configure el modo DNS y verifique la persistencia",
+    "settingsDestinationPrivateDnsTitle": "Red / DNS privado",
+    "settingsDestinationSystemCoreSubtitle": "Automatizacion ADB, bateria y salud del nucleo",
+    "settingsDestinationSystemCoreTitle": "Nucleo del sistema",
+    "settingsDestinationVoiceSubtitle": "Mapee teclas de voz del control y lance busquedas alternativas",
+    "settingsDestinationVoiceTitle": "Voz y busqueda",
+    "settingsDestinationWallpaperSubtitle": "Gradiente, imagen, video, carpetas y listas",
+    "settingsDestinationWallpaperTitle": "Fondo y medios",
+    "settingsShellSubtitle": "Controles TV-first para system bridge, medios, provision y recuperacion.",
+    "settingsShellTitle": "Ajustes de ATV Launcher",
+    "statusBarDescription": "Elija que indicadores y reloj permanecen visibles sin cubrir demasiado el fondo.",
+    "grantChipHealthy": "Permisos listos",
+    "grantChipMissing": "{count} criticos faltantes",
+    "@grantChipMissing": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "grantChipRecommended": "{count} recomendados faltantes",
+    "@grantChipRecommended": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "homeDockHeightDescription": "Mantenga el launcher anclado abajo y elija cuantas filas se ven por defecto.",
+"homeDockHeightTitle": "Altura del dock inferior",
+"homeDockAutoCollapseTitle": "Contraer dock automaticamente",
+"homeDockAutoCollapseDescription": "Contrae HOME a una sola fila visible despues del tiempo de inactividad configurado.",
+"homeDockAutoCollapseDelayTitle": "Espera para contraer",
+"homeDockAutoCollapseDelayDescription": "Elige cuanto tiempo debe esperar HOME sin usar el DPAD antes de contraer el dock.",
+    "iconCornerRadiusDescription": "Redondee solo las tarjetas de apps del inicio sin cambiar las tarjetas de ajustes.",
+    "iconCornerRadiusTitle": "Radio de esquinas del icono",
+    "appCardLayoutSizeTitle": "Tamano de tarjeta",
+    "appCardLayoutSizeDescription": "Escala la tarjeta completa de cada app dentro de su espacio fijo sin cambiar las filas ni el dock.",
+    "ramChipLabel": "RAM {value} libre",
+    "@ramChipLabel": {
+        "placeholders": {
+            "value": {
+                "type": "String"
+            }
+        }
+    },
+    "ramChipUnavailable": "RAM no disponible",
     "systemSettings": "Ajustes del sistema",
     "textAboutDialog": "FLauncher es un lanzador de aplicaciones alternativo de código abierto para Android TV.\nCódigo fuente disponible en {repoUrl}.\n\nLogo creado por Katie (@fureturoe) y diseño por @FXCostanzo.",
     "@textAboutDialog": {

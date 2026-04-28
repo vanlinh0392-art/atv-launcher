@@ -48,3 +48,6 @@ app.*.map.json
 android/app/google-services.json
 android/app/upload-keystore.jks
 coverage/
+tmp_verify/
+__pycache__/
+.code-review-graph/

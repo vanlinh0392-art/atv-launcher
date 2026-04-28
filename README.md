@@ -1,68 +1,206 @@
-# FLauncher (fork)
-#### This is a fork of the GitLab repository at: https://gitlab.com/flauncher/flauncher.
+# ATV Launcher
 
-FLauncher is an open-source alternative launcher for Android TV, built with [Flutter](https://flutter.dev).
+ATV Launcher is a Flutter-based Android TV launcher focused on non-Google TVs, Xiaomi TV / Mi Box devices, and Android TV 9+ deployments that need deeper system control than a typical launcher.
 
-## Download
-Get the latest build from the [releases](https://github.com/osrosal/flauncher/releases) page, you can look for older builds on the [actions](https://github.com/CocoCR300/flauncher/actions) tab, where they are uploaded as artifacts.
+This project starts from [`osrosal/flauncher`](https://github.com/osrosal/flauncher) tag `v2025.07.001` and turns it into a single integrated launcher APK with:
 
-## Features
-For a list of the changes introduced by this fork from the original, see the [CHANGELOG](CHANGELOG.md) file.
+- a TV-first bottom-dock home screen
+- local and playlist video wallpapers
+- bilingual UI (`English` and `Vietnamese`)
+- integrated system bridge for provisioning, voice, accessibility, DPI, DNS, and diagnostics
+- no dependency on Google Play Services
 
-- [x] No ads
-- [x] Customizable categories
-- [x] Manually reorder apps within categories
-- [x] Wallpaper support
-- [x] Open "Android Settings"
-- [x] Open "App info"
-- [x] Uninstall app
-- [x] Clock
-- [x] Switch between row and grid for categories
-- [x] Support for non-TV (sideloaded) apps
-- [x] Navigation sound feedback
-- [ ] Force stop app
+## Why this fork exists
 
-## Screenshots
-|  |  |  |
-|--|--|--|
-| ![](screenshots/Screenshot_1624378896.png) | ![](screenshots/Screenshot_1624378921.png) | ![](screenshots/Screenshot_1624378938.png) |
+Most Android TV launchers handle app browsing well, but stop short when the target device is:
 
-## Set FLauncher as default launcher
+- a Xiaomi TV or Mi Box with aggressive boot/wake behavior
+- a TV sold without Google certification
+- a device that needs one-time ADB provisioning and then self-healing behavior
+- a setup where voice remapping, accessibility recovery, DPI control, private DNS, or launcher recovery must live inside the launcher itself
 
-### Method 1: remap the Home button
-This is the "safer" and easiest way. Use [Button Mapper](https://play.google.com/store/apps/details?id=flar2.homebutton) to remap the Home button of the remote to launch FLauncher.
+ATV Launcher is built for that environment.
 
-### Method 2: disable the default launcher
-**:warning: Disclaimer :warning:**
+## Key capabilities
 
-**You are doing this at your own risk, and you'll be responsible in any case of malfunction on your device.**
+### Home experience
 
-The following commands have been tested on Chromecast with Google TV only. This may be different on other devices.
+- Bottom-dock TV-first home layout with configurable `2 / 3 / 4` visible rows
+- Auto-collapse dock with configurable collapsed state and idle timeout
+- Adjustable card size, icon/media size, corner radius, row spacing, glass intensity, and category title visibility
+- Row-centered DPAD scrolling tuned for remote control use
+- Video wallpaper remains the visual focus instead of being hidden by a full-height grid
 
-Once the default launcher is disabled, press the Home button on the remote, and you'll be prompted by the system to choose which app to set as default.
+### Wallpaper and media
 
-#### Disable default launcher
-```shell
-# Disable com.google.android.apps.tv.launcherx which is the default launcher on CCwGTV
-$ adb shell pm disable-user --user 0 com.google.android.apps.tv.launcherx
-# com.google.android.tungsten.setupwraith will then be used as a 'fallback' and will automatically
-# re-enable the default launcher, so disable it as well
-$ adb shell pm disable-user --user 0 com.google.android.tungsten.setupwraith
+- `gradient`, `image`, and `video` wallpaper modes
+- Video wallpaper from:
+  - single file
+  - multi-file playlist
+  - folder playlist
+- Sequential or shuffle playback
+- Advance on completion or fixed interval switching
+- Mute, dim, blur, fit mode, loop, and auto-resume controls
+- Hybrid file access:
+  - internal local video browser
+  - MediaStore-based browsing
+  - SAF fallback for file or folder selection
+- Persisted URI access so media does not need to be granted again every time
+
+### Voice and accessibility
+
+- Integrated voice button remap with support for:
+  - single press
+  - double press
+  - long press
+  - double press then hold
+- Learning mode for capturing the real remote key
+- Voice launch order:
+  - Google voice search activity if available
+  - `android.speech.action.WEB_SEARCH`
+  - `Intent.ACTION_ASSIST`
+  - `Intent.ACTION_VOICE_COMMAND`
+- Accessibility manager with repair and verification flows
+- Managed accessibility service list with recovery support after boot or wake
+
+### System bridge
+
+- Integrated native services and receivers inside the launcher host
+- Boot, wake, and Xiaomi-specific heal logic
+- Resident core service and diagnostics
+- Permission Center with local ADB flow and setup guidance
+- ADB automation policies:
+  - `off`
+  - `adb_only`
+  - `adb_and_wifi`
+- Optional disable-on-sleep handling with throttled re-apply logic
+- Home guard behavior to defend launcher foreground on devices that try to return to the stock home app
+
+### Device control
+
+- DPI read/apply/reset flow with multiple execution paths
+- Private DNS read/apply/reset
+- Battery optimization guidance
+- Developer options deep links
+- Provisioning checklist and grant health status
+
+### Data and recovery
+
+- Backup and restore for launcher configuration
+- Stores layout, wallpaper, voice, accessibility, ADB policy, and system-related preferences
+- Restore reports unresolved apps or missing media instead of silently failing
+
+## Technical profile
+
+- Package: `com.atv.launcher`
+- Base: `osrosal/flauncher` tag `v2025.07.001`
+- UI: Flutter
+- Native host: Android / Java 17
+- Min SDK: `28`
+- Target SDK: `35`
+- Release ABI: `armeabi-v7a` only
+- Google Play Services: not required
+
+## Settings areas
+
+The integrated settings shell currently includes:
+
+- Home & Layout
+- Wallpaper & Media
+- Voice & Search
+- Profiles & Security
+- Accessibility Manager
+- System Core
+- Display / DPI
+- Network / Private DNS
+- Permissions & Provisioning
+- Backup & Restore
+- Diagnostics
+- Status Bar
+- Applications
+
+## Provisioning workflow
+
+The intended deployment model is:
+
+1. Install the launcher once with ADB.
+2. Run one-time provisioning for elevated settings access.
+3. Let the launcher verify, heal, and maintain state internally after boot, wake, or package replacement.
+
+The repository includes a helper script:
+
+```bash
+python provision_atv_launcher.py --serial 192.168.1.111:5555
 ```
 
-#### Re-enable default launcher
-```shell
-$ adb shell pm enable com.google.android.apps.tv.launcherx
-$ adb shell pm enable com.google.android.tungsten.setupwraith
+What the script can do:
+
+- install the APK
+- grant `WRITE_SECURE_SETTINGS`
+- apply helpful appops
+- whitelist battery optimization
+- enable ADB or ADB Wi-Fi when requested
+- verify final provisioning state
+
+## Build instructions
+
+### Requirements
+
+- Flutter `3.24.5`
+- Android SDK with platform tools
+- Java `17`
+
+### Install dependencies
+
+```bash
+flutter pub get
 ```
 
-#### Known issues
-On Chromecast with Google TV (maybe others), the "YouTube" remote button will stop working if the default launcher is disabled. As a workaround, you can use [Button Mapper](https://play.google.com/store/apps/details?id=flar2.homebutton) to remap it correctly.
+### Run tests
 
-## Wallpaper
-Because Android's `WallpaperManager` is not available on some Android TV devices, FLauncher implements its own wallpaper management method.
+```bash
+flutter analyze --no-pub
+flutter test --no-pub
+```
 
-Please note that changing wallpaper requires a file explorer to be installed on the device in order to pick a file.
+### Build debug APK
 
-## Support the original author: [etienn01](https://github.com/etienn01)
-<a href="https://www.buymeacoffee.com/etienn01" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200"></a>
+```bash
+flutter build apk --debug --target-platform android-arm --no-pub
+```
+
+### Build release APK
+
+```bash
+flutter build apk --release --target-platform android-arm --no-pub
+```
+
+## Device focus
+
+This launcher is primarily tuned for:
+
+- Android TV 9 and above
+- Xiaomi TV firmware behavior
+- Mi Box style boot and wake cycles
+- TV devices without Google services
+- remote-first navigation from a DPAD handset
+
+## Repository status
+
+This repository is an actively customized product fork, not a minimal mirror of upstream FLauncher. Expect divergence in:
+
+- settings UX
+- system bridge code
+- native Android services and receivers
+- wallpaper/media architecture
+- provisioning tooling
+- TV-specific stability behavior
+
+## License
+
+This project remains under the upstream `GPL-3.0` license. See [LICENSE](LICENSE).
+
+## Credits
+
+- Original project: [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
+- Fork base used for this work: [osrosal/flauncher](https://github.com/osrosal/flauncher)

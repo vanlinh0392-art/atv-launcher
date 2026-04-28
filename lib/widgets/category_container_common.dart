@@ -26,11 +26,13 @@ Widget categoryContainerEmptyState(BuildContext context) {
             aspectRatio: 16 / 9,
             child: Card(
               clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
               child: InkWell(
                 onTap: () => showDialog(
                   context: context,
-                  builder: (_) => SettingsPanel(initialRoute: LauncherSectionsPanelPage.routeName),
+                  builder: (_) => SettingsPanel(
+                      initialRoute: LauncherSectionsPanelPage.routeName),
                 ),
                 child: Padding(
                   padding: EdgeInsets.all(8),

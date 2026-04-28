@@ -20,23 +20,32 @@ import 'dart:math';
 
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/widgets/app_card.dart';
+import 'package:flauncher/widgets/home_card_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/app.dart';
 import '../models/category.dart';
-import '../providers/settings_service.dart';
 import 'category_container_common.dart';
 
-class AppsGrid extends StatelessWidget
-{
+class AppsGrid extends StatelessWidget {
   final Category category;
   final List<App> applications;
+  final bool autofocusFirstItem;
+  final double rowSpacing;
+  final void Function(
+    String categoryName,
+    BuildContext itemContext,
+    int rowIndex,
+  )? onApplicationFocused;
 
   AppsGrid({
     Key? key,
     required this.category,
     required this.applications,
+    this.autofocusFirstItem = false,
+    this.rowSpacing = homeRowSpacingDefault,
+    this.onApplicationFocused,
   }) : super(key: key);
 
   @override
@@ -44,60 +53,59 @@ class AppsGrid extends StatelessWidget
     Widget categoryContent;
     if (applications.isEmpty) {
       categoryContent = categoryContainerEmptyState(context);
-    }
-    else {
-      categoryContent = GridView.custom(
-        primary: false,
-        shrinkWrap: true,
-        gridDelegate: _buildSliverGridDelegate(),
-        padding: EdgeInsets.all(16),
-        childrenDelegate: SliverChildBuilderDelegate(
-          childCount: applications.length,
-          findChildIndexCallback: _findChildIndex,
-          (context, index) => AppCard(
-              key: Key(applications[index].packageName),
-              category: category,
-              application: applications[index],
-              autofocus: index == 0,
-              onMove: (direction) => _onMove(context, direction, index),
-              onMoveEnd: () => _saveOrder(context)
-          )
-        )
+    } else {
+      categoryContent = LayoutBuilder(
+        builder: (context, constraints) {
+          final metrics = HomeCardMetrics.resolve(
+            maxWidth: constraints.maxWidth,
+            columnsCount: category.columnsCount,
+            rowHeight: category.rowHeight,
+            rowSpacing: rowSpacing,
+          );
+
+          return GridView.custom(
+            primary: false,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: _buildSliverGridDelegate(metrics),
+            padding: const EdgeInsets.symmetric(
+              horizontal: homeGridHorizontalPadding / 2,
+            ),
+            childrenDelegate: SliverChildBuilderDelegate(
+              childCount: applications.length,
+              findChildIndexCallback: _findChildIndex,
+              (context, index) => Align(
+                alignment: Alignment.center,
+                child: AppCard(
+                  key: Key(applications[index].packageName),
+                  category: category,
+                  application: applications[index],
+                  autofocus: autofocusFirstItem && index == 0,
+                  onFocused: (itemContext) => onApplicationFocused?.call(
+                    category.name,
+                    itemContext,
+                    index ~/ category.columnsCount,
+                  ),
+                  onMove: (direction) => _onMove(context, direction, index),
+                  onMoveEnd: () => _saveOrder(context),
+                ),
+              ),
+            ),
+          );
+        },
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Selector<SettingsService, bool>(
-          selector: (context, service) => service.showCategoryTitles,
-          builder: (context, showCategoriesTitle, _) {
-            if (showCategoriesTitle) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 16, bottom: 8),
-                child: Text(category.name,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge!
-                      .copyWith(shadows: [const Shadow(color: Colors.black54, offset: Offset(1, 1), blurRadius: 8)])
-                ),
-              );
-            }
-
-            return SizedBox.shrink();
-          }
-        ),
-        categoryContent
-      ],
-    );
+    return categoryContent;
   }
 
-  int _findChildIndex(Key key) =>
-      applications.indexWhere((app) => app.packageName == (key as ValueKey<String>).value);
+  int _findChildIndex(Key key) => applications
+      .indexWhere((app) => app.packageName == (key as ValueKey<String>).value);
 
   void _onMove(BuildContext context, AxisDirection direction, int index) {
     final currentRow = (index / category.columnsCount).floor();
-    final totalRows = ((applications.length - 1) / category.columnsCount).floor();
+    final totalRows =
+        ((applications.length - 1) / category.columnsCount).floor();
 
     int? newIndex;
     switch (direction) {
@@ -113,7 +121,8 @@ class AppsGrid extends StatelessWidget
         break;
       case AxisDirection.down:
         if (currentRow < totalRows) {
-          newIndex = min(index + category.columnsCount, applications.length - 1);
+          newIndex =
+              min(index + category.columnsCount, applications.length - 1);
         }
         break;
       case AxisDirection.left:
@@ -133,11 +142,11 @@ class AppsGrid extends StatelessWidget
     appsService.saveApplicationOrderInCategory(category);
   }
 
-  SliverGridDelegate _buildSliverGridDelegate() => SliverGridDelegateWithFixedCrossAxisCount(
+  SliverGridDelegate _buildSliverGridDelegate(HomeCardMetrics metrics) =>
+      SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: category.columnsCount,
-        childAspectRatio: 16 / 9,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
+        mainAxisExtent: metrics.slotMainAxisExtent,
+        mainAxisSpacing: rowSpacing,
+        crossAxisSpacing: homeGridSpacing,
       );
-
 }

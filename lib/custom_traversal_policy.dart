@@ -7,19 +7,24 @@ import 'package:flutter/material.dart';
 /// Going up or down will always go to the next or previous row. All other
 /// traversal policy try to be smart, and in some cases can skip rows when
 /// going up or down.
-class RowByRowTraversalPolicy extends FocusTraversalPolicy with DirectionalFocusTraversalPolicyMixin {
+class RowByRowTraversalPolicy extends FocusTraversalPolicy
+    with DirectionalFocusTraversalPolicyMixin {
   @override
-  Iterable<FocusNode> sortDescendants(Iterable<FocusNode> descendants, FocusNode currentNode) => descendants;
+  Iterable<FocusNode> sortDescendants(
+          Iterable<FocusNode> descendants, FocusNode currentNode) =>
+      descendants;
 
   @override
   bool inDirection(FocusNode currentNode, TraversalDirection direction) {
-    List<FocusNode>? nodes = currentNode.nearestScope?.traversalDescendants.toList();
+    List<FocusNode>? nodes =
+        currentNode.nearestScope?.traversalDescendants.toList();
     if (nodes == null) {
       return super.inDirection(currentNode, direction);
     }
 
     NodeSearcher searcher = NodeSearcher(direction);
-    List<CandidateNode> candidates = searcher.findCandidates(nodes, currentNode);
+    List<CandidateNode> candidates =
+        searcher.findCandidates(nodes, currentNode);
     if (candidates.isEmpty) {
       return super.inDirection(currentNode, direction);
     }
@@ -46,10 +51,12 @@ class NodeSearcher {
         copy.removeWhere((element) => element.isAboveOrEquals(from));
         break;
       case TraversalDirection.right:
-        copy.removeWhere((element) => element.isLeftToOrEquals(from) || !element.isOnTheSameRow(from));
+        copy.removeWhere((element) =>
+            element.isLeftToOrEquals(from) || !element.isOnTheSameRow(from));
         break;
       case TraversalDirection.left:
-        copy.removeWhere((element) => element.isRightToOrEquals(from) || !element.isOnTheSameRow(from));
+        copy.removeWhere((element) =>
+            element.isRightToOrEquals(from) || !element.isOnTheSameRow(from));
         break;
     }
     return toCandidateNodes(copy);
@@ -59,17 +66,22 @@ class NodeSearcher {
     List<FocusNode> candidates = toFocusNodes(nodes);
 
     return candidates.reduce((bestNode, challenger) {
-      if (directionToSearch == TraversalDirection.down && challenger.isAbove(bestNode)) {
+      if (directionToSearch == TraversalDirection.down &&
+          challenger.isAbove(bestNode)) {
         return challenger;
-      } else if (directionToSearch == TraversalDirection.up && challenger.isBelow(bestNode)) {
+      } else if (directionToSearch == TraversalDirection.up &&
+          challenger.isBelow(bestNode)) {
         return challenger;
-      } else if (directionToSearch == TraversalDirection.left && challenger.isRightTo(bestNode)) {
+      } else if (directionToSearch == TraversalDirection.left &&
+          challenger.isRightTo(bestNode)) {
         return challenger;
-      } else if (directionToSearch == TraversalDirection.right && challenger.isLeftTo(bestNode)) {
+      } else if (directionToSearch == TraversalDirection.right &&
+          challenger.isLeftTo(bestNode)) {
         return challenger;
       }
       // compute the element which is the closest horizontally
-      if (challenger.isOnTheSameRow(bestNode) && challenger.distance(from) < bestNode.distance(from)) {
+      if (challenger.isOnTheSameRow(bestNode) &&
+          challenger.distance(from) < bestNode.distance(from)) {
         return challenger;
       }
       return bestNode;
@@ -85,9 +97,11 @@ class CandidateNode {
 }
 
 /// Some conversion utilities used internally
-List<CandidateNode> toCandidateNodes(List<FocusNode> nodes) => nodes.map((e) => CandidateNode(e)).toList();
+List<CandidateNode> toCandidateNodes(List<FocusNode> nodes) =>
+    nodes.map((e) => CandidateNode(e)).toList();
 
-List<FocusNode> toFocusNodes(List<CandidateNode> nodes) => nodes.map((e) => e.node).toList();
+List<FocusNode> toFocusNodes(List<CandidateNode> nodes) =>
+    nodes.map((e) => e.node).toList();
 
 /// A few extension methods to the [FocusNode] to be able to compare their
 /// respective position easily.

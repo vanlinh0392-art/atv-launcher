@@ -6,6 +6,7 @@
     "appCardHighlightAnimation": "App card highlight animation",
     "appInfo": "Application info",
     "appKeyClick": "Click sound on key press",
+    "appTitle": "ATV Launcher",
     "applications": "Applications",
     "autoHideAppBar": "Automatically hide status bar",
     "backButtonAction": "Back button action",
@@ -80,8 +81,560 @@
     "settings": "Settings",
     "show": "Show",
     "showCategoryTitles": "Show category titles",
+    "showRamInStatusBar": "Show RAM in status bar",
     "sort": "Sort",
+    "settingStateOff": "Off",
+    "settingStateOn": "On",
+    "settingVisibilityHidden": "Hidden",
+    "settingVisibilityShown": "Shown",
+    "settingsControlCenterTitle": "Control Center",
+    "settingsDestinationAccessibilitySubtitle": "Track managed services and repair degraded states",
+    "settingsDestinationAccessibilityTitle": "Accessibility Manager",
+    "settingsDestinationBackupSubtitle": "Export, preview and restore launcher configuration",
+    "settingsDestinationBackupTitle": "Backup & Restore",
+    "settingsDestinationDensitySubtitle": "Inspect and override density with safe fallbacks",
+    "settingsDestinationDensityTitle": "Display / DPI",
+    "settingsDestinationDiagnosticsSubtitle": "Snapshot reports for debugging and provisioning audits",
+    "settingsDestinationDiagnosticsTitle": "Diagnostics",
+    "settingsDestinationHomeSubtitle": "Launcher structure, status bar, app presentation",
+    "settingsDestinationHomeTitle": "Home & Layout",
+    "settingsDestinationPermissionsSubtitle": "One-time grants, local ADB wizard and special access",
+    "settingsDestinationPermissionsTitle": "Permissions & Provisioning",
+    "settingsDestinationPrivateDnsSubtitle": "Configure DNS mode and verify persistence",
+    "settingsDestinationPrivateDnsTitle": "Network / Private DNS",
+    "settingsDestinationSystemCoreSubtitle": "ADB automation, battery whitelist and core health",
+    "settingsDestinationSystemCoreTitle": "System Core",
+    "settingsDestinationVoiceSubtitle": "Map remote voice keys and launch fallback search",
+    "settingsDestinationVoiceTitle": "Voice & Search",
+    "settingsDestinationWallpaperSubtitle": "Gradient, image, video wallpaper, folders and playlists",
+    "settingsDestinationWallpaperTitle": "Wallpaper & Media",
+    "settingsShellSubtitle": "TV-first controls for system bridge, wallpaper media, provisioning and recovery.",
+    "settingsShellTitle": "ATV Launcher Settings",
     "systemSettings": "System settings",
+    "statusBarDescription": "Choose which diagnostics and clock details stay visible without covering too much wallpaper.",
+    "grantChipHealthy": "Permissions ready",
+    "grantChipMissing": "{count} critical missing",
+    "@grantChipMissing": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "grantChipRecommended": "{count} recommended missing",
+    "@grantChipRecommended": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "appLanguageTitle": "App language",
+    "appLanguageDescription": "Follow the TV language or lock the launcher to English or Vietnamese.",
+    "appLanguageSystem": "System",
+    "appLanguageEnglish": "English",
+    "appLanguageVietnamese": "Vietnamese",
+    "homeDockHeightDescription": "Keep the launcher anchored at the bottom while choosing how many rows are visible by default.",
+    "homeDockHeightTitle": "Bottom dock height",
+    "homeDockCollapsedRowsTitle": "Collapsed dock rows",
+    "homeDockCollapsedRowsDescription": "Choose whether HOME collapses down to 1 row or 2 rows after the idle timeout.",
+"homeDockBlurTitle": "Dock glass blur",
+    "homeDockBlurDescription": "Blur the HOME dock background behind the app area. Turn it off to reveal more wallpaper and video.",
+"homeDockAutoCollapseTitle": "Auto collapse dock",
+"homeDockAutoCollapseDescription": "Collapse HOME back to one visible row after the configured idle time.",
+"homeDockAutoCollapseDelayTitle": "Auto collapse delay",
+"homeDockAutoCollapseDelayDescription": "Choose how long HOME should wait without DPAD input before collapsing the dock.",
+"homeDockGlassIntensityTitle": "Dock glass intensity",
+    "homeDockGlassIntensityDescription": "Control how strong the liquid-glass tint and blur should be. Set 0% for a fully clear dock.",
+    "homeDockRowSpacingTitle": "Row spacing",
+    "homeDockRowSpacingDescription": "Adjust the vertical gap between HOME icon rows while keeping the visible row count exact.",
+    "iconCornerRadiusDescription": "Round only the home app cards without changing the settings cards.",
+    "iconCornerRadiusTitle": "Icon corner radius",
+    "appCardLayoutSizeTitle": "Card size",
+    "appCardLayoutSizeDescription": "Scale the full home app card inside each fixed slot without changing row count or dock layout.",
+    "iconSizeTitle": "Icon size",
+    "iconSizeDescription": "Adjust only the banner or icon artwork inside each home card without changing the card layout.",
+    "dateAndTimeScaleTitle": "Date & time size",
+    "dateAndTimeScaleDescription": "Scale the HOME status bar clock and date without changing the rest of the layout.",
+    "ramChipLabel": "RAM {value} free",
+    "@ramChipLabel": {
+        "placeholders": {
+            "value": {
+                "type": "String"
+            }
+        }
+    },
+    "ramChipUnavailable": "RAM unavailable",
+    "currentLabel": "current",
+    "modeSettingLabel": "Mode",
+    "sourceLabel": "Source",
+    "grantedLabel": "Granted",
+    "missingLabel": "Missing",
+    "yesLabel": "Yes",
+    "noLabel": "No",
+    "permissionHealthLabel": "Permission health",
+    "requiredMissingLabel": "Required missing",
+    "recommendedMissingLabel": "Recommended missing",
+    "provisioningWizardTitle": "Provisioning Wizard",
+    "provisioningWizardDescription": "Guide the user to Developer Options when needed, then run local ADB grants and verify the launcher state.",
+    "grantViaLocalAdb": "Grant via local ADB",
+    "grantMediaAccess": "Grant media access",
+    "openDeveloperOptions": "Open developer options",
+    "batteryAccess": "Battery access",
+    "overlayAccess": "Overlay",
+    "writeSettingsAccess": "Write settings",
+    "requirementChecklistTitle": "Requirement Checklist",
+    "pcProvisioningCommandsTitle": "PC Provisioning Commands",
+    "wizardStepOpenDeveloperOptions": "Open developer options if ADB is disabled.",
+    "wizardStepGrantWss": "Grant WRITE_SECURE_SETTINGS using local ADB or PC ADB.",
+    "wizardStepGrantMediaAccess": "Grant video library access so the launcher can browse TV storage directly.",
+    "wizardStepAllowOverlayAndWriteSettings": "Allow overlay and WRITE_SETTINGS if your firmware requires it.",
+    "wizardStepWhitelistBattery": "Whitelist battery optimization for Xiaomi TVs.",
+    "wizardStepSelectAdbPolicy": "Select the long-term ADB automation policy.",
+    "requirementWriteSecureSettingsLabel": "WRITE_SECURE_SETTINGS",
+    "requirementWriteSecureSettingsGuidance": "ADB one-time grant or device owner",
+    "requirementWriteSettingsLabel": "WRITE_SETTINGS",
+    "requirementWriteSettingsGuidance": "Open the write settings page if missing",
+    "requirementSystemAlertWindowLabel": "SYSTEM_ALERT_WINDOW",
+    "requirementSystemAlertWindowGuidance": "Optional for future overlay tools",
+    "requirementIgnoreBatteryLabel": "Ignore battery optimizations",
+    "requirementIgnoreBatteryGuidance": "Recommended for Xiaomi stability",
+    "requirementPostNotificationsLabel": "POST_NOTIFICATIONS",
+    "requirementPostNotificationsGuidance": "Foreground service notification visibility",
+    "requirementDeviceOwnerLabel": "Device owner",
+    "requirementDeviceOwnerGuidance": "Optional enhancement path for fresh/reset devices",
+    "requirementAdbEnabledLabel": "ADB",
+    "requirementAdbEnabledGuidance": "Needed for one-time local ADB fallback",
+    "requirementAdbWifiEnabledLabel": "ADB Wi-Fi",
+    "requirementAdbWifiEnabledGuidance": "Useful for local ADB density/DNS fallback",
+    "requirementMediaReadLabel": "Video library access",
+    "requirementMediaReadGuidance": "Use the in-app prompt, local ADB wizard or PC ADB grant",
+    "actionCompleted": "Action completed.",
+    "actionDidNotComplete": "Action did not complete.",
+    "healthHealthy": "Healthy",
+    "healthNeedsReview": "Needs review",
+    "healthActionNeeded": "Action needed",
+    "healthDegraded": "Degraded",
+    "healthMissingWss": "Missing WSS",
+    "healthRepairing": "Repairing",
+    "adbLabel": "ADB",
+    "adbWifiLabel": "ADB Wi-Fi",
+    "coreHealthLabel": "Core health",
+    "adbAutomationPolicyTitle": "ADB automation policy",
+    "adbPolicyOff": "Off",
+    "adbPolicyAdbOnly": "ADB only",
+    "adbPolicyAdbAndWifi": "ADB + Wi-Fi",
+    "disableAdbOnSleepTitle": "Disable ADB on sleep",
+    "disableAdbOnSleepSubtitle": "Re-enable on wake or boot without spamming repeated writes.",
+    "enableNow": "Enable now",
+    "disableNow": "Disable now",
+    "runHealNow": "Run heal now",
+    "coreSnapshotTitle": "Core Snapshot",
+    "batteryOptimizationIgnored": "Battery optimization ignored",
+    "deviceOwner": "Device owner",
+    "accessibilityMaster": "Accessibility master",
+    "managedAccessibilityPackages": "Managed accessibility packages",
+    "lastRecoveryReason": "Last recovery reason",
+    "lastSuccess": "Last success",
+    "lastAdbPolicyApply": "Last ADB policy apply",
+    "lastAdbReason": "Last ADB reason",
+    "lastAdbState": "Last ADB state",
+    "missingServices": "Missing services",
+    "developerOptions": "Developer options",
+    "batterySettings": "Battery settings",
+    "voiceModeLabel": "Voice mode",
+    "keyCodeLabel": "Key code",
+    "accessibilityLabel": "Accessibility",
+    "interceptRemoteVoiceKey": "Intercept remote voice key",
+    "pressMode": "Press mode",
+    "defaultProfile": "Default profile",
+    "learningModeActive": "Learning mode active",
+    "learningModeHint": "Press the remote voice key now to capture the real key code.",
+    "learnRemoteKey": "Learn remote key",
+    "testVoiceLaunch": "Test voice launch",
+    "resetXiaomiDefault": "Reset Xiaomi default",
+    "repairAccessibility": "Repair accessibility",
+    "openAccessibilitySettings": "Open accessibility settings",
+    "voiceModeSinglePress": "Single press",
+    "voiceModeDoublePress": "Double press",
+    "voiceModeLongPress": "Long press",
+    "voiceModeDoublePressHold": "Double press then hold",
+    "lastExport": "Last export",
+    "lastImport": "Last import",
+    "lastRestore": "Last restore",
+    "exportBackup": "Export backup",
+    "previewBackup": "Preview backup",
+    "restoreLauncherOnly": "Restore launcher only",
+    "restoreWithSystemSettings": "Restore with system settings",
+    "backupPreviewEmptyState": "Select a backup to preview its contents before restoring.",
+    "backupExportCancelled": "Backup export cancelled.",
+    "backupExportedTo": "Backup exported to {displayName}.",
+    "@backupExportedTo": {
+        "placeholders": {
+            "displayName": {
+                "type": "String"
+            }
+        }
+    },
+    "backupExportFailed": "Backup export failed: {error}",
+    "@backupExportFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "backupPreviewCancelled": "Backup preview cancelled.",
+    "backupPreviewLoadedFrom": "Loaded preview from {displayName}.",
+    "@backupPreviewLoadedFrom": {
+        "placeholders": {
+            "displayName": {
+                "type": "String"
+            }
+        }
+    },
+    "backupPreviewFailed": "Backup preview failed: {error}",
+    "@backupPreviewFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "restoreCompleted": "Restore completed.",
+    "restoreCompletedWithMissingApps": "Restore completed with {count} missing app(s).",
+    "@restoreCompletedWithMissingApps": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "missingAppsList": "Missing apps: {names}",
+    "@missingAppsList": {
+        "placeholders": {
+            "names": {
+                "type": "String"
+            }
+        }
+    },
+    "backupRestoreFailed": "Backup restore failed: {error}",
+    "@backupRestoreFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "voiceModeRestored": "Voice mode restored.",
+    "voiceModeRestoreFailedPrefix": "Voice mode restore failed",
+    "adbAutomationRestored": "ADB automation restored.",
+    "adbAutomationRestoreFailedPrefix": "ADB automation restore failed",
+    "densityOverrideRestored": "Density override restored.",
+    "densityRestoreFailedPrefix": "Density restore failed",
+    "privateDnsRestored": "Private DNS restored.",
+    "privateDnsRestoreFailedPrefix": "Private DNS restore failed",
+    "managedAccessibilityReconciled": "Managed accessibility list reconciled.",
+    "accessibilityCleanupFailed": "Accessibility cleanup failed for {packageName}",
+    "@accessibilityCleanupFailed": {
+        "placeholders": {
+            "packageName": {
+                "type": "String"
+            }
+        }
+    },
+    "accessibilityRestoreFailed": "Accessibility restore failed for {packageName}",
+    "@accessibilityRestoreFailed": {
+        "placeholders": {
+            "packageName": {
+                "type": "String"
+            }
+        }
+    },
+    "restoreFailureLine": "{prefix}: {detail}",
+    "@restoreFailureLine": {
+        "placeholders": {
+            "prefix": {
+                "type": "String"
+            },
+            "detail": {
+                "type": "String"
+            }
+        }
+    },
+    "backupEmptyFileError": "Selected backup file is empty.",
+    "backupInvalidJsonError": "Selected backup is not a valid JSON object.",
+    "backupInvalidSignatureError": "Selected file is not an ATV Launcher backup.",
+    "backupInvalidStructureError": "Selected backup is missing required launcher data or has an unsupported structure.",
+    "backupOwnerPinNotRestoredNotice": "Owner PIN is not included in backups. Set a new PIN on this device if you want to protect locked apps and launcher security.",
+    "selectedBackup": "Selected backup",
+    "backupVersionChip": "Version {version}",
+    "@backupVersionChip": {
+        "placeholders": {
+            "version": {
+                "type": "String"
+            }
+        }
+    },
+    "backupSectionsChip": "{count} sections",
+    "@backupSectionsChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "backupManagedPackagesChip": "{count} managed accessibility package(s)",
+    "@backupManagedPackagesChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "backupProfilesChip": "{count} app security set(s)",
+    "@backupProfilesChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "backupSearchChip": "{count} recent search item(s)",
+    "@backupSearchChip": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "currentDpi": "Current DPI",
+    "factoryDpi": "Factory DPI",
+    "overrideLabel": "Override",
+    "executionPathLabel": "Execution path",
+    "customDpiRange": "Custom DPI (120-640)",
+    "enterValidDpi": "Enter a valid DPI value.",
+    "densityUpdated": "Density updated.",
+    "applyLabel": "Apply",
+    "reset": "Reset",
+    "densityReset": "Density reset.",
+    "reportLines": "Report lines",
+    "refreshLabel": "Refresh",
+    "copyReport": "Copy report",
+    "hostnameLabel": "Hostname",
+    "accessPathLabel": "Access path",
+    "localAdbLabel": "Local ADB",
+    "privateDnsHostname": "Private DNS hostname",
+    "privateDnsUpdated": "Private DNS updated.",
+    "applyHost": "Apply host",
+    "privateDnsDisabled": "Private DNS disabled.",
+    "turnOff": "Turn off",
+    "privateDnsReset": "Private DNS reset.",
+    "wssLabel": "WSS",
+    "masterSwitch": "Master switch",
+    "managedApps": "Managed apps",
+    "guardianVerifyResult": "Guardian verify result",
+    "repairLabel": "Repair",
+    "grantWssViaLocalAdb": "Grant WSS via local ADB",
+    "removeLabel": "Remove",
+    "manageLabel": "Manage",
+    "noService": "No service",
+    "mediaAccess": "Media access",
+    "playlistSize": "Playlist size",
+    "grantVideoLibraryAccessHint": "Grant video library access if you want to browse TV storage directly without a separate file manager app.",
+    "grantAccess": "Grant access",
+    "sourceSelectionTitle": "Source selection",
+    "singleVideo": "Single video",
+    "pickMultipleVideos": "Pick multiple videos",
+    "pickFolder": "Pick folder",
+    "browseTvStorage": "Browse TV storage",
+    "folderNameLabel": "Folder: {name}",
+    "@folderNameLabel": {
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "playlistBehaviourTitle": "Playlist behaviour",
+    "sequentialOrder": "Sequential",
+    "shuffleOrder": "Shuffle",
+    "onCompletion": "On completion",
+    "fixedInterval": "Fixed interval",
+    "loopPlaylist": "Loop playlist",
+    "switchIntervalSeconds": "Switch interval {seconds}s",
+    "@switchIntervalSeconds": {
+        "placeholders": {
+            "seconds": {
+                "type": "int"
+            }
+        }
+    },
+    "playbackAppearanceTitle": "Playback appearance",
+    "loopSingleVideo": "Loop single video",
+    "muteVideo": "Mute video",
+    "autoResumeOnHome": "Auto resume on HOME",
+    "videoFitLabel": "Video fit",
+    "videoBlurLabel": "Video blur",
+    "dimOverlayPercent": "Dim overlay {percent}%",
+    "@dimOverlayPercent": {
+        "placeholders": {
+            "percent": {
+                "type": "int"
+            }
+        }
+    },
+    "videoLibraryAccessGranted": "Video library access granted.",
+    "videoLibraryAccessNotGranted": "Video library access was not granted.",
+    "mediaPermissionMissingUseSaf": "Media permission is missing. Use SAF pickers or grant video access first.",
+    "browseTvStorageTitle": "Browse TV storage",
+    "browseTvStorageDescription": "Select a MediaStore folder for folder-based rotation, or pick a recent file directly.",
+    "foldersLabel": "Folders",
+    "genericFolder": "Folder",
+    "videoCount": "{count} video(s)",
+    "@videoCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "recentVideos": "Recent videos",
+    "genericVideo": "Video",
+    "wallpaperModeGradient": "Gradient",
+    "wallpaperModeImage": "Image",
+    "wallpaperModeVideo": "Video",
+    "videoSourceSingleFile": "Single file",
+    "videoSourceMultipleFiles": "Multiple files",
+    "videoSourceFolder": "Folder playlist",
+    "privateDnsModeOff": "Off",
+    "privateDnsModeOpportunistic": "Opportunistic",
+    "privateDnsModeHostname": "Hostname",
+    "videoFitCenterCrop": "Center crop",
+    "videoFitFit": "Fit",
+    "videoFitFill": "Fill",
+    "videoBlurOff": "Off",
+    "videoBlurLow": "Low",
+    "videoBlurMedium": "Medium",
+    "videoBlurHigh": "High",
+    "settingsDestinationProfilesTitle": "App Security",
+    "settingsDestinationProfilesSubtitle": "Lock apps, hide apps and protect launcher settings with a PIN",
+    "ownerProfileName": "Owner",
+    "guestProfileName": "Guest",
+    "kidsProfileName": "Kids",
+    "ownerProfileDescription": "Full launcher control, provisioning access and system tools.",
+    "guestProfileDescription": "Shared profile with app visibility filtering and optional locked apps.",
+    "kidsProfileDescription": "Safer profile for curated apps with hidden and locked titles.",
+    "activeProfileLabel": "Active profile",
+    "ownerPinStatusLabel": "Owner PIN",
+    "hiddenAppsProfileLabel": "Hidden in profile",
+    "lockedAppsProfileLabel": "Locked in profile",
+    "profilePinSet": "Configured",
+    "profilePinNotSet": "Not set",
+    "profileActiveNow": "Active now",
+    "profileSwitchNowAction": "Switch now",
+    "renameProfileAction": "Rename profile",
+    "manageHiddenAppsAction": "Manage hidden apps",
+    "manageHiddenAppsDescription": "Hide selected apps from HOME, settings lists and search results.",
+    "manageHiddenAppsDialogTitle": "Hidden apps",
+    "manageLockedAppsAction": "Manage locked apps",
+    "manageLockedAppsDescription": "Require the owner PIN before opening selected apps.",
+    "manageLockedAppsDialogTitle": "Locked apps",
+    "settingsLockTitle": "Lock launcher settings",
+    "settingsLockSubtitle": "Require the owner PIN before opening sensitive settings or protected apps.",
+    "setOwnerPinAction": "Set owner PIN",
+    "changeOwnerPinAction": "Change owner PIN",
+    "clearOwnerPinAction": "Clear owner PIN",
+    "clearOwnerPinDescription": "Remove the current 4-digit owner PIN.",
+    "enterCurrentOwnerPinTitle": "Enter current owner PIN",
+    "enterCurrentOwnerPinDescription": "Enter the current 4-digit owner PIN before continuing.",
+    "profileTypesTitle": "Profiles",
+    "enableProfileTitle": "Enable profile",
+    "unlockProfileTitle": "Unlock owner profile",
+    "unlockProfileDescription": "Enter the owner PIN to switch back to the owner profile.",
+    "ownerPinRequiredMessage": "Set an owner PIN first before using locked apps or protected launcher settings.",
+    "unlockAction": "Unlock",
+    "invalidPinMessage": "That PIN did not match.",
+    "unlockSettingsTitle": "Unlock settings",
+    "unlockSettingsDescription": "Enter the owner PIN to open protected ATV Launcher settings.",
+    "unlockAppTitle": "Unlock app",
+    "unlockAppDescription": "Enter the owner PIN to open {appName}.",
+    "@unlockAppDescription": {
+        "placeholders": {
+            "appName": {
+                "type": "String"
+            }
+        }
+    },
+    "ownerPinSetTitle": "Enter new owner PIN",
+    "ownerPinSetDescription": "Choose a 4-digit PIN for protected settings and locked apps.",
+    "ownerPinConfirmTitle": "Confirm owner PIN",
+    "ownerPinConfirmDescription": "Enter the same 4-digit PIN again to confirm it.",
+    "pinsDidNotMatchMessage": "The two PIN entries did not match.",
+    "ownerPinSavedMessage": "Owner PIN saved.",
+    "ownerPinClearedMessage": "Owner PIN cleared.",
+    "clearAction": "Clear",
+    "backspaceAction": "Backspace",
+    "cancel": "Cancel",
+    "closeAction": "Close",
+    "profileNameDialogTitle": "Rename profile",
+    "profileNameFieldLabel": "Profile name",
+    "manageHiddenAppsForProfile": "Hidden apps for {profileName}",
+    "@manageHiddenAppsForProfile": {
+        "placeholders": {
+            "profileName": {
+                "type": "String"
+            }
+        }
+    },
+    "manageLockedAppsForProfile": "Locked apps for {profileName}",
+    "@manageLockedAppsForProfile": {
+        "placeholders": {
+            "profileName": {
+                "type": "String"
+            }
+        }
+    },
+    "filterAppsHint": "Filter by app name or package",
+    "noAppsMatchFilter": "No apps match the current filter.",
+    "sensitiveActionsLockedHint": "Sensitive app actions are hidden until launcher security is unlocked.",
+    "searchHint": "Start voice search",
+    "searchRecentMetric": "Recent queries",
+    "searchInputsMetric": "TV inputs",
+    "searchMediaMetric": "Indexed media",
+    "searchDefaultModeMetric": "Default search mode",
+    "searchRecentTitle": "Recent searches",
+    "searchFilterAll": "All",
+    "searchFilterApps": "Apps",
+    "searchFilterSettings": "Settings",
+    "searchFilterInputs": "Inputs",
+    "searchFilterMedia": "Media",
+    "searchFilterActions": "Actions",
+    "noSearchResults": "No matching results.",
+    "genericInputLabel": "TV input",
+    "openUniversalSearchAction": "Open universal search",
+    "showRecentSearchesTitle": "Show recent searches",
+    "refreshSearchSourcesAction": "Refresh search sources",
+    "searchSourcesRefreshed": "Search sources refreshed.",
+    "clearSearchHistoryAction": "Clear search history",
+    "searchHistoryClearedMessage": "Search history cleared.",
+    "testSpeechCaptureAction": "Test speech capture",
+    "speechCaptureNoTextMessage": "No speech text was returned.",
+    "speechCapturedMessage": "Captured: {text}",
+    "@speechCapturedMessage": {
+        "placeholders": {
+            "text": {
+                "type": "String"
+            }
+        }
+    },
+    "searchModeLocalOverlay": "Local overlay",
+    "searchModeGoogleVoice": "Google voice",
+    "searchModeSystemAssist": "System assist",
+    "actionOpenSystemSettingsSubtitle": "Jump straight into Android system settings.",
+    "ambientModeAction": "Start ambient mode",
+    "actionStartAmbientModeSubtitle": "Start the built-in screensaver or ambient mode immediately.",
+    "actionRepairAccessibilitySubtitle": "Run the launcher accessibility repair flow now.",
     "textAboutDialog": "FLauncher is an open-source alternative launcher for Android TV.\nSource code available at {repoUrl}.\n\nLogo by Katie (@fureturoe), design by @FXCostanzo.",
     "@textAboutDialog": {
         "placeholders": {

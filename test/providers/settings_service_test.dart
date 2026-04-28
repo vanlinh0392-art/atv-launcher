@@ -26,14 +26,14 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 //import '../mocks.mocks.dart';
 
 void main() async {
-  SharedPreferencesStorePlatform.instance = InMemorySharedPreferencesStore.empty();
+  SharedPreferencesStorePlatform.instance =
+      InMemorySharedPreferencesStore.empty();
   final sharedPreferences = await SharedPreferences.getInstance();
   final settingsService = SettingsService(sharedPreferences);
 
   setUp(() async {
     await sharedPreferences.clear();
   });
-
 
   test("setUse24HourTimeFormat", () async {
     final sharedPreferences = await SharedPreferences.getInstance();
@@ -49,11 +49,12 @@ void main() async {
     final sharedPreferences = await SharedPreferences.getInstance();
     final settingsService = SettingsService(sharedPreferences);
 
-    await settingsService.setGradientUuid("4730aa2d-1a90-49a6-9942-ffe82f470e26");
+    await settingsService
+        .setGradientUuid("4730aa2d-1a90-49a6-9942-ffe82f470e26");
 
-    expect(sharedPreferences.getString("gradient_uuid"), "4730aa2d-1a90-49a6-9942-ffe82f470e26");
+    expect(sharedPreferences.getString("gradient_uuid"),
+        "4730aa2d-1a90-49a6-9942-ffe82f470e26");
   });
-
 
   group("getGradientUuid", () {
     test("without uuid from shared preferences", () async {
@@ -69,7 +70,8 @@ void main() async {
     test("with uuid from shared preferences", () async {
       final sharedPreferences = await SharedPreferences.getInstance();
       await sharedPreferences.clear();
-      sharedPreferences.setString("gradient_uuid", "4730aa2d-1a90-49a6-9942-ffe82f470e26");
+      sharedPreferences.setString(
+          "gradient_uuid", "4730aa2d-1a90-49a6-9942-ffe82f470e26");
       final settingsService = SettingsService(sharedPreferences);
 
       final gradientUuid = settingsService.gradientUuid;
@@ -78,7 +80,7 @@ void main() async {
     });
   });
 
-  group("getDateFormat", ()  {
+  group("getDateFormat", () {
     test("with default", () async {
       expect(settingsService.dateFormat, SettingsService.defaultDateFormat);
     });
@@ -89,6 +91,240 @@ void main() async {
       settingsService.setDateTimeFormat(expected, "");
 
       expect(settingsService.dateFormat, expected);
+    });
+  });
+
+  group("home dock settings", () {
+    test("use defaults when nothing is stored", () async {
+      expect(settingsService.homeDockRowsPreset, 3);
+      expect(
+        settingsService.homeDockCollapsedRowsPreset,
+        SettingsService.homeDockCollapsedRowsDefault,
+      );
+      expect(settingsService.homeDockAutoCollapseEnabled, true);
+      expect(
+        settingsService.homeDockAutoCollapseDelaySeconds,
+        SettingsService.homeDockAutoCollapseDelayDefault,
+      );
+      expect(settingsService.homeDockBlurEnabled, false);
+      expect(settingsService.homeDockGlassIntensityPercent, 0);
+      expect(
+        settingsService.homeDockRowSpacing,
+        SettingsService.homeDockRowSpacingDefault,
+      );
+      expect(settingsService.appLocaleMode, SettingsService.appLocaleSystem);
+      expect(settingsService.appCardCornerRadius, 8);
+      expect(
+        settingsService.appCardLayoutScalePercent,
+        SettingsService.appCardLayoutScaleDefault,
+      );
+      expect(
+        settingsService.appCardMediaScalePercent,
+        SettingsService.appCardMediaScaleDefault,
+      );
+      expect(settingsService.showRamInStatusBar, false);
+      expect(
+        settingsService.statusBarClockScalePercent,
+        SettingsService.statusBarClockScaleDefault,
+      );
+    });
+
+    test("backup and restore include dock and status bar fields", () async {
+      await settingsService.applyBackupMap(const <String, dynamic>{
+        'homeDockRowsPreset': 4,
+        'homeDockCollapsedRowsPreset': 2,
+        'homeDockAutoCollapseEnabled': false,
+        'homeDockAutoCollapseDelaySeconds': 25,
+        'homeDockGlassIntensityPercent': 65,
+        'homeDockRowSpacing': 8,
+        'appLocaleMode': 'vi',
+        'appCardCornerRadius': 18,
+        'appCardLayoutScalePercent': 95,
+        'appCardMediaScalePercent': 125,
+        'showRamInStatusBar': true,
+        'statusBarClockScalePercent': 150,
+      });
+
+      final backup = settingsService.toBackupMap();
+
+      expect(settingsService.homeDockRowsPreset, 4);
+      expect(settingsService.homeDockCollapsedRowsPreset, 2);
+      expect(settingsService.homeDockAutoCollapseEnabled, false);
+      expect(settingsService.homeDockAutoCollapseDelaySeconds, 25);
+      expect(settingsService.homeDockBlurEnabled, true);
+      expect(settingsService.homeDockGlassIntensityPercent, 65);
+      expect(settingsService.homeDockRowSpacing, 8);
+      expect(
+          settingsService.appLocaleMode, SettingsService.appLocaleVietnamese);
+      expect(settingsService.appCardCornerRadius, 18);
+      expect(settingsService.appCardLayoutScalePercent, 95);
+      expect(settingsService.appCardMediaScalePercent, 125);
+      expect(settingsService.showRamInStatusBar, true);
+      expect(settingsService.statusBarClockScalePercent, 150);
+      expect(backup['homeDockRowsPreset'], 4);
+      expect(backup['homeDockCollapsedRowsPreset'], 2);
+      expect(backup['homeDockAutoCollapseEnabled'], false);
+      expect(backup['homeDockAutoCollapseDelaySeconds'], 25);
+      expect(backup['homeDockBlurEnabled'], true);
+      expect(backup['homeDockGlassIntensityPercent'], 65);
+      expect(backup['homeDockRowSpacing'], 8);
+      expect(backup['appLocaleMode'], SettingsService.appLocaleVietnamese);
+      expect(backup['appCardCornerRadius'], 18);
+      expect(backup['appCardLayoutScalePercent'], 95);
+      expect(backup['appCardMediaScalePercent'], 125);
+      expect(backup['showRamInStatusBar'], true);
+      expect(backup['statusBarClockScalePercent'], 150);
+    });
+
+    test("missing new backup keys fall back to defaults", () async {
+      await settingsService.setAppLocaleMode(SettingsService.appLocaleEnglish);
+      await settingsService.setHomeDockAutoCollapseEnabled(false);
+      await settingsService.setHomeDockBlurEnabled(true);
+      await settingsService.setAppCardLayoutScalePercent(110);
+      await settingsService.setAppCardMediaScalePercent(125);
+      await settingsService.setStatusBarClockScalePercent(180);
+
+      await settingsService.applyBackupMap(const <String, dynamic>{
+        'homeDockRowsPreset': 2,
+      });
+
+      expect(settingsService.homeDockRowsPreset, 2);
+      expect(
+        settingsService.homeDockCollapsedRowsPreset,
+        SettingsService.homeDockCollapsedRowsDefault,
+      );
+      expect(settingsService.homeDockAutoCollapseEnabled, true);
+      expect(
+        settingsService.homeDockAutoCollapseDelaySeconds,
+        SettingsService.homeDockAutoCollapseDelayDefault,
+      );
+      expect(settingsService.homeDockBlurEnabled, false);
+      expect(settingsService.homeDockGlassIntensityPercent, 0);
+      expect(
+        settingsService.homeDockRowSpacing,
+        SettingsService.homeDockRowSpacingDefault,
+      );
+      expect(settingsService.appLocaleMode, SettingsService.appLocaleSystem);
+      expect(
+        settingsService.appCardLayoutScalePercent,
+        SettingsService.appCardLayoutScaleDefault,
+      );
+      expect(
+        settingsService.appCardMediaScalePercent,
+        SettingsService.appCardMediaScaleDefault,
+      );
+      expect(
+        settingsService.statusBarClockScalePercent,
+        SettingsService.statusBarClockScaleDefault,
+      );
+    });
+
+    test("legacy blur backup migrates to glass intensity", () async {
+      await settingsService.applyBackupMap(const <String, dynamic>{
+        'homeDockBlurEnabled': true,
+      });
+
+      expect(settingsService.homeDockBlurEnabled, true);
+      expect(
+        settingsService.homeDockGlassIntensityPercent,
+        SettingsService.homeDockGlassIntensityLegacyOnDefault,
+      );
+    });
+
+    test("media scale snaps to supported range and steps", () async {
+      await settingsService.setAppCardMediaScalePercent(127);
+      expect(settingsService.appCardMediaScalePercent, 125);
+
+      await settingsService.setAppCardMediaScalePercent(83);
+      expect(settingsService.appCardMediaScalePercent, 85);
+
+      await settingsService.setAppCardMediaScalePercent(12);
+      expect(
+        settingsService.appCardMediaScalePercent,
+        SettingsService.appCardMediaScaleMin,
+      );
+    });
+
+    test("layout scale snaps to supported range and steps", () async {
+      await settingsService.setAppCardLayoutScalePercent(117);
+      expect(
+        settingsService.appCardLayoutScalePercent,
+        SettingsService.appCardLayoutScaleMax,
+      );
+
+      await settingsService.setAppCardLayoutScalePercent(86);
+      expect(settingsService.appCardLayoutScalePercent, 85);
+
+      await settingsService.setAppCardLayoutScalePercent(12);
+      expect(
+        settingsService.appCardLayoutScalePercent,
+        SettingsService.appCardLayoutScaleMin,
+      );
+    });
+
+    test("clock scale snaps to supported range and steps", () async {
+      await settingsService.setStatusBarClockScalePercent(183);
+      expect(
+        settingsService.statusBarClockScalePercent,
+        SettingsService.statusBarClockScaleMax,
+      );
+
+      await settingsService.setStatusBarClockScalePercent(133);
+      expect(settingsService.statusBarClockScalePercent, 130);
+
+      await settingsService.setStatusBarClockScalePercent(65);
+      expect(
+        settingsService.statusBarClockScalePercent,
+        SettingsService.statusBarClockScaleMin,
+      );
+    });
+
+    test("auto collapse delay snaps to supported range and steps", () async {
+      await settingsService.setHomeDockAutoCollapseDelaySeconds(63);
+      expect(
+        settingsService.homeDockAutoCollapseDelaySeconds,
+        SettingsService.homeDockAutoCollapseDelayMax,
+      );
+
+      await settingsService.setHomeDockAutoCollapseDelaySeconds(27);
+      expect(settingsService.homeDockAutoCollapseDelaySeconds, 25);
+
+      await settingsService.setHomeDockAutoCollapseDelaySeconds(1);
+      expect(
+        settingsService.homeDockAutoCollapseDelaySeconds,
+        SettingsService.homeDockAutoCollapseDelayMin,
+      );
+    });
+
+    test("collapsed rows stay within the supported range", () async {
+      await settingsService.setHomeDockCollapsedRowsPreset(9);
+      expect(
+        settingsService.homeDockCollapsedRowsPreset,
+        SettingsService.homeDockCollapsedRowsMax,
+      );
+
+      await settingsService.setHomeDockCollapsedRowsPreset(-1);
+      expect(
+        settingsService.homeDockCollapsedRowsPreset,
+        SettingsService.homeDockCollapsedRowsMin,
+      );
+    });
+
+    test("row spacing snaps to supported range and steps", () async {
+      await settingsService.setHomeDockRowSpacing(29);
+      expect(
+        settingsService.homeDockRowSpacing,
+        SettingsService.homeDockRowSpacingMax,
+      );
+
+      await settingsService.setHomeDockRowSpacing(9);
+      expect(settingsService.homeDockRowSpacing, 10);
+
+      await settingsService.setHomeDockRowSpacing(1);
+      expect(
+        settingsService.homeDockRowSpacing,
+        SettingsService.homeDockRowSpacingMin,
+      );
     });
   });
 }

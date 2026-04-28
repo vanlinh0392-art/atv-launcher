@@ -19,7 +19,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-const longPressableKeys = [LogicalKeyboardKey.select, LogicalKeyboardKey.enter, LogicalKeyboardKey.gameButtonA];
+const longPressableKeys = [
+  LogicalKeyboardKey.select,
+  LogicalKeyboardKey.enter,
+  LogicalKeyboardKey.gameButtonA
+];
 
 class FocusKeyboardListener extends StatefulWidget {
   final WidgetBuilder builder;
@@ -43,23 +47,21 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
   @override
   Widget build(BuildContext context) => Focus(
         canRequestFocus: false,
-        // Using "onKeyEvent", in favor of the deprecated "onKey"
-        // seems to break the fix for issue #21 so, keep using the old property
-        onKey: (_, rawKeyEvent) => _handleKey(context, rawKeyEvent),
+        onKeyEvent: (_, keyEvent) => _handleKey(keyEvent),
         child: Builder(builder: widget.builder),
       );
 
-  KeyEventResult _handleKey(BuildContext context, RawKeyEvent rawKeyEvent) {
-    switch (rawKeyEvent.runtimeType) {
-      case RawKeyDownEvent:
-        return _keyDownEvent(context, rawKeyEvent.logicalKey);
-      case RawKeyUpEvent:
-        return _keyUpEvent(context, rawKeyEvent.logicalKey);
+  KeyEventResult _handleKey(KeyEvent keyEvent) {
+    switch (keyEvent.runtimeType) {
+      case KeyDownEvent:
+        return _keyDownEvent(keyEvent.logicalKey);
+      case KeyUpEvent:
+        return _keyUpEvent(keyEvent.logicalKey);
     }
     return KeyEventResult.handled;
   }
 
-  KeyEventResult _keyDownEvent(BuildContext context, LogicalKeyboardKey key) {
+  KeyEventResult _keyDownEvent(LogicalKeyboardKey key) {
     if (!longPressableKeys.contains(key)) {
       return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
     }
@@ -73,7 +75,7 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
     return KeyEventResult.handled;
   }
 
-  KeyEventResult _keyUpEvent(BuildContext context, LogicalKeyboardKey key) {
+  KeyEventResult _keyUpEvent(LogicalKeyboardKey key) {
     if (_keyDownAt != null) {
       _keyDownAt = null;
       return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
@@ -81,5 +83,7 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
     return KeyEventResult.ignored;
   }
 
-  bool _longPress() => _keyDownAt != null && DateTime.now().millisecondsSinceEpoch - _keyDownAt! >= 500;
+  bool _longPress() =>
+      _keyDownAt != null &&
+      DateTime.now().millisecondsSinceEpoch - _keyDownAt! >= 500;
 }

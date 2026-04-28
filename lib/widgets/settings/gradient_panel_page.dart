@@ -37,7 +37,8 @@ class GradientPanelPage extends StatelessWidget {
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
               children: FLauncherGradients.all
-                  .map((gradient) => EnsureVisible(alignment: 0.5, child: _gradientCard(gradient)))
+                  .map((gradient) => EnsureVisible(
+                      alignment: 0.5, child: _gradientCard(gradient)))
                   .toList(),
             ),
           ),
@@ -56,9 +57,14 @@ class GradientPanelPage extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   shape: _cardBorder(Focus.of(context).hasFocus),
                   child: InkWell(
-                    autofocus: fLauncherGradient == FLauncherGradients.greatWhale,
-                    onTap: () => context.read<WallpaperService>().setGradient(fLauncherGradient),
-                    child: Container(decoration: BoxDecoration(gradient: fLauncherGradient.gradient)),
+                    autofocus:
+                        fLauncherGradient == FLauncherGradients.greatWhale,
+                    onTap: () => context
+                        .read<WallpaperService>()
+                        .setGradient(fLauncherGradient),
+                    child: Container(
+                        decoration: BoxDecoration(
+                            gradient: fLauncherGradient.gradient)),
                   ),
                 ),
               ),
@@ -69,8 +75,9 @@ class GradientPanelPage extends StatelessWidget {
                         decoration: TextDecoration.underline,
                         color: Focus.of(context).hasFocus ? Colors.white : null,
                       ),
-                  duration: const Duration(milliseconds: 150),
-                  child: Text(fLauncherGradient.name, overflow: TextOverflow.ellipsis),
+                  duration: const Duration(milliseconds: 90),
+                  child: Text(fLauncherGradient.name,
+                      overflow: TextOverflow.ellipsis),
                 ),
               ),
             ],
@@ -79,6 +86,8 @@ class GradientPanelPage extends StatelessWidget {
       );
 
   ShapeBorder? _cardBorder(bool hasFocus) => hasFocus
-      ? RoundedRectangleBorder(side: const BorderSide(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(4))
+      ? RoundedRectangleBorder(
+          side: const BorderSide(color: Colors.white, width: 2),
+          borderRadius: BorderRadius.circular(4))
       : null;
 }

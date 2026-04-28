@@ -25,15 +25,16 @@ import 'package:provider/provider.dart';
 import '../widgets/settings/back_button_actions.dart';
 import 'apps_service.dart';
 
-class LauncherState extends ChangeNotifier
-{
+class LauncherState extends ChangeNotifier {
   bool _isDefaultLauncher;
   bool _launcherVisible;
 
-  bool  get isDefaultLauncher => _isDefaultLauncher;
-  bool  get launcherVisible => _launcherVisible;
+  bool get isDefaultLauncher => _isDefaultLauncher;
+  bool get launcherVisible => _launcherVisible;
 
-  LauncherState() : _isDefaultLauncher = false, _launcherVisible = true;
+  LauncherState()
+      : _isDefaultLauncher = false,
+        _launcherVisible = true;
 
   void toggleLauncherVisibility() {
     _launcherVisible = !_launcherVisible;
@@ -62,8 +63,7 @@ class LauncherState extends ChangeNotifier
           appsService.startAmbientMode();
           break;
       }
-    }
-    else {
+    } else {
       SystemNavigator.pop();
     }
   }

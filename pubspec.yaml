@@ -13,6 +13,7 @@ dependencies:
 
   image_picker: ^1.0.7
   intl: any
+  crypto: ^3.0.6
   drift: ^2.14.1
   drift_local_storage_inspector: ^0.7.0
   path: ^1.9.0

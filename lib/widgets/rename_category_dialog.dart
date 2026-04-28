@@ -39,7 +39,8 @@ class AddCategoryDialog extends StatelessWidget {
           autofocus: true,
           initialValue: initialValue,
           decoration: InputDecoration(labelText: localizations.name),
-          validator: (value) => value!.trim().isEmpty ? localizations.mustNotBeEmpty : null,
+          validator: (value) =>
+              value!.trim().isEmpty ? localizations.mustNotBeEmpty : null,
           autovalidateMode: AutovalidateMode.always,
           keyboardType: TextInputType.text,
           textCapitalization: TextCapitalization.sentences,

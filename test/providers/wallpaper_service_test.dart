@@ -1,142 +1,120 @@
-/*
- * FLauncher
- * Copyright (C) 2021  Étienne Fesser
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
-import 'package:drift/drift.dart';
 import 'package:flauncher/gradients.dart';
+import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:mockito/mockito.dart';
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../mocks.mocks.dart';
 
 void main() {
-  late final _MockPathProviderPlatform pathProviderPlatform;
-  setUpAll(() {
-    pathProviderPlatform = _MockPathProviderPlatform();
-    when(pathProviderPlatform.getApplicationDocumentsPath()).thenAnswer((_) => Future.value("."));
-    PathProviderPlatform.instance = pathProviderPlatform;
+  test('setGradient stores gradient mode and clears video state', () async {
+    final settings = await _createSettingsService();
+    final channel = MockFLauncherChannel();
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
+
+    await service.setGradient(FLauncherGradients.greatWhale);
+
+    expect(settings.wallpaperMode, 'gradient');
+    expect(service.wallpaper, isNull);
+    expect(service.videoTextureId, isNull);
+    verify(channel.setWallpaperMode('gradient')).called(1);
   });
 
-  group("pickWallpaper", () {
-    test("picks image", () async {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      final pickedFile = _MockXFile();
-      when(pickedFile.readAsBytes()).thenAnswer((_) => Future.value(Uint8List.fromList([0x01])));
-      final imagePicker = _MockImagePicker();
-      final fLauncherChannel = MockFLauncherChannel();
-      final settingsService = MockSettingsService();
-      when(imagePicker.pickImage(source: ImageSource.gallery)).thenAnswer((_) => Future.value(pickedFile));
-      when(fLauncherChannel.checkForGetContentAvailability()).thenAnswer((_) => Future.value(true));
-      final wallpaperService = WallpaperService(fLauncherChannel, settingsService);
-      await untilCalled(pathProviderPlatform.getApplicationDocumentsPath());
+  test('pickVideoWallpaperFilesSaf persists playlist selection', () async {
+    final settings = await _createSettingsService();
+    final channel = MockFLauncherChannel();
+    when(channel.pickWallpaperFiles()).thenAnswer(
+      (_) async => <String, dynamic>{
+        'uris': ['content://video/1', 'content://video/2'],
+        'primaryUri': 'content://video/1',
+        'previewPath': 'C:/preview.jpg',
+      },
+    );
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 7);
+    when(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
 
-      await wallpaperService.pickWallpaper();
+    await service.pickVideoWallpaperFilesSaf();
 
-      //verify(imagePicker.pickImage(source: ImageSource.gallery));
-      // MissingPluginException(No implementation found for method pickImage on channel plugins.flutter.io/image_picker)
-      //
-      expect(wallpaperService.wallpaper.hashCode, 1);
-    }, skip: true);
-
-    test("throws error when no file explorer installed", () async {
-      final fLauncherChannel = MockFLauncherChannel();
-      when(fLauncherChannel.checkForGetContentAvailability()).thenAnswer((_) => Future.value(false));
-      final wallpaperService = WallpaperService(fLauncherChannel, MockSettingsService());
-      await untilCalled(pathProviderPlatform.getApplicationDocumentsPath());
-
-      expect(() async => await wallpaperService.pickWallpaper(), throwsA(isInstanceOf<NoFileExplorerException>()));
-    });
+    expect(settings.wallpaperMode, 'video');
+    expect(settings.videoWallpaperSourceType, 'multi_file_playlist');
+    expect(
+      settings.videoWallpaperUris,
+      ['content://video/1', 'content://video/2'],
+    );
+    expect(settings.wallpaperAssetUri, 'content://video/1');
+    expect(settings.wallpaperPreviewPath, 'C:/preview.jpg');
+    expect(service.videoTextureId, 7);
   });
 
+  test('applyLibrarySelection stores folder playlist metadata', () async {
+    final settings = await _createSettingsService();
+    final channel = MockFLauncherChannel();
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 5);
+    when(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
 
-  test("setGradient", () async {
-    final fLauncherChannel = MockFLauncherChannel();
-    final settingsService = MockSettingsService();
-    final wallpaperService = WallpaperService(fLauncherChannel, settingsService);
+    await service.applyLibrarySelection(
+      uris: ['content://video/10', 'content://video/11'],
+      sourceType: 'folder_playlist',
+      folderBucketId: 'bucket-7',
+      folderName: 'Trailers',
+    );
 
-    await untilCalled(pathProviderPlatform.getApplicationDocumentsPath());
-    await wallpaperService.setGradient(FLauncherGradients.greatWhale);
-
-    verify(settingsService.setGradientUuid(FLauncherGradients.greatWhale.uuid));
-    expect(wallpaperService.wallpaper, null);
-  });
-
-  group("getGradient", () {
-    test("without uuid from settings", () async {
-      final fLauncherChannel = MockFLauncherChannel();
-      final settingsService = MockSettingsService();
-      final wallpaperService = WallpaperService(fLauncherChannel, settingsService);
-      when(settingsService.gradientUuid).thenReturn(null);
-
-      await untilCalled(pathProviderPlatform.getApplicationDocumentsPath());
-      final gradient = wallpaperService.gradient;
-
-      expect(gradient, FLauncherGradients.greatWhale);
-    });
-
-    test("with uuid from settings", () async {
-      final fLauncherChannel = MockFLauncherChannel();
-      final settingsService = MockSettingsService();
-      final wallpaperService = WallpaperService(fLauncherChannel, settingsService);
-      when(settingsService.gradientUuid).thenReturn(FLauncherGradients.grassShampoo.uuid);
-      await untilCalled(pathProviderPlatform.getApplicationDocumentsPath());
-
-      final gradient = wallpaperService.gradient;
-
-      expect(gradient, FLauncherGradients.grassShampoo);
-    });
+    expect(settings.videoWallpaperSourceType, 'folder_playlist');
+    expect(settings.videoWallpaperFolderBucketId, 'bucket-7');
+    expect(settings.videoWallpaperFolderName, 'Trailers');
+    expect(settings.videoWallpaperUris, ['content://video/10', 'content://video/11']);
+    expect(service.videoTextureId, 5);
   });
 }
 
-class _MockImagePicker extends Mock implements ImagePicker {
-  @override
-  Future<XFile?> pickImage({
-    required ImageSource source,
-    double? maxWidth,
-    double? maxHeight,
-    int? imageQuality,
-    CameraDevice preferredCameraDevice = CameraDevice.rear,
-    bool requestFullMetadata = true,
-  }) =>
-      super.noSuchMethod(
-          Invocation.method(#pickImage, [], {
-            #source: source,
-            #maxWidth: maxWidth,
-            #maxHeight: maxHeight,
-            #imageQuality: imageQuality,
-            #preferredCameraDevice: preferredCameraDevice,
-            #requestFullMetadata: requestFullMetadata,
-          }),
-          returnValue: Future<XFile?>.value());
-}
-
-// ignore: must_be_immutable
-class _MockXFile extends Mock implements XFile {
-  @override
-  Future<Uint8List> readAsBytes() => super
-      .noSuchMethod(Invocation.method(#readAsBytes, []), returnValue: Future<Uint8List>.value(Uint8List.fromList([])));
-}
-
-class _MockPathProviderPlatform extends Mock with MockPlatformInterfaceMixin implements PathProviderPlatform {
-  @override
-  Future<String?> getApplicationDocumentsPath() =>
-      super.noSuchMethod(Invocation.method(#getApplicationDocumentsPath, []), returnValue: Future<String?>.value());
+Future<SettingsService> _createSettingsService([
+  Map<String, Object> values = const <String, Object>{},
+]) async {
+  SharedPreferences.setMockInitialValues(values);
+  return SettingsService(await SharedPreferences.getInstance());
 }

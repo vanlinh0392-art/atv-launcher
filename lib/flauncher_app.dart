@@ -19,7 +19,7 @@
 import 'package:flauncher/actions.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/launcher_state.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flauncher/providers/settings_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -28,12 +28,9 @@ import 'package:provider/provider.dart';
 
 import 'flauncher.dart';
 
-class FLauncherApp extends StatelessWidget
-{
-  static const PrioritizedIntents _backIntents = PrioritizedIntents(orderedIntents: [
-    DismissIntent(),
-    BackIntent()
-  ]);
+class FLauncherApp extends StatelessWidget {
+  static const PrioritizedIntents _backIntents =
+      PrioritizedIntents(orderedIntents: [DismissIntent(), BackIntent()]);
 
   static const MaterialColor _swatch = MaterialColor(0xFF011526, <int, Color>{
     50: Color(0xFF36A0FA),
@@ -54,9 +51,29 @@ class FLauncherApp extends StatelessWidget
   Widget build(BuildContext context) {
     AppsService appsService = context.read<AppsService>();
     LauncherState launcherState = context.read<LauncherState>();
+    final Locale? locale = context.select<SettingsService, Locale?>((service) {
+      switch (service.appLocaleMode) {
+        case SettingsService.appLocaleEnglish:
+          return const Locale('en');
+        case SettingsService.appLocaleVietnamese:
+          return const Locale('vi');
+        default:
+          return null;
+      }
+    });
     launcherState.refresh(appsService);
 
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF5AA9FF),
+      brightness: Brightness.dark,
+      surface: const Color(0xFF0E1A29),
+      primary: const Color(0xFF5AA9FF),
+      secondary: const Color(0xFF8BE0B7),
+    );
+
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      locale: locale,
       shortcuts: {
         ...WidgetsApp.defaultShortcuts,
         const SingleActivator(LogicalKeyboardKey.escape): _backIntents,
@@ -71,23 +88,44 @@ class FLauncherApp extends StatelessWidget
       localizationsDelegates: [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      title: 'FLauncher',
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        colorScheme: colorScheme,
         primarySwatch: _swatch,
-        cardColor: _swatch[300],
-        canvasColor: _swatch[300],
-        dialogBackgroundColor: _swatch[400],
-        scaffoldBackgroundColor: _swatch[400],
-        textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: Colors.white)),
-        appBarTheme: const AppBarTheme(elevation: 0, backgroundColor: Colors.transparent),
+        cardColor: const Color(0xFF13263B),
+        canvasColor: const Color(0xFF13263B),
+        dialogBackgroundColor: const Color(0xFF0E1A29),
+        scaffoldBackgroundColor: const Color(0xFF0E1A29),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF2A6BD8),
+            foregroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          ),
+        ),
+        listTileTheme: const ListTileThemeData(
+          iconColor: Colors.white70,
+        ),
+        appBarTheme: const AppBarTheme(
+            elevation: 0, backgroundColor: Colors.transparent),
         typography: Typography.material2018(),
         inputDecorationTheme: InputDecorationTheme(
-          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
+          focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white)),
           labelStyle: Typography.material2018().white.bodyMedium,
         ),
         textSelectionTheme: TextSelectionThemeData(
@@ -97,15 +135,13 @@ class FLauncherApp extends StatelessWidget
         ),
       ),
       home: Builder(
-        builder: (context) => PopScope(
-          canPop: false,
-          child: FLauncher(),
-          onPopInvoked: (didPop) {
-            LauncherState launcherState = context.read<LauncherState>();
-            launcherState.handleBackNavigation(context);
-          }
-        )
-      ),
+          builder: (context) => PopScope(
+              canPop: false,
+              child: FLauncher(),
+              onPopInvokedWithResult: (didPop, _) {
+                LauncherState launcherState = context.read<LauncherState>();
+                launcherState.handleBackNavigation(context);
+              })),
     );
   }
 }

@@ -19,7 +19,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:format/format.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
@@ -56,8 +55,8 @@ class FormatModel extends ChangeNotifier {
   String get dateFormatString => _dateFormatString;
   String get timeFormatString => _timeFormatString;
 
-  FormatModel(String dateFormatString, String timeFormatString) :
-        _dateFormatString = dateFormatString,
+  FormatModel(String dateFormatString, String timeFormatString)
+      : _dateFormatString = dateFormatString,
         _timeFormatString = timeFormatString;
 
   void setDateFormatString(String newFormatString) {
@@ -75,136 +74,140 @@ class DateTimeFormatDialog extends StatelessWidget {
   final String _initialDateFormat;
   final String _initialTimeFormat;
 
-  const DateTimeFormatDialog(String initialDateFormat, String initialTimeFormat, {super.key}) :
-        _initialDateFormat = initialDateFormat,
+  const DateTimeFormatDialog(String initialDateFormat, String initialTimeFormat,
+      {super.key})
+      : _initialDateFormat = initialDateFormat,
         _initialTimeFormat = initialTimeFormat;
 
   @override
   Widget build(BuildContext context) {
     AppLocalizations localizations = AppLocalizations.of(context)!;
 
-    TextEditingController dateFormatFieldController = TextEditingController(
-        text: _initialDateFormat);
-    TextEditingController timeFormatFieldController = TextEditingController(
-        text: _initialTimeFormat);
+    TextEditingController dateFormatFieldController =
+        TextEditingController(text: _initialDateFormat);
+    TextEditingController timeFormatFieldController =
+        TextEditingController(text: _initialTimeFormat);
 
     List<DropdownMenuEntry<String>> menuEntries = [];
 
     Iterable<Tuple2<String, String>> formatSpecifiers =
-      dateFormatSpecifiers.followedBy(timeFormatSpecifiers);
+        dateFormatSpecifiers.followedBy(timeFormatSpecifiers);
     for (Tuple2<String, String> tuple in formatSpecifiers) {
-      menuEntries.add(DropdownMenuEntry(value: tuple.item1, label: tuple.item2));
+      menuEntries
+          .add(DropdownMenuEntry(value: tuple.item1, label: tuple.item2));
     }
 
     return ChangeNotifierProvider(
-      create: (_) => FormatModel(_initialDateFormat, _initialTimeFormat),
-      builder: (context, _) => SimpleDialog(
-        insetPadding: const EdgeInsets.only(bottom: 60),
-        contentPadding: const EdgeInsets.all(24),
-        title: Text(localizations.dateAndTimeFormat),
-        children: [
-          Consumer<FormatModel>(
-            builder: (_, model, __) {
-              String text;
+        create: (_) => FormatModel(_initialDateFormat, _initialTimeFormat),
+        builder: (context, _) => SimpleDialog(
+              insetPadding: const EdgeInsets.only(bottom: 60),
+              contentPadding: const EdgeInsets.all(24),
+              title: Text(localizations.dateAndTimeFormat),
+              children: [
+                Consumer<FormatModel>(builder: (_, model, __) {
+                  String text;
 
-              if (model.dateFormatString.isEmpty) {
-                text = localizations.noDateFormatSpecified;
-              }
-              else {
-                DateFormat dateFormat = DateFormat(
-                    model.dateFormatString, Platform.localeName);
-                text = localizations.formattedDate(dateFormat.format(DateTime.now()));
-              }
+                  if (model.dateFormatString.isEmpty) {
+                    text = localizations.noDateFormatSpecified;
+                  } else {
+                    DateFormat dateFormat =
+                        DateFormat(model.dateFormatString, Platform.localeName);
+                    text = localizations
+                        .formattedDate(dateFormat.format(DateTime.now()));
+                  }
 
-              if (model.timeFormatString.isEmpty) {
-                text += "\n${localizations.noTimeFormatSpecified}";
-              }
-              else {
-                DateFormat dateFormat = DateFormat(
-                    model.timeFormatString, Platform.localeName);
-                text += "\n${localizations.formattedTime(dateFormat.format(DateTime.now()))}";
-              }
+                  if (model.timeFormatString.isEmpty) {
+                    text += "\n${localizations.noTimeFormatSpecified}";
+                  } else {
+                    DateFormat dateFormat =
+                        DateFormat(model.timeFormatString, Platform.localeName);
+                    text +=
+                        "\n${localizations.formattedTime(dateFormat.format(DateTime.now()))}";
+                  }
 
-              return Text(text);
-            }
-          ),
-          const SizedBox(height: 24),
-          TextFormField(
-            autovalidateMode: AutovalidateMode.always,
-            controller: dateFormatFieldController,
-            decoration: InputDecoration(labelText: localizations.typeInTheDateFormat),
-            keyboardType: TextInputType.text,
-            onChanged: (value) => dateFormatStringChanged(context, value),
-            onFieldSubmitted: (value) {
-              returnFromDialog(context, value, timeFormatFieldController.text);
-            },
-            validator: (value) {
-              String? result;
+                  return Text(text);
+                }),
+                const SizedBox(height: 24),
+                TextFormField(
+                  autovalidateMode: AutovalidateMode.always,
+                  controller: dateFormatFieldController,
+                  decoration: InputDecoration(
+                      labelText: localizations.typeInTheDateFormat),
+                  keyboardType: TextInputType.text,
+                  onChanged: (value) => dateFormatStringChanged(context, value),
+                  onFieldSubmitted: (value) {
+                    returnFromDialog(
+                        context, value, timeFormatFieldController.text);
+                  },
+                  validator: (value) {
+                    String? result;
 
-              if (value != null) {
-                value = value.trim();
+                    if (value != null) {
+                      value = value.trim();
 
-                if (value.isEmpty) {
-                  result = localizations.mustNotBeEmpty;
-                }
-              }
-
-              return result;
-            },
-          ),
-          TextFormField(
-            autovalidateMode: AutovalidateMode.always,
-            controller: timeFormatFieldController,
-            decoration: InputDecoration(labelText: localizations.typeInTheHourFormat),
-            keyboardType: TextInputType.text,
-            onChanged: (value) => timeFormatStringChanged(context, value),
-            onFieldSubmitted: (value) {
-              returnFromDialog(context, dateFormatFieldController.text, value);
-            },
-            validator: (value) {
-              String? result;
-
-              if (value != null) {
-                value = value.trim();
-
-                if (value.isEmpty) {
-                  result = localizations.mustNotBeEmpty;
-                }
-              }
-
-              return result;
-            },
-          ),
-          const SizedBox(height: 24),
-          Text(localizations.orSelectFormatSpecifiers),
-          const SizedBox(height: 12),
-          DropdownMenu<String>(
-              dropdownMenuEntries: menuEntries,
-              onSelected: (selectedValue) {
-                if (selectedValue != null) {
-                  bool isTimeFormat = false;
-
-                  for (Tuple2<String, String> tuple in timeFormatSpecifiers) {
-                    if (tuple.item1 == selectedValue) {
-                      isTimeFormat = true;
-                      break;
+                      if (value.isEmpty) {
+                        result = localizations.mustNotBeEmpty;
+                      }
                     }
-                  }
 
-                  if (isTimeFormat) {
-                    timeFormatFieldController.text += selectedValue;
-                    timeFormatStringChanged(context, timeFormatFieldController.text);
-                  }
-                  else {
-                    dateFormatFieldController.text += selectedValue;
-                    dateFormatStringChanged(context, dateFormatFieldController.text);
-                  }
-                }
-              }
-          )
-        ],
-      )
-    );
+                    return result;
+                  },
+                ),
+                TextFormField(
+                  autovalidateMode: AutovalidateMode.always,
+                  controller: timeFormatFieldController,
+                  decoration: InputDecoration(
+                      labelText: localizations.typeInTheHourFormat),
+                  keyboardType: TextInputType.text,
+                  onChanged: (value) => timeFormatStringChanged(context, value),
+                  onFieldSubmitted: (value) {
+                    returnFromDialog(
+                        context, dateFormatFieldController.text, value);
+                  },
+                  validator: (value) {
+                    String? result;
+
+                    if (value != null) {
+                      value = value.trim();
+
+                      if (value.isEmpty) {
+                        result = localizations.mustNotBeEmpty;
+                      }
+                    }
+
+                    return result;
+                  },
+                ),
+                const SizedBox(height: 24),
+                Text(localizations.orSelectFormatSpecifiers),
+                const SizedBox(height: 12),
+                DropdownMenu<String>(
+                    dropdownMenuEntries: menuEntries,
+                    onSelected: (selectedValue) {
+                      if (selectedValue != null) {
+                        bool isTimeFormat = false;
+
+                        for (Tuple2<String, String> tuple
+                            in timeFormatSpecifiers) {
+                          if (tuple.item1 == selectedValue) {
+                            isTimeFormat = true;
+                            break;
+                          }
+                        }
+
+                        if (isTimeFormat) {
+                          timeFormatFieldController.text += selectedValue;
+                          timeFormatStringChanged(
+                              context, timeFormatFieldController.text);
+                        } else {
+                          dateFormatFieldController.text += selectedValue;
+                          dateFormatStringChanged(
+                              context, dateFormatFieldController.text);
+                        }
+                      }
+                    })
+              ],
+            ));
   }
 
   void dateFormatStringChanged(BuildContext context, String formatString) {
@@ -217,7 +220,8 @@ class DateTimeFormatDialog extends StatelessWidget {
     model.setTimeFormatString(formatString);
   }
 
-  void returnFromDialog(BuildContext context, String dateFormatString, String timeFormatString) {
+  void returnFromDialog(
+      BuildContext context, String dateFormatString, String timeFormatString) {
     dateFormatString = dateFormatString.trim();
     timeFormatString = timeFormatString.trim();
 

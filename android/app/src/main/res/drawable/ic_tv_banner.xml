@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:endColor="#08131C"
+                android:startColor="#173F67" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item
+        android:bottom="22dp"
+        android:gravity="center"
+        android:left="40dp"
+        android:right="40dp"
+        android:top="22dp"
+        android:drawable="@drawable/ic_launcher_foreground" />
+</layer-list>

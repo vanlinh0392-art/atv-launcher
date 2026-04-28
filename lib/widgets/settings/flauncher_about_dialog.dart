@@ -39,7 +39,8 @@ class FLauncherAboutDialog extends StatelessWidget {
       applicationLegalese: "© 2024 Oscar Rojas",
       children: [
         SizedBox(height: 24),
-        Text(localizations.textAboutDialog("https://github.com/osrosal/flauncher"))
+        Text(localizations
+            .textAboutDialog("https://github.com/osrosal/flauncher"))
       ],
     );
   }

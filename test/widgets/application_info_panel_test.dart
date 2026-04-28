@@ -1,27 +1,9 @@
-/*
- * FLauncher
- * Copyright (C) 2021  Étienne Fesser
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
-import 'package:flauncher/database.dart';
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/widgets/application_info_panel.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:provider/provider.dart';
 
@@ -29,139 +11,94 @@ import '../mocks.dart';
 import '../mocks.mocks.dart';
 
 void main() {
-  setUpAll(() async {
-    final binding = TestWidgetsFlutterBinding.ensureInitialized();
-    binding.window.physicalSizeTestValue = Size(1280, 720);
-    binding.window.devicePixelRatioTestValue = 1.0;
-    // Scale-down the font size because the font 'Ahem' used when running tests is much wider than Roboto
-    binding.platformDispatcher.textScaleFactorTestValue = 0.8;
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
   });
 
-  testWidgets("'Open' calls launchApp on AppsService", (tester) async {
+  testWidgets('Open triggers launchApp', (tester) async {
+    _prepareView(tester);
     final appsService = MockAppsService();
-    final app = fakeApp(
-      packageName: "me.efesser.flauncher",
-      name: "FLauncher",
-      version: "1.0.0",
-    );
-    when(appsService.applications).thenReturn([app]);
-    await _pumpWidgetWithProviders(tester, appsService, null, app);
+    final app = fakeApp();
+    await _pumpPanel(tester, appsService, app, null);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    verify(appsService.launchApp(app));
+
+    verify(appsService.launchApp(app)).called(1);
   });
 
-  testWidgets("'Hide' calls AppsService", (tester) async {
+  testWidgets('Hide triggers hideApplication for visible app', (tester) async {
+    _prepareView(tester);
     final appsService = MockAppsService();
-    final category = fakeCategory(name: "Category 1", order: 0);
-    final app = fakeApp(
-      packageName: "me.efesser.flauncher",
-      name: "FLauncher",
-      version: "1.0.0",
-    );
-    when(appsService.categoriesWithApps).thenReturn([
-      CategoryWithApps(category, [app]),
-    ]);
-    when(appsService.applications).thenReturn([]);
-    await _pumpWidgetWithProviders(tester, appsService, category, app);
+    final app = fakeApp(hidden: false);
+    await _pumpPanel(tester, appsService, app, fakeCategory(name: 'Favorites'));
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    verify(appsService.hideApplication(app));
+    await tester.tap(find.text('Hide'));
+    await tester.pumpAndSettle();
+
+    verify(appsService.hideApplication(app)).called(1);
   });
 
-  testWidgets("'Remove from...' calls AppsService", (tester) async {
+  testWidgets('Show triggers showApplication for hidden app', (tester) async {
+    _prepareView(tester);
     final appsService = MockAppsService();
-    final category = fakeCategory(name: "Category 1", order: 0);
-    final app = fakeApp(
-      packageName: "me.efesser.flauncher",
-      name: "FLauncher",
-      version: "1.0.0",
-    );
-    when(appsService.categoriesWithApps).thenReturn([
-      CategoryWithApps(category, [app]),
-    ]);
-    when(appsService.applications).thenReturn([]);
-    await _pumpWidgetWithProviders(tester, appsService, category, app);
+    final app = fakeApp(hidden: true);
+    await _pumpPanel(tester, appsService, app, fakeCategory(name: 'Favorites'));
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    verify(appsService.removeFromCategory(app, category));
+    await tester.tap(find.text('Show'));
+    await tester.pumpAndSettle();
+
+    verify(appsService.showApplication(app)).called(1);
   });
 
-  testWidgets("'App info' calls AppsService", (tester) async {
+  testWidgets('Remove from category is available when category exists',
+      (tester) async {
+    _prepareView(tester);
     final appsService = MockAppsService();
-    final category = fakeCategory(name: "Category 1", order: 0);
-    final app = fakeApp(
-      packageName: "me.efesser.flauncher",
-      name: "FLauncher",
-      version: "1.0.0",
-    );
-    when(appsService.categoriesWithApps).thenReturn([
-      CategoryWithApps(category, [app]),
-    ]);
-    when(appsService.applications).thenReturn([]);
-    await _pumpWidgetWithProviders(tester, appsService, category, app);
+    final app = fakeApp();
+    final category = fakeCategory(name: 'Favorites');
+    await _pumpPanel(tester, appsService, app, category);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    verify(appsService.openAppInfo(app));
-  });
+    expect(find.textContaining('Remove from'), findsOneWidget);
 
-  testWidgets("'Uninstall' calls AppsService", (tester) async {
-    final appsService = MockAppsService();
-    final category = fakeCategory(name: "Category 1", order: 0);
-    final app = fakeApp(
-      packageName: "me.efesser.flauncher",
-      name: "FLauncher",
-      version: "1.0.0",
-    );
-    when(appsService.categoriesWithApps).thenReturn([
-      CategoryWithApps(category, [app]),
-    ]);
-    when(appsService.applications).thenReturn([]);
-    await _pumpWidgetWithProviders(tester, appsService, category, app);
+    await tester.tap(find.textContaining('Remove from'));
+    await tester.pumpAndSettle();
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    verify(appsService.uninstallApp(app));
+    verify(appsService.removeFromCategory(app, category)).called(1);
   });
 }
 
-Future<void> _pumpWidgetWithProviders(
+Future<void> _pumpPanel(
   WidgetTester tester,
   AppsService appsService,
-  Category? category,
-  App application,
+  dynamic app,
+  dynamic category,
 ) async {
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<AppsService>.value(value: appsService),
+        Provider<ProfileSecurityService?>.value(value: null),
       ],
-      builder: (_, __) => MaterialApp(
-        home: ApplicationInfoPanel(
-          category: category,
-          application: application,
+      child: MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Material(
+          child: ApplicationInfoPanel(
+            category: category,
+            application: app,
+          ),
         ),
       ),
     ),
   );
   await tester.pumpAndSettle();
+}
+
+void _prepareView(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1280, 720);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }

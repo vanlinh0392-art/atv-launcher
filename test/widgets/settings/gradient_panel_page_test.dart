@@ -29,26 +29,25 @@ import '../../mocks.mocks.dart';
 
 void main() {
   setUpAll(() async {
-    final binding = TestWidgetsFlutterBinding.ensureInitialized();
-    binding.window.physicalSizeTestValue = Size(1280, 720);
-    binding.window.devicePixelRatioTestValue = 1.0;
-    // Scale-down the font size because the font 'Ahem' used when running tests is much wider than Roboto
-    binding.platformDispatcher.textScaleFactorTestValue = 0.8;
+    TestWidgetsFlutterBinding.ensureInitialized();
   });
 
   testWidgets("Selecting a gradient calls WallpaperService", (tester) async {
+    _prepareView(tester);
     final wallpaperService = MockWallpaperService();
 
     await _pumpWidgetWithProviders(tester, wallpaperService);
 
-    expect(find.byKey(Key("gradient-${FLauncherGradients.greatWhale.uuid}")), findsOneWidget);
+    expect(find.byKey(Key("gradient-${FLauncherGradients.greatWhale.uuid}")),
+        findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     verify(wallpaperService.setGradient(FLauncherGradients.greatWhale));
   });
 }
 
-Future<void> _pumpWidgetWithProviders(WidgetTester tester, WallpaperService wallpaperService) async {
+Future<void> _pumpWidgetWithProviders(
+    WidgetTester tester, WallpaperService wallpaperService) async {
   await tester.pumpWidget(
     MultiProvider(
       providers: [
@@ -58,4 +57,11 @@ Future<void> _pumpWidgetWithProviders(WidgetTester tester, WallpaperService wall
     ),
   );
   await tester.pumpAndSettle();
+}
+
+void _prepareView(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1280, 720);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }

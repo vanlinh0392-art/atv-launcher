@@ -18,6 +18,10 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <permission
+        android:name="com.atv.launcher.permission.KICK_GUARDIAN"
+        android:protectionLevel="signature" />
+
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false" />
@@ -30,7 +34,22 @@
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="com.atv.launcher.permission.KICK_GUARDIAN" />
 
     <queries>
         <intent>
@@ -39,16 +58,35 @@
         <intent>
             <action android:name="android.intent.action.GET_CONTENT" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.WEB_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.ASSIST" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VOICE_COMMAND" />
+        </intent>
     </queries>
 
     <application
         android:allowBackup="true"
-        android:banner="@drawable/banner"
+        android:banner="@drawable/ic_tv_banner"
         android:fullBackupContent="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="FLauncher">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name">
         <activity
-            android:name=".MainActivity"
+            android:name="com.atv.launcher.MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:exported="true"
             android:hardwareAccelerated="true"
@@ -70,6 +108,151 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.shared.admin.MapVoiceAdminReceiver"
+            android:directBootAware="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.shared.boot.BootOrRecoverReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="999999">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="mitv.action.STR_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.shared.boot.HealAlarmReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.shared.control.VoiceModeControlReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="999999">
+                <action android:name="com.atv.launcher.control.GET_MODE" />
+                <action android:name="com.atv.launcher.control.SET_MODE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.accessmanager.boot.BootReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="999999">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="mitv.action.STR_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.accessmanager.boot.PackageChangeReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="999999">
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_CHANGED" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.accessmanager.boot.MyPackageReplacedReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="999999">
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.accessmanager.boot.RecoveryKickReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="com.atv.launcher.permission.KICK_GUARDIAN">
+            <intent-filter android:priority="999999">
+                <action android:name="com.atv.launcher.action.KICK_GUARDIAN" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.atv.launcher.systembridge.accessmanager.boot.GuardianAlarmReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false" />
+
+        <service
+            android:name="com.atv.launcher.systembridge.shared.service.ResidentCoreService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
+            android:name="com.atv.launcher.systembridge.shared.service.HealJobService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <service
+            android:name="com.atv.launcher.systembridge.shared.access.VoiceBridgeAccessibilityService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:process=":acc">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/system_bridge_accessibility_service" />
+        </service>
+
+        <service
+            android:name="com.atv.launcher.systembridge.accessmanager.service.GuardianService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
+            android:name="com.atv.launcher.systembridge.accessmanager.service.GuardianJobService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <meta-data
             android:name="flutterEmbedding"
