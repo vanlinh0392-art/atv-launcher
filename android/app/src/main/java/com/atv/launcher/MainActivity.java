@@ -34,6 +34,7 @@ import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.tv.TvContract;
@@ -49,6 +50,7 @@ import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.speech.RecognizerIntent;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
@@ -98,11 +100,18 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 
 public class MainActivity extends FlutterActivity {
+    private static final String TAG = "FLauncherPerf";
     private static final String METHOD_CHANNEL = "com.atv.launcher/method";
     private static final String APPS_EVENT_CHANNEL = "com.atv.launcher/event_apps";
     private static final String NETWORK_EVENT_CHANNEL = "com.atv.launcher/event_network";
     private static final String SYSTEM_EVENT_CHANNEL = "com.atv.launcher/event_system";
     private static final long SYSTEM_EVENT_INTERVAL_MS = 3000L;
+    private static final int MAX_IMAGE_CACHE_ENTRIES = 128;
+    private static final int MAX_IMAGE_CACHE_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_BANNER_WIDTH = 640;
+    private static final int MAX_BANNER_HEIGHT = 360;
+    private static final int MAX_ICON_WIDTH = 256;
+    private static final int MAX_ICON_HEIGHT = 256;
     private static final String PRIVATE_DNS_SETTINGS_ACTION = "android.settings.PRIVATE_DNS_SETTINGS";
     private static final String ADB_WIFI_KEY = "adb_wifi_enabled";
     private static final int REQUEST_PICK_WALLPAPER_ASSET = 4101;
@@ -114,6 +123,8 @@ public class MainActivity extends FlutterActivity {
     private static final int REQUEST_SPEECH_RECOGNIZER = 4107;
 
     private final Handler systemEventHandler = new Handler(Looper.getMainLooper());
+    private final LinkedHashMap<String, byte[]> appImageCache = new LinkedHashMap<>(16, 0.75f, true);
+    private int appImageCacheBytes = 0;
     private EventChannel.EventSink systemEventSink;
     private VideoWallpaperController videoWallpaperController;
     private MethodChannel.Result pendingWallpaperAssetResult;
@@ -305,6 +316,7 @@ public class MainActivity extends FlutterActivity {
     }
 
     private List<Map<String, Serializable>> getApplications() {
+        long startedAt = System.nanoTime();
         ExecutorService executor = Executors.newFixedThreadPool(4);
         CompletionService<Pair<Boolean, List<ResolveInfo>>> queryIntentActivitiesCompletionService =
                 new ExecutorCompletionService<>(executor);
@@ -382,35 +394,124 @@ public class MainActivity extends FlutterActivity {
             }
         }
 
+        logPerf("getApplications count=" + applications.size(), startedAt);
         return applications;
     }
 
     private byte[] getApplicationBanner(String packageName) {
+        long startedAt = System.nanoTime();
+        String cacheKey = buildAppImageCacheKey("banner", packageName);
+        byte[] cachedImageBytes = getCachedAppImage(cacheKey);
+        if (cachedImageBytes != null) {
+            logPerf("getApplicationBanner cacheHit package=" + packageName + " bytes=" + cachedImageBytes.length, startedAt);
+            return cachedImageBytes;
+        }
+
         byte[] imageBytes = new byte[0];
         PackageManager packageManager = getPackageManager();
         try {
             ApplicationInfo info = packageManager.getApplicationInfo(packageName, 0);
             Drawable drawable = info.loadBanner(packageManager);
             if (drawable != null) {
-                imageBytes = drawableToByteArray(drawable);
+                imageBytes = drawableToByteArray(drawable, MAX_BANNER_WIDTH, MAX_BANNER_HEIGHT, true);
             }
         } catch (PackageManager.NameNotFoundException ignored) {
         }
+        putCachedAppImage(cacheKey, imageBytes);
+        logPerf("getApplicationBanner package=" + packageName + " bytes=" + imageBytes.length, startedAt);
         return imageBytes;
     }
 
     private byte[] getApplicationIcon(String packageName) {
+        long startedAt = System.nanoTime();
+        String cacheKey = buildAppImageCacheKey("icon", packageName);
+        byte[] cachedImageBytes = getCachedAppImage(cacheKey);
+        if (cachedImageBytes != null) {
+            logPerf("getApplicationIcon cacheHit package=" + packageName + " bytes=" + cachedImageBytes.length, startedAt);
+            return cachedImageBytes;
+        }
+
         byte[] imageBytes = new byte[0];
         PackageManager packageManager = getPackageManager();
         try {
             ApplicationInfo info = packageManager.getApplicationInfo(packageName, 0);
             Drawable drawable = info.loadIcon(packageManager);
             if (drawable != null) {
-                imageBytes = drawableToByteArray(drawable);
+                imageBytes = drawableToByteArray(drawable, MAX_ICON_WIDTH, MAX_ICON_HEIGHT, false);
             }
         } catch (PackageManager.NameNotFoundException ignored) {
         }
+        putCachedAppImage(cacheKey, imageBytes);
+        logPerf("getApplicationIcon package=" + packageName + " bytes=" + imageBytes.length, startedAt);
         return imageBytes;
+    }
+
+    void clearAppImageCache(String packageName) {
+        synchronized (appImageCache) {
+            List<String> keysToRemove = new ArrayList<>();
+            for (String key : appImageCache.keySet()) {
+                if (key.startsWith("banner:" + packageName + ":") || key.startsWith("icon:" + packageName + ":")) {
+                    keysToRemove.add(key);
+                }
+            }
+            for (String key : keysToRemove) {
+                byte[] bytes = appImageCache.remove(key);
+                if (bytes != null) {
+                    appImageCacheBytes -= bytes.length;
+                }
+            }
+        }
+    }
+
+    private String buildAppImageCacheKey(String type, String packageName) {
+        PackageManager packageManager = getPackageManager();
+        try {
+            PackageInfo packageInfo = packageManager.getPackageInfo(packageName, 0);
+            long versionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    ? packageInfo.getLongVersionCode()
+                    : packageInfo.versionCode;
+            return type + ":" + packageName + ":" + versionCode + ":" + packageInfo.lastUpdateTime;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return type + ":" + packageName + ":missing";
+        }
+    }
+
+    private byte[] getCachedAppImage(String cacheKey) {
+        synchronized (appImageCache) {
+            return appImageCache.get(cacheKey);
+        }
+    }
+
+    private void putCachedAppImage(String cacheKey, byte[] imageBytes) {
+        if (imageBytes.length > MAX_IMAGE_CACHE_BYTES / 2) {
+            return;
+        }
+        synchronized (appImageCache) {
+            byte[] previous = appImageCache.put(cacheKey, imageBytes);
+            if (previous != null) {
+                appImageCacheBytes -= previous.length;
+            }
+            appImageCacheBytes += imageBytes.length;
+            trimAppImageCache();
+        }
+    }
+
+    private void trimAppImageCache() {
+        while (appImageCache.size() > MAX_IMAGE_CACHE_ENTRIES || appImageCacheBytes > MAX_IMAGE_CACHE_BYTES) {
+            String eldestKey = appImageCache.keySet().iterator().next();
+            byte[] eldest = appImageCache.remove(eldestKey);
+            if (eldest != null) {
+                appImageCacheBytes -= eldest.length;
+            }
+        }
+    }
+
+    private void logPerf(String label, long startedAtNanos) {
+        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            return;
+        }
+        long elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
+        Log.d(TAG, label + " elapsedMs=" + elapsedMs);
     }
 
     private boolean applicationExists(String packageName) {
@@ -1629,25 +1730,37 @@ public class MainActivity extends FlutterActivity {
         return success;
     }
 
-    private byte[] drawableToByteArray(Drawable drawable) {
+    private byte[] drawableToByteArray(Drawable drawable, int maxWidth, int maxHeight, boolean opaqueBackground) {
         if (drawable.getIntrinsicWidth() <= 0 || drawable.getIntrinsicHeight() <= 0) {
             return new byte[0];
         }
-        Bitmap bitmap = drawable instanceof BitmapDrawable bitmapDrawable
-                ? bitmapDrawable.getBitmap()
-                : drawableToBitmap(drawable);
+        Bitmap bitmap = drawableToBitmap(drawable, maxWidth, maxHeight, opaqueBackground);
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+        Bitmap.CompressFormat format = opaqueBackground ? Bitmap.CompressFormat.JPEG : Bitmap.CompressFormat.PNG;
+        int quality = opaqueBackground ? 86 : 100;
+        bitmap.compress(format, quality, stream);
         return stream.toByteArray();
     }
 
-    private Bitmap drawableToBitmap(Drawable drawable) {
-        Bitmap bitmap = Bitmap.createBitmap(
-                drawable.getIntrinsicWidth(),
-                drawable.getIntrinsicHeight(),
-                Bitmap.Config.ARGB_8888);
+    private Bitmap drawableToBitmap(Drawable drawable, int maxWidth, int maxHeight, boolean opaqueBackground) {
+        int sourceWidth = drawable.getIntrinsicWidth();
+        int sourceHeight = drawable.getIntrinsicHeight();
+        float scale = Math.min(1f, Math.min(maxWidth / (float) sourceWidth, maxHeight / (float) sourceHeight));
+        int targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+        int targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+        Bitmap bitmap;
+        if (drawable instanceof BitmapDrawable bitmapDrawable) {
+            Bitmap sourceBitmap = bitmapDrawable.getBitmap();
+            if (!opaqueBackground && sourceBitmap.getWidth() == targetWidth && sourceBitmap.getHeight() == targetHeight) {
+                return sourceBitmap;
+            }
+        }
+        bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-        drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+        if (opaqueBackground) {
+            canvas.drawColor(Color.BLACK);
+        }
+        drawable.setBounds(0, 0, targetWidth, targetHeight);
         drawable.draw(canvas);
         return bitmap;
     }

@@ -29,6 +29,7 @@ import 'package:flauncher/widgets/settings/launcher_section_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
 import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_panel_page.dart';
 import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flauncher/widgets/settings/system_core_panel_page.dart';
@@ -63,71 +64,100 @@ class _SettingsPanelState extends State<SettingsPanel> {
         },
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: RightPanelDialog(
-            width: 1360,
-            child: Navigator(
-              key: _navigatorKey,
-              initialRoute: widget.initialRoute ?? SettingsPanelPage.routeName,
-              onGenerateRoute: (settings) {
-                switch (settings.name) {
-                  case SettingsPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => SettingsPanelPage());
-                  case HomeLayoutPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => HomeLayoutPanelPage());
-                  case WallpaperPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => WallpaperPanelPage());
-                  case VoiceSearchPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => VoiceSearchPanelPage());
-                  case ProfilesSecurityPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => ProfilesSecurityPanelPage());
-                  case AccessibilityManagerPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => AccessibilityManagerPanelPage());
-                  case SystemCorePanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => SystemCorePanelPage());
-                  case DensityPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => DensityPanelPage());
-                  case PrivateDnsPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => PrivateDnsPanelPage());
-                  case PermissionsPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => PermissionsPanelPage());
-                  case BackupRestorePanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => BackupRestorePanelPage());
-                  case DiagnosticsPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => DiagnosticsPanelPage());
-                  case StatusBarPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => StatusBarPanelPage());
-                  case GradientPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => GradientPanelPage());
-                  case ApplicationsPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => ApplicationsPanelPage());
-                  case LauncherSectionsPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => LauncherSectionsPanelPage());
-                  case LauncherSectionPanelPage.routeName:
-                    return MaterialPageRoute(
-                        builder: (_) => LauncherSectionPanelPage(
-                            sectionIndex: settings.arguments as int?));
-                  default:
-                    throw ArgumentError.value(
-                        settings.name, "settings.name", "Route not supported.");
-                }
-              },
-            ),
+          body: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              final settingsTheme = theme.copyWith(
+                textButtonTheme: TextButtonThemeData(
+                  style: SettingsButtonStyles.text(context),
+                ),
+                filledButtonTheme: FilledButtonThemeData(
+                  style: SettingsButtonStyles.filled(context),
+                ),
+                elevatedButtonTheme: ElevatedButtonThemeData(
+                  style: SettingsButtonStyles.elevated(context),
+                ),
+                outlinedButtonTheme: OutlinedButtonThemeData(
+                  style: SettingsButtonStyles.text(context),
+                ),
+                iconButtonTheme: IconButtonThemeData(
+                  style: SettingsButtonStyles.icon(context),
+                ),
+              );
+              return Theme(
+                data: settingsTheme,
+                child: RightPanelDialog(
+                  width: 1360,
+                  child: Navigator(
+                    key: _navigatorKey,
+                    initialRoute:
+                        widget.initialRoute ?? SettingsPanelPage.routeName,
+                    onGenerateRoute: (settings) {
+                      switch (settings.name) {
+                        case SettingsPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => SettingsPanelPage());
+                        case HomeLayoutPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => HomeLayoutPanelPage());
+                        case WallpaperPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => WallpaperPanelPage());
+                        case VoiceSearchPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => VoiceSearchPanelPage());
+                        case ProfilesSecurityPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => ProfilesSecurityPanelPage());
+                        case AccessibilityManagerPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => AccessibilityManagerPanelPage());
+                        case SystemCorePanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => SystemCorePanelPage());
+                        case DensityPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => DensityPanelPage());
+                        case PrivateDnsPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => PrivateDnsPanelPage());
+                        case PermissionsPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => PermissionsPanelPage());
+                        case BackupRestorePanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => BackupRestorePanelPage());
+                        case DiagnosticsPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => DiagnosticsPanelPage());
+                        case StatusBarPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => StatusBarPanelPage());
+                        case GradientPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => GradientPanelPage());
+                        case ApplicationsPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => ApplicationsPanelPage());
+                        case LauncherSectionsPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => LauncherSectionsPanelPage());
+                        case LauncherSectionPanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => LauncherSectionPanelPage(
+                                  sectionIndex: settings.arguments as int?));
+                        default:
+                          throw ArgumentError.value(
+                            settings.name,
+                            "settings.name",
+                            "Route not supported.",
+                          );
+                      }
+                    },
+                  ),
+                ),
+              );
+            },
           ),
         ),
       );

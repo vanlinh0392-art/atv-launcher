@@ -34,6 +34,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -91,6 +92,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     when(appsService.initialized).thenReturn(true);
@@ -132,6 +134,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -189,6 +192,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -246,6 +250,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -319,6 +324,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -386,6 +392,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -476,6 +483,7 @@ void main() {
     _prepareView(tester);
     final appsService = MockAppsService();
     final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
     final bridgeService = MockSystemBridgeService();
     final channel = MockFLauncherChannel();
     final settingsService = await _createSettingsService();
@@ -611,6 +619,28 @@ Future<SettingsService> _createSettingsService() async {
 Future<ProfileSecurityService> _createProfileSecurityService() async {
   SharedPreferences.setMockInitialValues(const <String, Object>{});
   return ProfileSecurityService(await SharedPreferences.getInstance());
+}
+
+void _stubWallpaperService(
+  MockWallpaperService wallpaperService, {
+  String wallpaperMode = 'gradient',
+  ImageProvider<Object>? wallpaper,
+  FLauncherGradient? gradient,
+  bool isVideoMode = false,
+  int? videoTextureId,
+  String videoFit = 'center-crop',
+  String videoBlur = 'off',
+  int videoDimPercent = 15,
+}) {
+  when(wallpaperService.wallpaperMode).thenReturn(wallpaperMode);
+  when(wallpaperService.wallpaper).thenReturn(wallpaper);
+  when(wallpaperService.gradient)
+      .thenReturn(gradient ?? FLauncherGradients.greatWhale);
+  when(wallpaperService.isVideoMode).thenReturn(isVideoMode);
+  when(wallpaperService.videoTextureId).thenReturn(videoTextureId);
+  when(wallpaperService.videoFit).thenReturn(videoFit);
+  when(wallpaperService.videoBlur).thenReturn(videoBlur);
+  when(wallpaperService.videoDimPercent).thenReturn(videoDimPercent);
 }
 
 Future<SearchService> _createSearchService(FLauncherChannel channel) async {

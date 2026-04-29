@@ -17,7 +17,9 @@
  */
 
 import 'dart:async';
+import 'dart:collection';
 
+import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_image_type.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
@@ -43,8 +45,13 @@ const _validationKeys = [
 typedef AppCardFocusCallback = void Function(BuildContext itemContext);
 
 class AppCard extends StatefulWidget {
-  static final Map<String, Future<Tuple2<AppImageType, ImageProvider>>>
-      _imageLoadCache = <String, Future<Tuple2<AppImageType, ImageProvider>>>{};
+  static const int _maxImageCacheSize = 96;
+  static final LinkedHashMap<String, Tuple2<AppImageType, ImageProvider>>
+      _resolvedImageCache =
+      LinkedHashMap<String, Tuple2<AppImageType, ImageProvider>>();
+  static final LinkedHashMap<String,
+          Future<Tuple2<AppImageType, ImageProvider>>> _imageLoadCache =
+      LinkedHashMap<String, Future<Tuple2<AppImageType, ImageProvider>>>();
 
   final App application;
   final Category category;
@@ -65,12 +72,75 @@ class AppCard extends StatefulWidget {
 
   @override
   State<AppCard> createState() => _AppCardState();
+
+  static Tuple2<AppImageType, ImageProvider>? _getCachedImage(
+      String packageName) {
+    final image = _resolvedImageCache.remove(packageName);
+    if (image != null) {
+      _resolvedImageCache[packageName] = image;
+    }
+    return image;
+  }
+
+  static Future<Tuple2<AppImageType, ImageProvider>> _putImageLoadFuture(
+    String packageName,
+    Future<Tuple2<AppImageType, ImageProvider>> Function() loader,
+  ) {
+    final cachedFuture = _imageLoadCache.remove(packageName);
+    if (cachedFuture != null) {
+      _imageLoadCache[packageName] = cachedFuture;
+      return cachedFuture;
+    }
+
+    final future = loader().then((image) {
+      _rememberImage(packageName, image);
+      return image;
+    }).catchError((Object error) {
+      _imageLoadCache.remove(packageName);
+      throw error;
+    });
+    _imageLoadCache[packageName] = future;
+    _trimImageCaches();
+    return future;
+  }
+
+  static void _rememberImage(
+    String packageName,
+    Tuple2<AppImageType, ImageProvider> image,
+  ) {
+    _resolvedImageCache.remove(packageName);
+    _resolvedImageCache[packageName] = image;
+    _trimImageCaches();
+  }
+
+  static void _evictImage(String packageName) {
+    _resolvedImageCache.remove(packageName);
+    _imageLoadCache.remove(packageName);
+  }
+
+  static void _clearImageCaches() {
+    _resolvedImageCache.clear();
+    _imageLoadCache.clear();
+  }
+
+  static void _trimImageCaches() {
+    while (_resolvedImageCache.length > _maxImageCacheSize) {
+      _imageLoadCache.remove(_resolvedImageCache.keys.first);
+      _resolvedImageCache.remove(_resolvedImageCache.keys.first);
+    }
+    while (_imageLoadCache.length > _maxImageCacheSize) {
+      _imageLoadCache.remove(_imageLoadCache.keys.first);
+    }
+  }
 }
 
 class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   bool _moving = false;
 
   late Future<Tuple2<AppImageType, ImageProvider>> _appImageLoadFuture;
+  Tuple2<AppImageType, ImageProvider>? _resolvedAppImage;
+  Object? _appImageLoadError;
+  int? _lastSeenImageCacheRevision;
   late final AnimationController _animation = AnimationController(
     vsync: this,
     lowerBound: 0,
@@ -83,19 +153,24 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     super.initState();
 
     FocusManager.instance.addHighlightModeListener(_focusHighlightModeChanged);
-    final packageName = widget.application.packageName;
-    _appImageLoadFuture = AppCard._imageLoadCache.putIfAbsent(
-      packageName,
-      () => _loadAppBannerOrIcon(
-        Provider.of<AppsService>(context, listen: false),
-      ),
-    );
+    _lastSeenImageCacheRevision = AppImageCacheInvalidator.instance.revision;
+    AppImageCacheInvalidator.instance.addListener(_syncImageCacheRevision);
+    _bindAppImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant AppCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.application.packageName != widget.application.packageName) {
+      _bindAppImage();
+    }
   }
 
   @override
   void dispose() {
     FocusManager.instance
         .removeHighlightModeListener(_focusHighlightModeChanged);
+    AppImageCacheInvalidator.instance.removeListener(_syncImageCacheRevision);
     _animation.dispose();
 
     super.dispose();
@@ -135,82 +210,88 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                     width: constraints.maxWidth,
                     height: constraints.maxHeight,
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      curve: Curves.easeInOut,
+                      duration: const Duration(milliseconds: 90),
+                      curve: Curves.easeOutCubic,
                       transformAlignment: Alignment.center,
                       transform: _scaleTransform(context),
-                      child: Material(
-                        borderRadius: BorderRadius.circular(cornerRadius),
-                        clipBehavior: Clip.antiAlias,
-                        elevation: shouldHighlight ? 16 : 0,
-                        shadowColor: Colors.black,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            InkWell(
-                              autofocus: widget.autofocus,
-                              focusColor: Colors.transparent,
-                              child: _appImage(
-                                layout,
-                                layoutScale: layoutScale,
-                                mediaScale: mediaScale,
+                      child: RepaintBoundary(
+                        child: Material(
+                          borderRadius: BorderRadius.circular(cornerRadius),
+                          clipBehavior: Clip.antiAlias,
+                          elevation: shouldHighlight ? 16 : 0,
+                          shadowColor: Colors.black,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              InkWell(
+                                autofocus: widget.autofocus,
+                                focusColor: Colors.transparent,
+                                child: _appImage(
+                                  layout,
+                                  layoutScale: layoutScale,
+                                  mediaScale: mediaScale,
+                                ),
+                                onTap: () => _onPressed(
+                                  context,
+                                  LogicalKeyboardKey.enter,
+                                ),
+                                onLongPress: () => _onLongPress(
+                                  context,
+                                  LogicalKeyboardKey.enter,
+                                ),
+                                onFocusChange: (focused) {
+                                  if (!focused) {
+                                    return;
+                                  }
+                                  widget.onFocused?.call(context);
+                                },
                               ),
-                              onTap: () =>
-                                  _onPressed(context, LogicalKeyboardKey.enter),
-                              onLongPress: () => _onLongPress(
-                                context,
-                                LogicalKeyboardKey.enter,
+                              if (_moving) ..._arrows(),
+                              IgnorePointer(
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 140),
+                                  curve: Curves.easeOutCubic,
+                                  opacity:
+                                      shouldHighlight ? 0 : idleShadeOpacity,
+                                  child: Container(color: Colors.black),
+                                ),
                               ),
-                              onFocusChange: (focused) {
-                                if (!focused) {
-                                  return;
-                                }
-                                widget.onFocused?.call(context);
-                              },
-                            ),
-                            if (_moving) ..._arrows(),
-                            IgnorePointer(
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeInOut,
-                                opacity: shouldHighlight ? 0 : idleShadeOpacity,
-                                child: Container(color: Colors.black),
-                              ),
-                            ),
-                            Selector<SettingsService, bool>(
-                              selector: (_, settingsService) =>
-                                  settingsService
-                                      .appHighlightAnimationEnabled &&
-                                  shouldHighlight,
-                              builder: (context, highlight, _) {
-                                if (highlight) {
-                                  _animation.repeat(reverse: true);
-                                  return AnimatedBuilder(
-                                    animation: _animation,
-                                    builder: (context, child) => IgnorePointer(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            cornerRadius,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.white.withAlpha(
-                                              _animation.value.round(),
+                              Selector<SettingsService, bool>(
+                                selector: (_, settingsService) =>
+                                    settingsService
+                                        .appHighlightAnimationEnabled &&
+                                    shouldHighlight,
+                                builder: (context, highlight, _) {
+                                  if (highlight) {
+                                    _animation.repeat(reverse: true);
+                                    return AnimatedBuilder(
+                                      animation: _animation,
+                                      builder: (context, child) =>
+                                          IgnorePointer(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              cornerRadius,
                                             ),
-                                            width: 3,
+                                            border: Border.all(
+                                              color: Colors.white.withAlpha(
+                                                _animation.value.round(),
+                                              ),
+                                              width: 3,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                }
+                                    );
+                                  }
 
-                                _animation.stop();
-                                return const SizedBox();
-                              },
-                            ),
-                            if (locked) _lockBadge(),
-                          ],
+                                  _animation.stop();
+                                  return const SizedBox();
+                                },
+                              ),
+                              if (locked) _lockBadge(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -250,107 +331,101 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
         mediaScale: mediaScale,
       ),
     );
+    final tuple = _resolvedAppImage;
+    if (tuple != null) {
+      if (tuple.item1 == AppImageType.Banner) {
+        return ColoredBox(
+          color: surfaceColor,
+          child: _bannerMedia(tuple.item2, mediaScale),
+        );
+      }
 
-    return FutureBuilder(
-      future: _appImageLoadFuture,
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          final tuple = snapshot.data!;
-
-          if (tuple.item1 == AppImageType.Banner) {
-            return ColoredBox(
-              color: surfaceColor,
-              child: _bannerMedia(tuple.item2, mediaScale),
-            );
-          }
-
-          return ColoredBox(
-            color: surfaceColor,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final iconLaneWidth =
-                    constraints.maxWidth * layout.iconLaneFactor;
-                return Padding(
-                  padding: EdgeInsets.all(layout.contentPadding),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: iconLaneWidth,
-                        child: ClipRect(
-                          child: Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(layout.iconPadding),
-                              child: Transform.scale(
-                                scale: layout.iconVisualScale,
-                                child: Image(
-                                  image: tuple.item2,
-                                  fit: BoxFit.contain,
-                                  width: iconLaneWidth,
-                                  height: constraints.maxHeight,
-                                  filterQuality: FilterQuality.medium,
-                                ),
-                              ),
+      return ColoredBox(
+        color: surfaceColor,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final iconLaneWidth = constraints.maxWidth * layout.iconLaneFactor;
+            return Padding(
+              padding: EdgeInsets.all(layout.contentPadding),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: iconLaneWidth,
+                    child: ClipRect(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(layout.iconPadding),
+                          child: Transform.scale(
+                            scale: layout.iconVisualScale,
+                            child: Image(
+                              image: tuple.item2,
+                              fit: BoxFit.contain,
+                              width: iconLaneWidth,
+                              height: constraints.maxHeight,
+                              filterQuality: FilterQuality.low,
                             ),
                           ),
                         ),
                       ),
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            left: layout.textGap,
-                            right: layout.trailingPadding,
-                          ),
-                          child: Text(
-                            app.name,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      fontSize: (Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.fontSize ??
-                                              12) *
-                                          layout.titleScale,
-                                      height: 1.16,
-                                    ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: layout.textMaxLines,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                );
-              },
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.all(8),
-            child: Center(
-              child: Text(
-                app.name,
-                style: Theme.of(context).textTheme.bodySmall,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 3,
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: layout.textGap,
+                        right: layout.trailingPadding,
+                      ),
+                      child: Text(
+                        app.name,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontSize: (Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.fontSize ??
+                                      12) *
+                                  layout.titleScale,
+                              height: 1.16,
+                            ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: layout.textMaxLines,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          );
-        }
+            );
+          },
+        ),
+      );
+    }
 
-        return Padding(
-          padding: const EdgeInsets.all(8),
+    return ColoredBox(
+      color: surfaceColor,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Center(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 12),
-              Text(localizations.loading),
+              Icon(
+                _appImageLoadError == null
+                    ? Icons.apps_rounded
+                    : Icons.broken_image_outlined,
+                size: 22,
+                color: Colors.white70,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _appImageLoadError == null ? localizations.loading : app.name,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -365,18 +440,70 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           child: FractionallySizedBox(
             widthFactor: shrinkFactor,
             heightFactor: shrinkFactor,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: imageProvider,
-                  fit: BoxFit.cover,
-                ),
-              ),
+            child: Image(
+              image: imageProvider,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.low,
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _bindAppImage() {
+    final packageName = widget.application.packageName;
+    _resolvedAppImage = AppCard._getCachedImage(packageName);
+    _appImageLoadError = null;
+    _appImageLoadFuture = AppCard._putImageLoadFuture(
+      packageName,
+      () async {
+        final image = await _loadAppBannerOrIcon(
+          Provider.of<AppsService>(context, listen: false),
+        );
+        return image;
+      },
+    );
+    if (_resolvedAppImage != null) {
+      return;
+    }
+    unawaited(
+      _appImageLoadFuture.then((value) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _resolvedAppImage = value;
+          _appImageLoadError = null;
+        });
+      }).catchError((Object error) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _appImageLoadError = error;
+        });
+      }),
+    );
+  }
+
+  void _syncImageCacheRevision() {
+    final invalidator = AppImageCacheInvalidator.instance;
+    if (_lastSeenImageCacheRevision == invalidator.revision) {
+      return;
+    }
+    _lastSeenImageCacheRevision = invalidator.revision;
+    final packageName = invalidator.packageName;
+    if (packageName == null) {
+      AppCard._clearImageCaches();
+      _bindAppImage();
+      return;
+    }
+    if (packageName == widget.application.packageName) {
+      AppCard._evictImage(packageName);
+      _bindAppImage();
+    }
   }
 
   void _focusHighlightModeChanged(FocusHighlightMode mode) {

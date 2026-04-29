@@ -52,6 +52,21 @@ void main() {
     expect(target.hasPin, isFalse);
     expect(target.activeProfileId, ProfileSecurityService.ownerProfileId);
     expect(target.settingsLockEnabled, isFalse);
+    expect(target.activeHiddenCount, 0);
+    expect(
+      target.isPackageHiddenForProfile(
+        ProfileSecurityService.ownerProfileId,
+        'owner.hidden',
+      ),
+      isFalse,
+    );
+    expect(
+      target.isPackageHiddenForProfile(
+        ProfileSecurityService.ownerProfileId,
+        'guest.hidden',
+      ),
+      isFalse,
+    );
     expect(
       target.isPackageLockedForProfile(
         ProfileSecurityService.ownerProfileId,

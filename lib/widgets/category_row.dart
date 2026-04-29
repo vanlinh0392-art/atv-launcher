@@ -62,32 +62,39 @@ class CategoryRow extends StatelessWidget {
             rowHeight: category.rowHeight,
             rowSpacing: rowSpacing,
           );
+          final rowCount = (applications.length / category.columnsCount).ceil();
+          final contentHeight = (rowCount * metrics.slotMainAxisExtent) +
+              ((rowCount - 1) * rowSpacing);
 
-          return GridView.custom(
-            primary: false,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: _buildSliverGridDelegate(metrics),
-            padding: const EdgeInsets.symmetric(
-              horizontal: homeGridHorizontalPadding / 2,
-            ),
-            childrenDelegate: SliverChildBuilderDelegate(
-              childCount: applications.length,
-              findChildIndexCallback: _findChildIndex,
-              (context, index) => Align(
-                alignment: Alignment.center,
-                child: AppCard(
-                  key: Key(applications[index].packageName),
-                  category: category,
-                  application: applications[index],
-                  autofocus: autofocusFirstItem && index == 0,
-                  onFocused: (itemContext) => onApplicationFocused?.call(
-                    category.name,
-                    itemContext,
-                    index ~/ category.columnsCount,
+          return SizedBox(
+            height: contentHeight,
+            child: RepaintBoundary(
+              child: GridView.custom(
+                primary: false,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: _buildSliverGridDelegate(metrics),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: homeGridHorizontalPadding / 2,
+                ),
+                childrenDelegate: SliverChildBuilderDelegate(
+                  childCount: applications.length,
+                  findChildIndexCallback: _findChildIndex,
+                  (context, index) => Align(
+                    alignment: Alignment.center,
+                    child: AppCard(
+                      key: Key(applications[index].packageName),
+                      category: category,
+                      application: applications[index],
+                      autofocus: autofocusFirstItem && index == 0,
+                      onFocused: (itemContext) => onApplicationFocused?.call(
+                        category.name,
+                        itemContext,
+                        index ~/ category.columnsCount,
+                      ),
+                      onMove: (direction) => _onMove(context, direction, index),
+                      onMoveEnd: () => _onMoveEnd(context),
+                    ),
                   ),
-                  onMove: (direction) => _onMove(context, direction, index),
-                  onMoveEnd: () => _onMoveEnd(context),
                 ),
               ),
             ),

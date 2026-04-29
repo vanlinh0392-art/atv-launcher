@@ -17,10 +17,10 @@
  */
 
 import 'dart:async';
-import 'dart:collection';
 import 'package:collection/collection.dart' as collection;
 
 import 'package:drift/drift.dart';
+import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/database.dart';
 import 'package:flauncher/flauncher_channel.dart';
 import 'package:flutter/foundation.dart' hide Category;
@@ -38,28 +38,51 @@ class AppsService extends ChangeNotifier {
   List<LauncherSection> _launcherSections = List.empty(growable: true);
   Map<String, App> _applications = Map();
   Map<int, Category> _categoriesById = Map();
+  List<App>? _applicationsSnapshot;
+  List<LauncherSection>? _launcherSectionsSnapshot;
+  List<Category>? _categoriesSnapshot;
+  List<CategoryWithApps>? _categoriesWithAppsSnapshot;
 
   bool get initialized => _initialized;
 
-  List<App> get applications => UnmodifiableListView(
+  List<App> get applications => _applicationsSnapshot ??= List.unmodifiable(
       _applications.values.sortedBy((application) => application.name));
 
   List<LauncherSection> get launcherSections =>
-      List.unmodifiable(_launcherSections);
-  List<Category> get categories => _categoriesById.values
-      .map((category) => category.unmodifiable())
-      .toList(growable: false);
-  List<CategoryWithApps> get categoriesWithApps => categories
-      .map(
-        (category) => CategoryWithApps(
-          category,
-          List<App>.unmodifiable(category.applications),
-        ),
-      )
-      .toList(growable: false);
+      _launcherSectionsSnapshot ??= List.unmodifiable(_launcherSections);
+  List<Category> get categories =>
+      _categoriesSnapshot ??= _categoriesById.values
+          .map((category) => category.unmodifiable())
+          .toList(growable: false);
+  List<CategoryWithApps> get categoriesWithApps =>
+      _categoriesWithAppsSnapshot ??= categories
+          .map(
+            (category) => CategoryWithApps(
+              category,
+              List<App>.unmodifiable(category.applications),
+            ),
+          )
+          .toList(growable: false);
 
   AppsService(this._fLauncherChannel, this._database) {
     _init();
+  }
+
+  @override
+  void notifyListeners() {
+    _clearSnapshots();
+    super.notifyListeners();
+  }
+
+  void _clearSnapshots() {
+    _applicationsSnapshot = null;
+    _launcherSectionsSnapshot = null;
+    _categoriesSnapshot = null;
+    _categoriesWithAppsSnapshot = null;
+  }
+
+  void _invalidateAppImageCache(String? packageName) {
+    AppImageCacheInvalidator.instance.invalidate(packageName);
   }
 
   Future<void> _init() async {
@@ -69,6 +92,7 @@ class AppsService extends ChangeNotifier {
     }
 
     _fLauncherChannel.addAppsChangedListener((event) async {
+      String? changedImagePackageName;
       switch (event["action"]) {
         case "PACKAGE_ADDED":
         case "PACKAGE_CHANGED":
@@ -77,6 +101,7 @@ class AppsService extends ChangeNotifier {
 
           App application = App.fromSystem(applicationInfo);
           _applications[application.packageName] = application;
+          changedImagePackageName = application.packageName;
           break;
         case "PACKAGES_AVAILABLE":
           List<dynamic> applicationsInfo = event["activitiesInfo"];
@@ -87,10 +112,12 @@ class AppsService extends ChangeNotifier {
             App application = App.fromSystem(applicationInfo);
             _applications[application.packageName] = application;
           }
+          _invalidateAppImageCache(null);
           break;
         case "PACKAGE_REMOVED":
           String packageName = event['packageName'];
           await _database.deleteApps([packageName]);
+          changedImagePackageName = packageName;
 
           App? application = _applications.remove(packageName);
 
@@ -105,6 +132,9 @@ class AppsService extends ChangeNotifier {
           break;
       }
 
+      if (changedImagePackageName != null) {
+        _invalidateAppImageCache(changedImagePackageName);
+      }
       notifyListeners();
     });
 
@@ -555,7 +585,8 @@ class AppsService extends ChangeNotifier {
     }
   }
 
-  Future<void> unHideApplication(App application) => showApplication(application);
+  Future<void> unHideApplication(App application) =>
+      showApplication(application);
 
   Future<void> setCategoryType(Category category, CategoryType type,
       {bool shouldNotifyListeners = true}) async {

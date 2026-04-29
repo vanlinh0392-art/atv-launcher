@@ -39,6 +39,9 @@ void main() {
     when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
     when(wallpaperService.isVideoMode).thenReturn(false);
     when(wallpaperService.videoTextureId).thenReturn(null);
+    when(wallpaperService.videoFit).thenReturn('center-crop');
+    when(wallpaperService.videoBlur).thenReturn('off');
+    when(wallpaperService.videoDimPercent).thenReturn(15);
     when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
     when(bridgeService.status).thenReturn(const <String, dynamic>{
       'memory': <String, dynamic>{},

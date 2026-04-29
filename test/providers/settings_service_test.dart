@@ -109,6 +109,10 @@ void main() async {
       expect(settingsService.homeDockBlurEnabled, false);
       expect(settingsService.homeDockGlassIntensityPercent, 0);
       expect(
+        settingsService.homeDockPerformanceMode,
+        SettingsService.homeDockPerformanceModeDefault,
+      );
+      expect(
         settingsService.homeDockRowSpacing,
         SettingsService.homeDockRowSpacingDefault,
       );
@@ -146,6 +150,7 @@ void main() async {
         'homeDockAutoCollapseEnabled': false,
         'homeDockAutoCollapseDelaySeconds': 25,
         'homeDockGlassIntensityPercent': 65,
+        'homeDockPerformanceMode': 'smooth',
         'homeDockRowSpacing': 8,
         'appLocaleMode': 'vi',
         'settingsUiTransparencyPercent': 70,
@@ -164,6 +169,10 @@ void main() async {
       expect(settingsService.homeDockAutoCollapseDelaySeconds, 25);
       expect(settingsService.homeDockBlurEnabled, true);
       expect(settingsService.homeDockGlassIntensityPercent, 65);
+      expect(
+        settingsService.homeDockPerformanceMode,
+        SettingsService.homeDockPerformanceModeSmooth,
+      );
       expect(settingsService.homeDockRowSpacing, 8);
       expect(
           settingsService.appLocaleMode, SettingsService.appLocaleVietnamese);
@@ -179,6 +188,10 @@ void main() async {
       expect(backup['homeDockAutoCollapseDelaySeconds'], 25);
       expect(backup['homeDockBlurEnabled'], true);
       expect(backup['homeDockGlassIntensityPercent'], 65);
+      expect(
+        backup['homeDockPerformanceMode'],
+        SettingsService.homeDockPerformanceModeSmooth,
+      );
       expect(backup['homeDockRowSpacing'], 8);
       expect(backup['appLocaleMode'], SettingsService.appLocaleVietnamese);
       expect(backup['settingsUiTransparencyPercent'], 70);
@@ -193,6 +206,9 @@ void main() async {
       await settingsService.setAppLocaleMode(SettingsService.appLocaleEnglish);
       await settingsService.setHomeDockAutoCollapseEnabled(false);
       await settingsService.setHomeDockBlurEnabled(true);
+      await settingsService.setHomeDockPerformanceMode(
+        SettingsService.homeDockPerformanceModeQuality,
+      );
       await settingsService.setAppCardLayoutScalePercent(110);
       await settingsService.setAppCardMediaScalePercent(125);
       await settingsService.setStatusBarClockScalePercent(180);
@@ -213,6 +229,10 @@ void main() async {
       );
       expect(settingsService.homeDockBlurEnabled, false);
       expect(settingsService.homeDockGlassIntensityPercent, 0);
+      expect(
+        settingsService.homeDockPerformanceMode,
+        SettingsService.homeDockPerformanceModeDefault,
+      );
       expect(
         settingsService.homeDockRowSpacing,
         SettingsService.homeDockRowSpacingDefault,

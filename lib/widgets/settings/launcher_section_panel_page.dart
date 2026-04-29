@@ -19,6 +19,7 @@
 import 'dart:async';
 
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -212,9 +213,14 @@ class LauncherSectionPanelPage extends StatelessWidget {
                           return Padding(
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
+                                  style: SettingsButtonStyles.mergeElevatedVariant(
+                                    context,
+                                    ElevatedButton.styleFrom(
                                       backgroundColor: Colors.greenAccent[700],
-                                      foregroundColor: Colors.white),
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    variant: SettingsButtonVariant.success,
+                                  ),
                                   child: Text(localizations.save),
                                   onPressed: onSavePressed));
                         }),
@@ -222,9 +228,14 @@ class LauncherSectionPanelPage extends StatelessWidget {
                       Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16),
                           child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
+                              style: SettingsButtonStyles.mergeElevatedVariant(
+                                context,
+                                ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red[400],
-                                  foregroundColor: Colors.white),
+                                  foregroundColor: Colors.white,
+                                ),
+                                variant: SettingsButtonVariant.danger,
+                              ),
                               child: Text(localizations.delete),
                               onPressed: () async {
                                 state.setDeleted();

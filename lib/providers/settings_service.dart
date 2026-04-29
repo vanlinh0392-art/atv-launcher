@@ -35,6 +35,7 @@ const _homeDockAutoCollapseDelaySeconds =
     "home_dock_auto_collapse_delay_seconds";
 const _homeDockBlurEnabled = "home_dock_blur_enabled";
 const _homeDockGlassIntensityPercent = "home_dock_glass_intensity_percent";
+const _homeDockPerformanceMode = "home_dock_performance_mode";
 const _homeDockRowSpacing = "home_dock_row_spacing";
 const _appLocaleMode = "app_locale_mode";
 const _showCategoryTitles = "show_category_titles";
@@ -103,6 +104,12 @@ class SettingsService extends ChangeNotifier {
   static const int homeDockGlassIntensityDefault = 0;
   static const int homeDockGlassIntensityStep = 5;
   static const int homeDockGlassIntensityLegacyOnDefault = 55;
+  static const String homeDockPerformanceModeQuality = "quality";
+  static const String homeDockPerformanceModeBalanced = "balanced";
+  static const String homeDockPerformanceModeSmooth = "smooth";
+  static const String homeDockPerformanceModeOff = "off";
+  static const String homeDockPerformanceModeDefault =
+      homeDockPerformanceModeBalanced;
   static const int homeDockAutoCollapseDelayMin = 5;
   static const int homeDockAutoCollapseDelayMax = 60;
   static const int homeDockAutoCollapseDelayDefault = 15;
@@ -188,6 +195,11 @@ class SettingsService extends ChangeNotifier {
   }
 
   bool get homeDockBlurEnabled => homeDockGlassIntensityPercent > 0;
+
+  String get homeDockPerformanceMode => _sanitizeHomeDockPerformanceMode(
+        _sharedPreferences.getString(_homeDockPerformanceMode) ??
+            homeDockPerformanceModeDefault,
+      );
 
   int get homeDockRowSpacing => _normalizeHomeDockRowSpacing(
         _sharedPreferences.getInt(_homeDockRowSpacing) ??
@@ -355,6 +367,14 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.setInt(_homeDockGlassIntensityPercent, normalized),
       _sharedPreferences.setBool(_homeDockBlurEnabled, normalized > 0),
     ]);
+    notifyListeners();
+  }
+
+  Future<void> setHomeDockPerformanceMode(String value) async {
+    await _sharedPreferences.setString(
+      _homeDockPerformanceMode,
+      _sanitizeHomeDockPerformanceMode(value),
+    );
     notifyListeners();
   }
 
@@ -561,6 +581,7 @@ class SettingsService extends ChangeNotifier {
       'homeDockAutoCollapseDelaySeconds': homeDockAutoCollapseDelaySeconds,
       'homeDockBlurEnabled': homeDockBlurEnabled,
       'homeDockGlassIntensityPercent': homeDockGlassIntensityPercent,
+      'homeDockPerformanceMode': homeDockPerformanceMode,
       'homeDockRowSpacing': homeDockRowSpacing,
       'appLocaleMode': appLocaleMode,
       'statusBarClockScalePercent': statusBarClockScalePercent,
@@ -664,6 +685,16 @@ class SettingsService extends ChangeNotifier {
         _homeDockGlassIntensityPercent,
         _resolveHomeDockGlassIntensityForBackup(data),
       ),
+      _sharedPreferences.setString(
+        _homeDockPerformanceMode,
+        _sanitizeHomeDockPerformanceMode(
+          _readString(
+            data,
+            'homeDockPerformanceMode',
+            homeDockPerformanceModeDefault,
+          ),
+        ),
+      ),
       _sharedPreferences.setInt(
         _homeDockRowSpacing,
         _normalizeHomeDockRowSpacing(
@@ -710,9 +741,7 @@ class SettingsService extends ChangeNotifier {
           data,
           'appCardCornerRadius',
           appCardCornerRadiusDefault,
-        )
-            .clamp(appCardCornerRadiusMin, appCardCornerRadiusMax)
-            .toInt(),
+        ).clamp(appCardCornerRadiusMin, appCardCornerRadiusMax).toInt(),
       ),
       _sharedPreferences.setInt(
         _appCardLayoutScalePercent,
@@ -873,6 +902,18 @@ class SettingsService extends ChangeNotifier {
         return value;
       default:
         return appLocaleSystem;
+    }
+  }
+
+  static String _sanitizeHomeDockPerformanceMode(String value) {
+    switch (value) {
+      case homeDockPerformanceModeQuality:
+      case homeDockPerformanceModeBalanced:
+      case homeDockPerformanceModeSmooth:
+      case homeDockPerformanceModeOff:
+        return value;
+      default:
+        return homeDockPerformanceModeDefault;
     }
   }
 

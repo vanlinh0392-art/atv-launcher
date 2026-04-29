@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -321,7 +323,7 @@ class _LauncherSecurityCard extends StatelessWidget {
   }
 }
 
-class _ProfileActionTile extends StatelessWidget {
+class _ProfileActionTile extends StatefulWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
@@ -337,30 +339,70 @@ class _ProfileActionTile extends StatelessWidget {
   });
 
   @override
+  State<_ProfileActionTile> createState() => _ProfileActionTileState();
+}
+
+class _ProfileActionTileState extends State<_ProfileActionTile> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(enabled ? 0.03 : 0.015),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: ListTile(
-        dense: true,
-        visualDensity: const VisualDensity(horizontal: 0, vertical: -2),
-        minVerticalPadding: 0,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        enabled: enabled,
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: subtitle == null
-            ? null
-            : Text(
-                subtitle!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+    return EnsureVisible(
+      alignment: 0.12,
+      child: SettingsFocusFrame(
+        padding: EdgeInsets.zero,
+        child: FocusableActionDetector(
+          enabled: widget.enabled,
+          autofocus: false,
+          onShowFocusHighlight: (value) {
+            if (_focused != value) {
+              setState(() => _focused = value);
+            }
+          },
+          shortcuts: const <ShortcutActivator, Intent>{
+            SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+            SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
+            SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+          },
+          actions: <Type, Action<Intent>>{
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                if (widget.enabled) {
+                  widget.onPressed();
+                }
+                return null;
+              },
+            ),
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.enabled ? widget.onPressed : null,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 110),
+              opacity: widget.enabled ? (_focused ? 1 : 0.97) : 0.46,
+              child: ListTile(
+                dense: true,
+                visualDensity: const VisualDensity(horizontal: 0, vertical: -2),
+                minVerticalPadding: 0,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                enabled: widget.enabled,
+                leading: Icon(widget.icon),
+                title: Text(widget.title),
+                subtitle: widget.subtitle == null
+                    ? null
+                    : Text(
+                        widget.subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                trailing: const Icon(Icons.chevron_right),
               ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: enabled ? onPressed : null,
+            ),
+          ),
+        ),
       ),
     );
   }

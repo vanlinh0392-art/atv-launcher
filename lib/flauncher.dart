@@ -39,6 +39,39 @@ import 'package:provider/provider.dart';
 import 'models/category.dart';
 
 const Duration _dockHeightAnimationDuration = Duration(milliseconds: 320);
+typedef _WallpaperSnapshot = ({
+  String wallpaperMode,
+  ImageProvider<Object>? wallpaper,
+  Gradient gradient,
+  bool isVideoMode,
+  int? videoTextureId,
+  String videoFit,
+  String videoBlur,
+  int videoDimPercent,
+});
+
+typedef _WallpaperStatusSnapshot = ({
+  bool videoReady,
+  double videoWidth,
+  double videoHeight,
+});
+
+typedef _HomeDockSettingsSnapshot = ({
+  int dockRowsPreset,
+  int collapsedRowsPreset,
+  bool autoCollapseEnabled,
+  int autoCollapseDelaySeconds,
+  bool showCategoryTitles,
+  int glassIntensityPercent,
+  String performanceMode,
+  double rowSpacing,
+});
+
+typedef _HomeSectionsSnapshot = ({
+  bool initialized,
+  List<LauncherSection> sections,
+  String signature,
+});
 
 class FLauncher extends StatelessWidget {
   const FLauncher({super.key});
@@ -48,10 +81,7 @@ class FLauncher extends StatelessWidget {
         policy: RowByRowTraversalPolicy(),
         child: Stack(
           children: [
-            Consumer2<WallpaperService, SystemBridgeService>(
-              builder: (_, wallpaperService, systemBridgeService, __) =>
-                  _wallpaper(context, wallpaperService, systemBridgeService),
-            ),
+            const _WallpaperLayer(),
             Consumer<LauncherState>(
               builder: (_, state, child) => Visibility(
                 visible: state.launcherVisible,
@@ -63,140 +93,164 @@ class FLauncher extends StatelessWidget {
                 appBar: FocusAwareAppBar(),
                 body: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  child: Consumer3<AppsService, SettingsService,
-                      ProfileSecurityService?>(
-                    builder:
-                        (context, appsService, settingsService, security, _) {
-                      if (!appsService.initialized) {
-                        return _emptyState(context);
-                      }
-
-                      final sections = security == null
-                          ? appsService.launcherSections
-                          : security.filterLauncherSections(
-                              appsService.launcherSections,
-                            );
-
-                      return LayoutBuilder(
-                        builder: (context, constraints) => _HomeDockViewport(
-                          sections: sections,
-                          maxWidth: constraints.maxWidth,
-                          maxHeight: constraints.maxHeight,
-                          dockRowsPreset: settingsService.homeDockRowsPreset,
-                          collapsedRowsPreset:
-                              settingsService.homeDockCollapsedRowsPreset,
-                          autoCollapseEnabled:
-                              settingsService.homeDockAutoCollapseEnabled,
-                          autoCollapseDelaySeconds:
-                              settingsService.homeDockAutoCollapseDelaySeconds,
-                          showCategoryTitles:
-                              settingsService.showCategoryTitles,
-                          glassIntensityPercent:
-                              settingsService.homeDockGlassIntensityPercent,
-                          rowSpacing:
-                              settingsService.homeDockRowSpacing.toDouble(),
-                        ),
-                      );
-                    },
-                  ),
+                  child: const _HomeContent(),
                 ),
               ),
             ),
           ],
         ),
       );
+}
 
-  Widget _wallpaper(
-    BuildContext context,
-    WallpaperService wallpaperService,
-    SystemBridgeService systemBridgeService,
-  ) {
-    final physicalSize = MediaQuery.sizeOf(context);
-    final baseWallpaper = wallpaperService.wallpaperMode != 'gradient' &&
-            wallpaperService.wallpaper != null
-        ? Image(
-            image: wallpaperService.wallpaper!,
-            key: const Key('background'),
-            fit: BoxFit.cover,
-            height: physicalSize.height,
-            width: physicalSize.width,
-          )
-        : Container(
-            key: const Key('background'),
-            decoration:
-                BoxDecoration(gradient: wallpaperService.gradient.gradient),
-          );
+class _WallpaperLayer extends StatelessWidget {
+  const _WallpaperLayer();
 
-    if (!wallpaperService.isVideoMode ||
-        wallpaperService.videoTextureId == null) {
-      return baseWallpaper;
-    }
-
-    final wallpaperStatus = systemBridgeService.wallpaperStatus;
-    final videoReady = wallpaperStatus['videoReady'] == true;
-    final videoWidth =
-        ((wallpaperStatus['videoWidth'] as num?) ?? 1920).toDouble();
-    final videoHeight =
-        ((wallpaperStatus['videoHeight'] as num?) ?? 1080).toDouble();
-    final blurSigma = _blurSigma(wallpaperService.videoBlur);
-    final dimOpacity =
-        wallpaperService.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
-
-    Widget videoLayer = SizedBox.expand(
-      child: FittedBox(
-        fit: _videoFit(wallpaperService.videoFit),
-        child: SizedBox(
-          width: videoWidth,
-          height: videoHeight,
-          child: Texture(textureId: wallpaperService.videoTextureId!),
-        ),
+  @override
+  Widget build(BuildContext context) {
+    final wallpaper = context.select<WallpaperService, _WallpaperSnapshot>(
+      (service) => (
+        wallpaperMode: service.wallpaperMode,
+        wallpaper: service.wallpaper,
+        gradient: service.gradient.gradient,
+        isVideoMode: service.isVideoMode,
+        videoTextureId: service.videoTextureId,
+        videoFit: service.videoFit,
+        videoBlur: service.videoBlur,
+        videoDimPercent: service.videoDimPercent,
       ),
     );
-
-    if (blurSigma > 0) {
-      videoLayer = ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: videoLayer,
-      );
-    }
-
-    return Stack(
-      children: [
-        baseWallpaper,
-        if (videoReady) Positioned.fill(child: videoLayer),
-        if (videoReady && dimOpacity > 0)
-          Positioned.fill(
-            child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
-          ),
-      ],
+    final wallpaperStatus =
+        context.select<SystemBridgeService, _WallpaperStatusSnapshot>(
+      (service) {
+        final status = service.wallpaperStatus;
+        return (
+          videoReady: status['videoReady'] == true,
+          videoWidth: ((status['videoWidth'] as num?) ?? 1920).toDouble(),
+          videoHeight: ((status['videoHeight'] as num?) ?? 1080).toDouble(),
+        );
+      },
+    );
+    return _buildWallpaperLayer(
+      context,
+      wallpaper: wallpaper,
+      wallpaperStatus: wallpaperStatus,
     );
   }
+}
 
-  BoxFit _videoFit(String fit) {
-    switch (fit) {
-      case 'fit':
-        return BoxFit.contain;
-      case 'fill':
-        return BoxFit.fill;
-      default:
-        return BoxFit.cover;
-    }
+class _HomeContent extends StatelessWidget {
+  const _HomeContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final dockSettings =
+        context.select<SettingsService, _HomeDockSettingsSnapshot>(
+      (settingsService) => (
+        dockRowsPreset: settingsService.homeDockRowsPreset,
+        collapsedRowsPreset: settingsService.homeDockCollapsedRowsPreset,
+        autoCollapseEnabled: settingsService.homeDockAutoCollapseEnabled,
+        autoCollapseDelaySeconds:
+            settingsService.homeDockAutoCollapseDelaySeconds,
+        showCategoryTitles: settingsService.showCategoryTitles,
+        glassIntensityPercent: settingsService.homeDockGlassIntensityPercent,
+        performanceMode: settingsService.homeDockPerformanceMode,
+        rowSpacing: settingsService.homeDockRowSpacing.toDouble(),
+      ),
+    );
+    final videoWallpaperActive = context.select<WallpaperService, bool>(
+      (service) => service.isVideoMode && service.videoTextureId != null,
+    );
+
+    return Selector2<AppsService, ProfileSecurityService?,
+        _HomeSectionsSnapshot>(
+      selector: (_, appsService, security) {
+        if (!appsService.initialized) {
+          return const (
+            initialized: false,
+            sections: <LauncherSection>[],
+            signature: 'loading',
+          );
+        }
+        final sections = security == null
+            ? appsService.launcherSections
+            : security.filterLauncherSections(appsService.launcherSections);
+        return (
+          initialized: true,
+          sections: sections,
+          signature: _launcherSectionsSignature(sections),
+        );
+      },
+      shouldRebuild: (previous, next) =>
+          previous.initialized != next.initialized ||
+          previous.signature != next.signature,
+      builder: (context, homeSections, _) {
+        if (!homeSections.initialized) {
+          return const _HomeLoadingState();
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) => _HomeDockViewport(
+            sections: homeSections.sections,
+            maxWidth: constraints.maxWidth,
+            maxHeight: constraints.maxHeight,
+            dockRowsPreset: dockSettings.dockRowsPreset,
+            collapsedRowsPreset: dockSettings.collapsedRowsPreset,
+            autoCollapseEnabled: dockSettings.autoCollapseEnabled,
+            autoCollapseDelaySeconds: dockSettings.autoCollapseDelaySeconds,
+            showCategoryTitles: dockSettings.showCategoryTitles,
+            glassIntensityPercent: dockSettings.glassIntensityPercent,
+            performanceMode: dockSettings.performanceMode,
+            videoWallpaperActive: videoWallpaperActive,
+            rowSpacing: dockSettings.rowSpacing,
+          ),
+        );
+      },
+    );
   }
+}
 
-  double _blurSigma(String blur) {
-    switch (blur) {
-      case 'low':
-        return 2;
-      case 'medium':
-        return 5;
-      case 'high':
-        return 9;
-      default:
-        return 0;
+String _launcherSectionsSignature(List<LauncherSection> sections) {
+  final buffer = StringBuffer();
+  for (final section in sections) {
+    buffer.write(section.runtimeType);
+    buffer.write(':');
+    buffer.write(section.id);
+    buffer.write(':');
+    buffer.write(section.order);
+    if (section is LauncherSpacer) {
+      buffer.write(':');
+      buffer.write(section.height);
+    } else if (section is Category) {
+      buffer.write(':');
+      buffer.write(section.name);
+      buffer.write(':');
+      buffer.write(section.sort.name);
+      buffer.write(':');
+      buffer.write(section.type.name);
+      buffer.write(':');
+      buffer.write(section.columnsCount);
+      buffer.write(':');
+      buffer.write(section.rowHeight);
+      buffer.write(':');
+      for (final app in section.applications) {
+        buffer.write(app.packageName);
+        buffer.write('@');
+        buffer.write(app.name);
+        buffer.write('@');
+        buffer.write(app.hidden ? 1 : 0);
+        buffer.write(',');
+      }
     }
+    buffer.write('|');
   }
+  return buffer.toString();
+}
 
-  Widget _emptyState(BuildContext context) {
+class _HomeLoadingState extends StatelessWidget {
+  const _HomeLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
 
     return Center(
@@ -215,6 +269,91 @@ class FLauncher extends StatelessWidget {
   }
 }
 
+Widget _buildWallpaperLayer(
+  BuildContext context, {
+  required _WallpaperSnapshot wallpaper,
+  required _WallpaperStatusSnapshot wallpaperStatus,
+}) {
+  final physicalSize = MediaQuery.sizeOf(context);
+  final baseWallpaper =
+      wallpaper.wallpaperMode != 'gradient' && wallpaper.wallpaper != null
+          ? Image(
+              image: wallpaper.wallpaper!,
+              key: const Key('background'),
+              fit: BoxFit.cover,
+              height: physicalSize.height,
+              width: physicalSize.width,
+              filterQuality: FilterQuality.low,
+              gaplessPlayback: true,
+            )
+          : Container(
+              key: const Key('background'),
+              decoration: BoxDecoration(gradient: wallpaper.gradient),
+            );
+
+  if (!wallpaper.isVideoMode || wallpaper.videoTextureId == null) {
+    return RepaintBoundary(child: baseWallpaper);
+  }
+
+  final blurSigma = _videoBlurSigma(wallpaper.videoBlur);
+  final dimOpacity = wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
+
+  Widget videoLayer = SizedBox.expand(
+    child: FittedBox(
+      fit: _videoBoxFit(wallpaper.videoFit),
+      child: SizedBox(
+        width: wallpaperStatus.videoWidth,
+        height: wallpaperStatus.videoHeight,
+        child: Texture(textureId: wallpaper.videoTextureId!),
+      ),
+    ),
+  );
+
+  if (blurSigma > 0) {
+    videoLayer = ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+      child: videoLayer,
+    );
+  }
+
+  return RepaintBoundary(
+    child: Stack(
+      children: [
+        baseWallpaper,
+        if (wallpaperStatus.videoReady) Positioned.fill(child: videoLayer),
+        if (wallpaperStatus.videoReady && dimOpacity > 0)
+          Positioned.fill(
+            child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
+          ),
+      ],
+    ),
+  );
+}
+
+BoxFit _videoBoxFit(String fit) {
+  switch (fit) {
+    case 'fit':
+      return BoxFit.contain;
+    case 'fill':
+      return BoxFit.fill;
+    default:
+      return BoxFit.cover;
+  }
+}
+
+double _videoBlurSigma(String blur) {
+  switch (blur) {
+    case 'low':
+      return 2;
+    case 'medium':
+      return 5;
+    case 'high':
+      return 9;
+    default:
+      return 0;
+  }
+}
+
 class _HomeDockViewport extends StatefulWidget {
   final List<LauncherSection> sections;
   final double maxWidth;
@@ -225,6 +364,8 @@ class _HomeDockViewport extends StatefulWidget {
   final int autoCollapseDelaySeconds;
   final bool showCategoryTitles;
   final int glassIntensityPercent;
+  final String performanceMode;
+  final bool videoWallpaperActive;
   final double rowSpacing;
 
   const _HomeDockViewport({
@@ -237,6 +378,8 @@ class _HomeDockViewport extends StatefulWidget {
     required this.autoCollapseDelaySeconds,
     required this.showCategoryTitles,
     required this.glassIntensityPercent,
+    required this.performanceMode,
+    required this.videoWallpaperActive,
     required this.rowSpacing,
   });
 
@@ -310,6 +453,8 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     final dockChild = _BottomDockShell(
       height: dockHeight,
       glassIntensityPercent: widget.glassIntensityPercent,
+      performanceMode: widget.performanceMode,
+      videoWallpaperActive: widget.videoWallpaperActive,
       child: KeyedSubtree(
         key: const Key('home_bottom_dock_scroll'),
         child: ListView(
@@ -341,9 +486,11 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
               Positioned(
                 left: 22,
                 top: -34,
-                child: _DockSectionLabel(
-                  title: _activeSectionName!,
-                  glassIntensityPercent: widget.glassIntensityPercent,
+                child: RepaintBoundary(
+                  child: _DockSectionLabel(
+                    title: _activeSectionName!,
+                    glassIntensityPercent: widget.glassIntensityPercent,
+                  ),
                 ),
               ),
             Focus(
@@ -494,13 +641,10 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
 
   bool _moveFocusWithinDock(TraversalDirection direction) {
     final current = FocusManager.instance.primaryFocus;
-    final dockContext = _dockListKey.currentContext;
-    if (current == null || dockContext == null) {
+    if (current == null) {
       return false;
     }
-    final nodes = FocusManager.instance.rootScope.traversalDescendants
-        .where((node) => _isDockDescendant(node.context, dockContext))
-        .toList(growable: false);
+    final nodes = _dockTraversalNodes();
     if (nodes.isEmpty || !nodes.contains(current)) {
       return false;
     }
@@ -665,9 +809,9 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     final itemTopLeft = item.localToGlobal(Offset.zero, ancestor: viewport);
     final itemCenterY = itemTopLeft.dy + (item.size.height / 2);
     final viewportCenterY = viewport.size.height / 2;
-    final delta = itemCenterY - viewportCenterY;
+    final scrollDelta = itemCenterY - viewportCenterY;
     final currentOffset = _dockScrollController.offset;
-    final targetOffset = (currentOffset + delta).clamp(
+    final targetOffset = (currentOffset + scrollDelta).clamp(
       _dockScrollController.position.minScrollExtent,
       _dockScrollController.position.maxScrollExtent,
     );
@@ -676,14 +820,20 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       return;
     }
 
+    final targetDelta = (targetOffset - currentOffset).abs();
+    if (!animate || targetDelta < 14) {
+      _dockScrollController.jumpTo(targetOffset);
+      return;
+    }
+
     if (animate) {
       _dockScrollController.animateTo(
         targetOffset,
-        duration: const Duration(milliseconds: 120),
+        duration: Duration(
+          milliseconds: targetDelta < (viewport.size.height * 0.35) ? 82 : 110,
+        ),
         curve: Curves.easeOutCubic,
       );
-    } else {
-      _dockScrollController.jumpTo(targetOffset);
     }
   }
 
@@ -709,17 +859,22 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   }
 
   void _focusFirstDockItem() {
-    final dockContext = _dockListKey.currentContext;
-    if (dockContext == null) {
-      return;
-    }
-    final nodes = FocusManager.instance.rootScope.traversalDescendants
-        .where((node) => _isDockDescendant(node.context, dockContext))
-        .toList(growable: false);
+    final nodes = _dockTraversalNodes();
     if (nodes.isEmpty) {
       return;
     }
     nodes.first.requestFocus();
+  }
+
+  List<FocusNode> _dockTraversalNodes() {
+    return _dockFocusNode.traversalDescendants
+        .where(
+          (node) =>
+              node.context != null &&
+              node.canRequestFocus &&
+              !node.skipTraversal,
+        )
+        .toList(growable: false);
   }
 }
 
@@ -752,45 +907,50 @@ class _DockSectionLabel extends StatelessWidget {
     final fillOpacity = lerpDouble(0.08, 0.44, intensity) ?? 0.08;
     final borderOpacity = lerpDouble(0.10, 0.22, intensity) ?? 0.10;
     final shadowOpacity = lerpDouble(0.06, 0.18, intensity) ?? 0.06;
+    final useBackdropBlur = intensity >= 0.16 && blurSigma > 0;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF14253B).withOpacity(fillOpacity),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withOpacity(borderOpacity),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(shadowOpacity),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
+    final surface = DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF14253B).withOpacity(fillOpacity),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: Colors.white.withOpacity(borderOpacity),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(shadowOpacity),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            shadows: const [
+              Shadow(
+                color: Colors.black54,
+                offset: Offset(0, 1),
+                blurRadius: 6,
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                shadows: const [
-                  Shadow(
-                    color: Colors.black54,
-                    offset: Offset(0, 1),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: useBackdropBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: surface,
+            )
+          : surface,
     );
   }
 }
@@ -798,105 +958,132 @@ class _DockSectionLabel extends StatelessWidget {
 class _BottomDockShell extends StatelessWidget {
   final double height;
   final int glassIntensityPercent;
+  final String performanceMode;
+  final bool videoWallpaperActive;
   final Widget child;
 
   const _BottomDockShell({
     required this.height,
     required this.glassIntensityPercent,
+    required this.performanceMode,
+    required this.videoWallpaperActive,
     required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
+    final profile = _DockPerformanceProfile.resolve(performanceMode);
     final intensity = glassIntensityPercent.clamp(0, 100).toDouble() / 100.0;
-    final blurSigma = lerpDouble(0, 20, intensity) ?? 0;
+    final maxBlurSigma = videoWallpaperActive
+        ? profile.videoMaxBlurSigma
+        : profile.staticMaxBlurSigma;
+    final blurSigma = lerpDouble(0, maxBlurSigma, intensity) ?? 0;
     final borderOpacity = lerpDouble(0.10, 0.16, intensity) ?? 0.10;
-    final shadowOpacity = lerpDouble(0.14, 0.27, intensity) ?? 0.14;
+    final shadowOpacity = videoWallpaperActive
+        ? (lerpDouble(0.08, profile.videoShadowOpacity, intensity) ?? 0.08)
+        : (lerpDouble(0.10, profile.staticShadowOpacity, intensity) ?? 0.10);
+    final shadowBlurRadius = videoWallpaperActive
+        ? profile.videoShadowBlurRadius
+        : profile.staticShadowBlurRadius;
+    final useBackdropBlur = profile.backdropBlurEnabled &&
+        (!videoWallpaperActive || profile.videoBackdropBlurEnabled) &&
+        intensity >= 0.14 &&
+        blurSigma > 0;
+    final fakeGlassBoost =
+        videoWallpaperActive ? profile.videoFakeGlassBoost : 1.0;
     final backgroundColors = <Color>[
-      _scaledOpacity(const Color(0x6E132238), intensity),
-      _scaledOpacity(const Color(0x8A14253B), intensity),
-      _scaledOpacity(const Color(0xA316263B), intensity),
+      _scaledOpacity(const Color(0x6E132238), intensity * fakeGlassBoost),
+      _scaledOpacity(const Color(0x8A14253B), intensity * fakeGlassBoost),
+      _scaledOpacity(const Color(0xA316263B), intensity * fakeGlassBoost),
     ];
 
-    return Container(
-      key: const Key('home_bottom_dock'),
-      height: height,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(38)),
-        border: Border.all(color: Colors.white.withOpacity(borderOpacity)),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: backgroundColors,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF000000).withOpacity(shadowOpacity * intensity),
-            blurRadius: 34,
-            offset: const Offset(0, -12),
+    return RepaintBoundary(
+      child: Container(
+        key: const Key('home_bottom_dock'),
+        height: height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(38)),
+          border: Border.all(color: Colors.white.withOpacity(borderOpacity)),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: backgroundColors,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(38)),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: intensity <= 0
-                  ? const SizedBox.shrink()
-                  : BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: blurSigma,
-                        sigmaY: blurSigma,
-                      ),
-                      child: ColoredBox(
-                        color: Colors.white.withOpacity(0.025 * intensity),
-                      ),
-                    ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFF000000).withOpacity(shadowOpacity * intensity),
+              blurRadius: shadowBlurRadius,
+              offset: const Offset(0, -12),
             ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.012 * intensity),
-                ),
-              ),
-            ),
-            if (intensity > 0)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withOpacity(0.16 * intensity),
-                        Colors.white.withOpacity(0.03 * intensity),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.22, 0.72],
-                    ),
-                  ),
-                ),
-              ),
-            if (intensity > 0.1)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.topCenter,
-                      radius: 1.4,
-                      colors: [
-                        Colors.white.withOpacity(0.15 * intensity),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            child,
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(38)),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.012 * intensity),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: !useBackdropBlur
+                    ? const SizedBox.shrink()
+                    : BackdropFilter(
+                        filter: ImageFilter.blur(
+                          sigmaX: blurSigma,
+                          sigmaY: blurSigma,
+                        ),
+                        child: ColoredBox(
+                          color: Colors.white.withOpacity(0.025 * intensity),
+                        ),
+                      ),
+              ),
+              if (intensity > 0)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withOpacity(
+                              (0.16 * intensity * fakeGlassBoost)
+                                  .clamp(0.0, 0.22)),
+                          Colors.white.withOpacity(
+                              (0.03 * intensity * fakeGlassBoost)
+                                  .clamp(0.0, 0.06)),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.22, 0.72],
+                      ),
+                    ),
+                  ),
+                ),
+              if (intensity > 0.32)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.topCenter,
+                        radius: 1.4,
+                        colors: [
+                          Colors.white.withOpacity(
+                              (0.15 * intensity * fakeGlassBoost)
+                                  .clamp(0.0, 0.2)),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              RepaintBoundary(child: child),
+            ],
+          ),
         ),
       ),
     );
@@ -904,5 +1091,82 @@ class _BottomDockShell extends StatelessWidget {
 
   static Color _scaledOpacity(Color color, double factor) {
     return color.withOpacity((color.opacity * factor).clamp(0.0, 1.0));
+  }
+}
+
+class _DockPerformanceProfile {
+  final double staticMaxBlurSigma;
+  final double videoMaxBlurSigma;
+  final double staticShadowBlurRadius;
+  final double videoShadowBlurRadius;
+  final double staticShadowOpacity;
+  final double videoShadowOpacity;
+  final double videoFakeGlassBoost;
+  final bool backdropBlurEnabled;
+  final bool videoBackdropBlurEnabled;
+
+  const _DockPerformanceProfile({
+    required this.staticMaxBlurSigma,
+    required this.videoMaxBlurSigma,
+    required this.staticShadowBlurRadius,
+    required this.videoShadowBlurRadius,
+    required this.staticShadowOpacity,
+    required this.videoShadowOpacity,
+    required this.videoFakeGlassBoost,
+    required this.backdropBlurEnabled,
+    required this.videoBackdropBlurEnabled,
+  });
+
+  static _DockPerformanceProfile resolve(String mode) {
+    switch (mode) {
+      case SettingsService.homeDockPerformanceModeQuality:
+        return const _DockPerformanceProfile(
+          staticMaxBlurSigma: 16,
+          videoMaxBlurSigma: 6,
+          staticShadowBlurRadius: 30,
+          videoShadowBlurRadius: 22,
+          staticShadowOpacity: 0.27,
+          videoShadowOpacity: 0.20,
+          videoFakeGlassBoost: 1.1,
+          backdropBlurEnabled: true,
+          videoBackdropBlurEnabled: true,
+        );
+      case SettingsService.homeDockPerformanceModeSmooth:
+        return const _DockPerformanceProfile(
+          staticMaxBlurSigma: 6,
+          videoMaxBlurSigma: 0,
+          staticShadowBlurRadius: 18,
+          videoShadowBlurRadius: 12,
+          staticShadowOpacity: 0.18,
+          videoShadowOpacity: 0.14,
+          videoFakeGlassBoost: 1.3,
+          backdropBlurEnabled: true,
+          videoBackdropBlurEnabled: false,
+        );
+      case SettingsService.homeDockPerformanceModeOff:
+        return const _DockPerformanceProfile(
+          staticMaxBlurSigma: 0,
+          videoMaxBlurSigma: 0,
+          staticShadowBlurRadius: 10,
+          videoShadowBlurRadius: 8,
+          staticShadowOpacity: 0.12,
+          videoShadowOpacity: 0.10,
+          videoFakeGlassBoost: 1.35,
+          backdropBlurEnabled: false,
+          videoBackdropBlurEnabled: false,
+        );
+      default:
+        return const _DockPerformanceProfile(
+          staticMaxBlurSigma: 10,
+          videoMaxBlurSigma: 0,
+          staticShadowBlurRadius: 24,
+          videoShadowBlurRadius: 16,
+          staticShadowOpacity: 0.24,
+          videoShadowOpacity: 0.18,
+          videoFakeGlassBoost: 1.25,
+          backdropBlurEnabled: true,
+          videoBackdropBlurEnabled: false,
+        );
+    }
   }
 }

@@ -44,7 +44,7 @@ class ProfileSecurityService extends ChangeNotifier
   bool get isUnlocked => _isUnlockSessionValid();
   bool get canManageLauncherStructure => isOwnerActive && _isSettingsAccessOpen;
   bool get canAccessSettingsWithoutPin => _isSettingsAccessOpen;
-  int get activeHiddenCount => _ownerProfile.hiddenPackages.length;
+  int get activeHiddenCount => 0;
   int get activeLockedCount => _ownerProfile.lockedPackages.length;
 
   LauncherProfile get _ownerProfile => _profiles.putIfAbsent(
@@ -238,16 +238,7 @@ class ProfileSecurityService extends ChangeNotifier
     String profileId,
     String packageName,
     bool hidden,
-  ) async {
-    final profile = _profileStorageFor(profileId);
-    if (hidden) {
-      profile.hiddenPackages.add(packageName);
-      profile.lockedPackages.remove(packageName);
-    } else {
-      profile.hiddenPackages.remove(packageName);
-    }
-    await _persist();
-  }
+  ) async {}
 
   Future<void> setPackageLockedForProfile(
     String profileId,
@@ -264,8 +255,7 @@ class ProfileSecurityService extends ChangeNotifier
     await _persist();
   }
 
-  bool isPackageHiddenForProfile(String profileId, String packageName) =>
-      _profileStorageFor(profileId).hiddenPackages.contains(packageName);
+  bool isPackageHiddenForProfile(String profileId, String packageName) => false;
 
   bool isPackageLockedForProfile(String profileId, String packageName) =>
       _profileStorageFor(profileId).lockedPackages.contains(packageName);
@@ -445,17 +435,16 @@ class ProfileSecurityService extends ChangeNotifier
 
   void _collapseLegacyProfilesIntoOwner() {
     final owner = _ownerProfile;
+    owner.hiddenPackages.clear();
     for (final entry in _profiles.entries) {
       if (entry.key == ownerProfileId) {
         continue;
       }
-      owner.hiddenPackages.addAll(entry.value.hiddenPackages);
       owner.lockedPackages.addAll(entry.value.lockedPackages);
       entry.value.hiddenPackages.clear();
       entry.value.lockedPackages.clear();
       entry.value.enabled = false;
     }
-    owner.lockedPackages.removeAll(owner.hiddenPackages);
     owner.enabled = true;
   }
 

@@ -109,7 +109,7 @@ void main() {
     expect(find.text('App language'), findsAtLeastNWidgets(1));
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      isNot(contains('settings_rail_')),
+      'home_layout_target_appLocale',
     );
     expect(
       tester

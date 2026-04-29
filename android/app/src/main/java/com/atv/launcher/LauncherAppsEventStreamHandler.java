@@ -50,11 +50,13 @@ public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandle
 
         @Override
         public void onPackageRemoved(String packageName, UserHandle user) {
+            _activity.clearAppImageCache(packageName);
             _eventSink.success(eventMap("PACKAGE_REMOVED", packageName, null, null));
         }
 
         @Override
         public void onPackageAdded(String packageName, UserHandle user) {
+            _activity.clearAppImageCache(packageName);
             Map<String, Serializable> application = _activity.getApplication(packageName);
 
             if (!application.isEmpty()) {
@@ -64,6 +66,7 @@ public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandle
 
         @Override
         public void onPackageChanged(String packageName, UserHandle user) {
+            _activity.clearAppImageCache(packageName);
             Map<String, Serializable> application = _activity.getApplication(packageName);
 
             if (!application.isEmpty()) {
@@ -76,6 +79,7 @@ public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandle
             List<Map<String, Serializable>> applications = new ArrayList<>(packageNames.length);
 
             for (String name : packageNames) {
+                _activity.clearAppImageCache(name);
                 Map<String, Serializable> application = _activity.getApplication(name);
 
                 if (!application.isEmpty()) {

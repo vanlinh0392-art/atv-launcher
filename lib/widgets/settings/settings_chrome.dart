@@ -7,49 +7,99 @@ import 'package:provider/provider.dart';
 double _lerpOpacity(double solid, double transparent, double amount) =>
     solid + ((transparent - solid) * amount);
 
+Color _accentWithOpacity(Color color, double opacity) => color.withOpacity(
+      opacity.clamp(0.0, 1.0),
+    );
+
+enum SettingsButtonVariant {
+  neutral,
+  primary,
+  success,
+  danger,
+}
+
 class SettingsChromeSpec {
   final double transparencyFraction;
+  final double effectiveTransparencyFraction;
 
-  const SettingsChromeSpec._(this.transparencyFraction);
+  const SettingsChromeSpec._(
+    this.transparencyFraction,
+    this.effectiveTransparencyFraction,
+  );
+
+  factory SettingsChromeSpec.fromTransparencyPercent(int transparencyPercent) {
+    final rawFraction = (transparencyPercent / 100).clamp(0.0, 1.0);
+    // Make low TV-facing steps like 5/10/15% visually meaningful instead of
+    // feeling almost identical to 0%.
+    final effectiveFraction = Curves.easeOutCubic.transform(rawFraction);
+    return SettingsChromeSpec._(rawFraction, effectiveFraction);
+  }
 
   factory SettingsChromeSpec.of(BuildContext context) {
-    final settingsService = context.watch<SettingsService?>();
-    final transparencyPercent = settingsService?.settingsUiTransparencyPercent ??
-        SettingsService.settingsUiTransparencyDefault;
-    return SettingsChromeSpec._(
-      (transparencyPercent / 100).clamp(0.0, 1.0),
+    final transparencyPercent = context.select<SettingsService?, int>(
+      (settingsService) =>
+          settingsService?.settingsUiTransparencyPercent ??
+          SettingsService.settingsUiTransparencyDefault,
     );
+    return SettingsChromeSpec.fromTransparencyPercent(transparencyPercent);
   }
 
   double get panelSurfaceOpacity =>
-      _lerpOpacity(0.72, 0.16, transparencyFraction);
+      _lerpOpacity(0.78, 0.05, effectiveTransparencyFraction);
 
   double get panelBorderOpacity =>
-      _lerpOpacity(0.08, 0.035, transparencyFraction);
+      _lerpOpacity(0.1, 0.014, effectiveTransparencyFraction);
 
   double get panelShadowOpacity =>
-      _lerpOpacity(0.16, 0.06, transparencyFraction);
+      _lerpOpacity(0.22, 0.035, effectiveTransparencyFraction);
 
   double get focusFillOpacity =>
-      _lerpOpacity(0.16, 0.05, transparencyFraction);
+      _lerpOpacity(0.2, 0.035, effectiveTransparencyFraction);
 
   double get focusBaseOpacity =>
-      _lerpOpacity(0.07, 0.015, transparencyFraction);
+      _lerpOpacity(0.09, 0.008, effectiveTransparencyFraction);
 
   double get metricTileOpacity =>
-      _lerpOpacity(0.04, 0.012, transparencyFraction);
+      _lerpOpacity(0.08, 0.004, effectiveTransparencyFraction);
 
   double get metricBorderOpacity =>
-      _lerpOpacity(0.055, 0.02, transparencyFraction);
+      _lerpOpacity(0.075, 0.012, effectiveTransparencyFraction);
 
   double get dialogGradientOpacity =>
-      _lerpOpacity(0.82, 0.28, transparencyFraction);
+      _lerpOpacity(0.92, 0.08, effectiveTransparencyFraction);
 
   double get dialogBorderOpacity =>
-      _lerpOpacity(0.08, 0.03, transparencyFraction);
+      _lerpOpacity(0.1, 0.018, effectiveTransparencyFraction);
 
   double get dialogShadowOpacity =>
-      _lerpOpacity(0.36, 0.14, transparencyFraction);
+      _lerpOpacity(0.44, 0.08, effectiveTransparencyFraction);
+
+  double get detailFocusFillOpacity =>
+      _lerpOpacity(0.11, 0.02, effectiveTransparencyFraction);
+
+  double get detailFocusBorderOpacity =>
+      _lerpOpacity(0.88, 0.24, effectiveTransparencyFraction);
+
+  double get detailFocusGlowOpacity =>
+      _lerpOpacity(0.22, 0.055, effectiveTransparencyFraction);
+
+  double get detailFocusShadowOpacity =>
+      _lerpOpacity(0.18, 0.04, effectiveTransparencyFraction);
+
+  double get actionButtonSurfaceOpacity =>
+      _lerpOpacity(0.14, 0.045, effectiveTransparencyFraction);
+
+  double get actionButtonFocusSurfaceOpacity =>
+      _lerpOpacity(0.22, 0.095, effectiveTransparencyFraction);
+
+  double get actionButtonFocusBorderOpacity =>
+      _lerpOpacity(0.98, 0.66, effectiveTransparencyFraction);
+
+  double get actionButtonFocusGlowOpacity =>
+      _lerpOpacity(0.34, 0.14, effectiveTransparencyFraction);
+
+  double get actionButtonPressedOpacity =>
+      _lerpOpacity(0.28, 0.12, effectiveTransparencyFraction);
 }
 
 class SettingsContentView extends StatelessWidget {
@@ -235,36 +285,45 @@ class _SettingsFocusFrameState extends State<SettingsFocusFrame> {
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
           color: _focused
-              ? const Color(0xFF2F7BF5).withOpacity(chromeSpec.focusFillOpacity)
+              ? _accentWithOpacity(
+                  const Color(0xFF4B93FF),
+                  chromeSpec.detailFocusFillOpacity,
+                )
               : Colors.white.withOpacity(chromeSpec.focusBaseOpacity),
           borderRadius: borderRadius,
           border: Border.all(
             color: _focused
-                ? const Color(0xFF9ED4FF)
+                ? _accentWithOpacity(
+                    const Color(0xFFB9DEFF),
+                    chromeSpec.detailFocusBorderOpacity,
+                  )
                 : Colors.white.withOpacity(chromeSpec.panelBorderOpacity),
-            width: _focused ? 2.4 : 1,
+            width: _focused ? 1.7 : 1,
           ),
           boxShadow: _focused
               ? [
                   BoxShadow(
-                    color: const Color(0xFF2A6BD8)
-                        .withOpacity(chromeSpec.panelShadowOpacity + 0.02),
-                    blurRadius: 14,
-                    offset: Offset(0, 7),
+                    color: _accentWithOpacity(
+                      const Color(0xFF4E95FF),
+                      chromeSpec.detailFocusGlowOpacity,
+                    ),
+                    blurRadius: 11,
+                    spreadRadius: 0.5,
+                    offset: const Offset(0, 5),
                   ),
                   BoxShadow(
                     color: Colors.black
-                        .withOpacity(chromeSpec.panelShadowOpacity),
-                    blurRadius: 12,
-                    offset: Offset(0, 6),
+                        .withOpacity(chromeSpec.detailFocusShadowOpacity),
+                    blurRadius: 11,
+                    offset: const Offset(0, 6),
                   ),
                 ]
               : [
                   BoxShadow(
                     color: Colors.black
-                        .withOpacity(chromeSpec.panelShadowOpacity - 0.01),
+                        .withOpacity(chromeSpec.panelShadowOpacity - 0.02),
                     blurRadius: 12,
-                    offset: Offset(0, 6),
+                    offset: const Offset(0, 6),
                   ),
                 ],
         ),
@@ -357,4 +416,322 @@ class SettingsMetricTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class SettingsButtonStyles {
+  static const Duration _duration = Duration(milliseconds: 110);
+  static const BorderRadius _radius = BorderRadius.all(Radius.circular(18));
+  static const BorderRadius _compactRadius =
+      BorderRadius.all(Radius.circular(16));
+
+  static Color accentForVariant(SettingsButtonVariant variant) {
+    switch (variant) {
+      case SettingsButtonVariant.neutral:
+        return const Color(0xFFEAF6FF);
+      case SettingsButtonVariant.primary:
+        return const Color(0xFF7BC2FF);
+      case SettingsButtonVariant.success:
+        return const Color(0xFF61E59B);
+      case SettingsButtonVariant.danger:
+        return const Color(0xFFFF8F8F);
+    }
+  }
+
+  static ButtonStyle filled(
+    BuildContext context, {
+    SettingsButtonVariant variant = SettingsButtonVariant.primary,
+  }) {
+    final spec = SettingsChromeSpec.of(context);
+    final accent = accentForVariant(variant);
+    return ButtonStyle(
+      animationDuration: _duration,
+      minimumSize: const WidgetStatePropertyAll(Size(0, 50)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+      ),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: _radius),
+      ),
+      side: _actionSide(spec, accent),
+      overlayColor: _overlay(spec, accent),
+      shadowColor: _shadow(spec, accent),
+      elevation: _elevation(focused: 6, idle: 1.5, disabled: 0),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  static ButtonStyle elevated(
+    BuildContext context, {
+    SettingsButtonVariant variant = SettingsButtonVariant.primary,
+  }) {
+    final spec = SettingsChromeSpec.of(context);
+    final accent = accentForVariant(variant);
+    return ButtonStyle(
+      animationDuration: _duration,
+      minimumSize: const WidgetStatePropertyAll(Size(0, 50)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+      ),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: _radius),
+      ),
+      side: _actionSide(spec, accent),
+      overlayColor: _overlay(spec, accent),
+      shadowColor: _shadow(spec, accent),
+      elevation: _elevation(focused: 7, idle: 2, disabled: 0),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  static ButtonStyle text(BuildContext context) {
+    final spec = SettingsChromeSpec.of(context);
+    const accent = Color(0xFF8FC9FF);
+    return ButtonStyle(
+      animationDuration: _duration,
+      minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: _radius),
+      ),
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return Colors.white.withOpacity(0.02);
+        }
+        if (states.contains(WidgetState.focused)) {
+          return _accentWithOpacity(
+            accent,
+            spec.actionButtonSurfaceOpacity,
+          );
+        }
+        if (states.contains(WidgetState.pressed)) {
+          return _accentWithOpacity(
+            accent,
+            spec.actionButtonFocusSurfaceOpacity,
+          );
+        }
+        return Colors.white.withOpacity(spec.focusBaseOpacity + 0.012);
+      }),
+      overlayColor: _overlay(spec, accent),
+      shadowColor: _shadow(spec, accent),
+      elevation: _elevation(focused: 3.5, idle: 0, disabled: 0),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  static ButtonStyle icon(BuildContext context) {
+    final spec = SettingsChromeSpec.of(context);
+    const accent = Color(0xFF8FC9FF);
+    return ButtonStyle(
+      animationDuration: _duration,
+      minimumSize: const WidgetStatePropertyAll(Size(44, 44)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.all(10)),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: _compactRadius),
+      ),
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return Colors.white.withOpacity(0.015);
+        }
+        if (states.contains(WidgetState.focused)) {
+          return _accentWithOpacity(
+            accent,
+            spec.actionButtonSurfaceOpacity,
+          );
+        }
+        return Colors.white.withOpacity(spec.focusBaseOpacity + 0.008);
+      }),
+      side: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
+          return BorderSide(
+            color: _accentWithOpacity(
+              accent,
+              spec.actionButtonFocusBorderOpacity,
+            ),
+            width: 2,
+          );
+        }
+        return BorderSide(
+          color: Colors.white.withOpacity(spec.panelBorderOpacity + 0.02),
+          width: 1,
+        );
+      }),
+      overlayColor: _overlay(spec, accent),
+      shadowColor: _shadow(spec, accent),
+      elevation: _elevation(focused: 5, idle: 0, disabled: 0),
+    );
+  }
+
+  static ButtonStyle mergeElevatedVariant(
+    BuildContext context,
+    ButtonStyle baseStyle, {
+    required SettingsButtonVariant variant,
+  }) {
+    final spec = SettingsChromeSpec.of(context);
+    final accent = accentForVariant(variant);
+    return baseStyle.copyWith(
+      animationDuration: _duration,
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: _radius),
+      ),
+      side: _actionSide(spec, accent),
+      overlayColor: _overlay(spec, accent),
+      shadowColor: _shadow(spec, accent),
+      elevation: _elevation(focused: 7, idle: 2, disabled: 0),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  static SettingsControlVisuals resolveControlVisuals(
+    SettingsChromeSpec spec, {
+    required SettingsButtonVariant variant,
+    required bool focused,
+    required bool enabled,
+    required bool selected,
+  }) {
+    final accent = accentForVariant(variant);
+    final fillColor = !enabled
+        ? Colors.white.withOpacity(0.02)
+        : focused
+            ? _accentWithOpacity(accent, spec.actionButtonFocusSurfaceOpacity)
+            : selected
+                ? _accentWithOpacity(accent, spec.actionButtonSurfaceOpacity)
+                : Colors.white.withOpacity(spec.focusBaseOpacity + 0.018);
+    final borderColor = !enabled
+        ? Colors.white.withOpacity(0.04)
+        : focused
+            ? _accentWithOpacity(accent, spec.actionButtonFocusBorderOpacity)
+            : selected
+                ? _accentWithOpacity(accent, 0.7)
+                : Colors.white.withOpacity(spec.panelBorderOpacity + 0.03);
+    final shadowColor = focused
+        ? _accentWithOpacity(accent, spec.actionButtonFocusGlowOpacity)
+        : Colors.black.withOpacity(spec.panelShadowOpacity);
+    return SettingsControlVisuals(
+      fillColor: fillColor,
+      borderColor: borderColor,
+      shadowColor: shadowColor,
+      borderWidth: focused ? 2.35 : (selected ? 1.5 : 1),
+      contentOpacity: enabled ? 1 : 0.42,
+      scale: focused ? 1.024 : 1,
+    );
+  }
+
+  static WidgetStateProperty<BorderSide?> _actionSide(
+    SettingsChromeSpec spec,
+    Color accent,
+  ) {
+    return WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) {
+        return BorderSide(
+          color: Colors.white.withOpacity(spec.panelBorderOpacity),
+          width: 1,
+        );
+      }
+      if (states.contains(WidgetState.focused)) {
+        return BorderSide(
+          color: _accentWithOpacity(
+            accent,
+            spec.actionButtonFocusBorderOpacity,
+          ),
+          width: 2.3,
+        );
+      }
+      if (states.contains(WidgetState.pressed)) {
+        return BorderSide(
+          color: _accentWithOpacity(accent, 0.82),
+          width: 2.1,
+        );
+      }
+      return BorderSide(
+        color: Colors.white.withOpacity(spec.panelBorderOpacity + 0.025),
+        width: 1,
+      );
+    });
+  }
+
+  static WidgetStateProperty<Color?> _overlay(
+    SettingsChromeSpec spec,
+    Color accent,
+  ) {
+    return WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.pressed)) {
+        return _accentWithOpacity(accent, spec.actionButtonPressedOpacity);
+      }
+      if (states.contains(WidgetState.focused)) {
+        return _accentWithOpacity(
+          accent,
+          spec.actionButtonFocusSurfaceOpacity,
+        );
+      }
+      if (states.contains(WidgetState.hovered)) {
+        return _accentWithOpacity(accent, spec.actionButtonSurfaceOpacity);
+      }
+      return null;
+    });
+  }
+
+  static WidgetStateProperty<Color?> _shadow(
+    SettingsChromeSpec spec,
+    Color accent,
+  ) {
+    return WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) {
+        return Colors.transparent;
+      }
+      if (states.contains(WidgetState.focused)) {
+        return _accentWithOpacity(accent, spec.actionButtonFocusGlowOpacity);
+      }
+      return Colors.black.withOpacity(spec.panelShadowOpacity);
+    });
+  }
+
+  static WidgetStateProperty<double?> _elevation({
+    required double focused,
+    required double idle,
+    required double disabled,
+  }) {
+    return WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) {
+        return disabled;
+      }
+      if (states.contains(WidgetState.focused)) {
+        return focused;
+      }
+      if (states.contains(WidgetState.pressed)) {
+        return math.max(idle, focused - 1.5);
+      }
+      return idle;
+    });
+  }
+}
+
+class SettingsControlVisuals {
+  final Color fillColor;
+  final Color borderColor;
+  final Color shadowColor;
+  final double borderWidth;
+  final double contentOpacity;
+  final double scale;
+
+  const SettingsControlVisuals({
+    required this.fillColor,
+    required this.borderColor,
+    required this.shadowColor,
+    required this.borderWidth,
+    required this.contentOpacity,
+    required this.scale,
+  });
 }
