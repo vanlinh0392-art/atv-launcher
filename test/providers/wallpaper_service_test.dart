@@ -8,6 +8,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../mocks.mocks.dart';
 
 void main() {
+  test('defers startup video warm-up until after the fast-start delay',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/1',
+    });
+    final channel = MockFLauncherChannel();
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 13);
+    when(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+
+    final service = WallpaperService(channel, settings);
+
+    verifyNever(channel.getVideoWallpaperTextureId());
+
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    expect(service.videoTextureId, 13);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
+  });
+
   test('setGradient stores gradient mode and clears video state', () async {
     final settings = await _createSettingsService();
     final channel = MockFLauncherChannel();
@@ -107,7 +145,8 @@ void main() {
     expect(settings.videoWallpaperSourceType, 'folder_playlist');
     expect(settings.videoWallpaperFolderBucketId, 'bucket-7');
     expect(settings.videoWallpaperFolderName, 'Trailers');
-    expect(settings.videoWallpaperUris, ['content://video/10', 'content://video/11']);
+    expect(settings.videoWallpaperUris,
+        ['content://video/10', 'content://video/11']);
     expect(service.videoTextureId, 5);
   });
 }

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flauncher/database.dart';
 import 'package:flauncher/models/category.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
+import 'package:drift/drift.dart';
 
 import '../mocks.mocks.dart';
 import '../test_sqlite_setup.dart';
@@ -62,19 +65,26 @@ void main() {
     await harness.service.hideApplication(application);
     expect(harness.service.applications.single.hidden, isTrue);
     expect(
-      harness.service.categories.singleWhere((item) => item.id == category.id).applications,
+      harness.service.categories
+          .singleWhere((item) => item.id == category.id)
+          .applications,
       isEmpty,
     );
 
     await harness.service.showApplication(application);
     expect(harness.service.applications.single.hidden, isFalse);
     expect(
-      harness.service.categories.singleWhere((item) => item.id == category.id).applications.single.packageName,
+      harness.service.categories
+          .singleWhere((item) => item.id == category.id)
+          .applications
+          .single
+          .packageName,
       'tv.app',
     );
   });
 
-  test('restoreLayoutBackup reports unresolved packages and preserves valid apps',
+  test(
+      'restoreLayoutBackup reports unresolved packages and preserves valid apps',
       () async {
     final harness = await _createHarness([
       {
@@ -111,16 +121,21 @@ void main() {
     expect(result['unresolvedPackages'], contains('missing.app'));
     expect(harness.service.categories.single.name, 'Recovered');
     expect(
-      harness.service.categories.single.applications.map((app) => app.packageName).toList(),
+      harness.service.categories.single.applications
+          .map((app) => app.packageName)
+          .toList(),
       ['tv.app'],
     );
     expect(
-      harness.service.applications.firstWhere((app) => app.packageName == 'other.app').hidden,
+      harness.service.applications
+          .firstWhere((app) => app.packageName == 'other.app')
+          .hidden,
       isTrue,
     );
   });
 
-  test('moveCategory compatibility wrapper reorders launcher sections', () async {
+  test('moveCategory compatibility wrapper reorders launcher sections',
+      () async {
     final harness = await _createHarness([
       {
         'packageName': 'tv.app',
@@ -140,9 +155,80 @@ void main() {
     await harness.service.moveCategory(1, 0);
 
     expect(
-      harness.service.launcherSections.whereType<Category>().map((category) => category.name).toList(),
+      harness.service.launcherSections
+          .whereType<Category>()
+          .map((category) => category.name)
+          .toList(),
       ['Non-TV Applications', 'TV Applications'],
     );
+  });
+
+  test(
+      'bootstraps renderable home from cached database before live sync finishes',
+      () async {
+    final channel = MockFLauncherChannel();
+    final liveApps = Completer<List<Map<dynamic, dynamic>>>();
+    when(channel.getApplications()).thenAnswer((_) => liveApps.future);
+    when(channel.applicationExists(any)).thenAnswer((_) async => true);
+    when(channel.addAppsChangedListener(any)).thenReturn(null);
+
+    final database = FLauncherDatabase.inMemory();
+    await database.persistApps([
+      AppsCompanion.insert(
+        packageName: 'cached.app',
+        name: 'Cached App',
+        version: '1.0.0',
+      ),
+    ]);
+    final categoryId = await database.insertCategory(
+      CategoriesCompanion.insert(
+        name: 'Cached',
+        order: 0,
+        sort: const Value(CategorySort.manual),
+        type: const Value(CategoryType.row),
+        rowHeight: const Value(Category.RowHeight),
+        columnsCount: const Value(Category.ColumnsCount),
+      ),
+    );
+    await database.insertAppsCategories([
+      AppsCategoriesCompanion.insert(
+        categoryId: categoryId,
+        appPackageName: 'cached.app',
+        order: 0,
+      ),
+    ]);
+
+    final service = AppsService(channel, database);
+    addTearDown(service.dispose);
+    addTearDown(database.close);
+
+    for (var attempt = 0; attempt < 50 && !service.initialized; attempt += 1) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+
+    expect(service.initialized, isTrue);
+    expect(service.hasRenderableHome, isTrue);
+    expect(service.staleCache, isFalse);
+    expect(service.startupPhase, AppsService.startupPhaseSyncingLive);
+    expect(service.categories.single.name, 'Cached');
+
+    liveApps.complete([
+      {
+        'packageName': 'cached.app',
+        'name': 'Cached App',
+        'version': '1.0.1',
+        'sideloaded': false,
+      },
+    ]);
+
+    for (var attempt = 0;
+        attempt < 80 && service.startupPhase != AppsService.startupPhaseReady;
+        attempt += 1) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+
+    expect(service.startupPhase, AppsService.startupPhaseReady);
+    expect(service.lastLiveSyncAt, greaterThan(0));
   });
 }
 

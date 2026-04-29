@@ -5,8 +5,8 @@ import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -88,43 +88,53 @@ class WallpaperPanelPage extends StatelessWidget {
                 Text(localizations.sourceSelectionTitle,
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 14),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                SettingsAdaptiveGrid(
+                  minChildWidth: 230,
+                  maxColumns: 3,
                   children: [
-                    FilledButton.tonalIcon(
-                      onPressed: () => Navigator.of(context)
-                          .pushNamed(GradientPanelPage.routeName),
-                      icon: const Icon(Icons.gradient),
-                      label: Text(localizations.gradient),
+                    SettingsActionCard(
+                      title: localizations.gradient,
+                      icon: Icons.gradient,
+                      onPressed: () async {
+                        Navigator.of(context).pushNamed(
+                          GradientPanelPage.routeName,
+                        );
+                      },
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => wallpaperService.pickImageWallpaper(),
-                      icon: const Icon(Icons.image_outlined),
-                      label: Text(localizations.picture),
+                    SettingsActionCard(
+                      title: localizations.picture,
+                      icon: Icons.image_outlined,
+                      onPressed: () async {
+                        await wallpaperService.pickImageWallpaper();
+                      },
                     ),
-                    FilledButton.icon(
-                      onPressed: () => wallpaperService.pickVideoWallpaper(),
-                      icon: const Icon(Icons.movie_outlined),
-                      label: Text(localizations.singleVideo),
+                    SettingsActionCard(
+                      title: localizations.singleVideo,
+                      icon: Icons.movie_outlined,
+                      onPressed: () async {
+                        await wallpaperService.pickVideoWallpaper();
+                      },
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: () =>
-                          wallpaperService.pickVideoWallpaperFilesSaf(),
-                      icon: const Icon(Icons.video_collection_outlined),
-                      label: Text(localizations.pickMultipleVideos),
+                    SettingsActionCard(
+                      title: localizations.pickMultipleVideos,
+                      icon: Icons.video_collection_outlined,
+                      onPressed: () async {
+                        await wallpaperService.pickVideoWallpaperFilesSaf();
+                      },
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: () =>
-                          wallpaperService.pickVideoWallpaperFolderSaf(),
-                      icon: const Icon(Icons.folder_open_outlined),
-                      label: Text(localizations.pickFolder),
+                    SettingsActionCard(
+                      title: localizations.pickFolder,
+                      icon: Icons.folder_open_outlined,
+                      onPressed: () async {
+                        await wallpaperService.pickVideoWallpaperFolderSaf();
+                      },
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: () =>
-                          _browseLocalLibrary(context, wallpaperService),
-                      icon: const Icon(Icons.sd_storage_outlined),
-                      label: Text(localizations.browseTvStorage),
+                    SettingsActionCard(
+                      title: localizations.browseTvStorage,
+                      icon: Icons.sd_storage_outlined,
+                      onPressed: () async {
+                        await _browseLocalLibrary(context, wallpaperService);
+                      },
                     ),
                   ],
                 ),
@@ -162,37 +172,52 @@ class WallpaperPanelPage extends StatelessWidget {
                 Text(localizations.playlistBehaviourTitle,
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 14),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    ChoiceChip(
-                      label: Text(localizations.sequentialOrder),
-                      selected: wallpaperService.videoOrderMode == 'sequential',
-                      onSelected: (_) =>
-                          wallpaperService.setVideoOrderMode('sequential'),
+                SettingsChoiceCard<String>(
+                  selectorKey: const Key('wallpaper_order_mode_selector'),
+                  optionKeyPrefix: 'wallpaper_order_mode_option',
+                  title: localizations.sourceLabel,
+                  subtitle: localizations.playlistBehaviourTitle,
+                  icon: Icons.playlist_play_outlined,
+                  value: wallpaperService.videoOrderMode,
+                  options: <SettingsChoiceOption<String>>[
+                    SettingsChoiceOption<String>(
+                      value: 'sequential',
+                      label: localizations.sequentialOrder,
                     ),
-                    ChoiceChip(
-                      label: Text(localizations.shuffleOrder),
-                      selected: wallpaperService.videoOrderMode == 'shuffle',
-                      onSelected: (_) =>
-                          wallpaperService.setVideoOrderMode('shuffle'),
-                    ),
-                    ChoiceChip(
-                      label: Text(localizations.onCompletion),
-                      selected:
-                          wallpaperService.videoAdvanceMode == 'on_completion',
-                      onSelected: (_) =>
-                          wallpaperService.setVideoAdvanceMode('on_completion'),
-                    ),
-                    ChoiceChip(
-                      label: Text(localizations.fixedInterval),
-                      selected:
-                          wallpaperService.videoAdvanceMode == 'fixed_interval',
-                      onSelected: (_) => wallpaperService
-                          .setVideoAdvanceMode('fixed_interval'),
+                    SettingsChoiceOption<String>(
+                      value: 'shuffle',
+                      label: localizations.shuffleOrder,
                     ),
                   ],
+                  valueLabelBuilder: (value) => localizedVideoOrderMode(
+                    localizations,
+                    value,
+                  ),
+                  onChanged: wallpaperService.setVideoOrderMode,
+                ),
+                const SizedBox(height: 10),
+                SettingsChoiceCard<String>(
+                  selectorKey: const Key('wallpaper_advance_mode_selector'),
+                  optionKeyPrefix: 'wallpaper_advance_mode_option',
+                  title: localizations.playlistBehaviourTitle,
+                  subtitle: localizations.fixedInterval,
+                  icon: Icons.schedule_outlined,
+                  value: wallpaperService.videoAdvanceMode,
+                  options: <SettingsChoiceOption<String>>[
+                    SettingsChoiceOption<String>(
+                      value: 'on_completion',
+                      label: localizations.onCompletion,
+                    ),
+                    SettingsChoiceOption<String>(
+                      value: 'fixed_interval',
+                      label: localizations.fixedInterval,
+                    ),
+                  ],
+                  valueLabelBuilder: (value) => localizedVideoAdvanceMode(
+                    localizations,
+                    value,
+                  ),
+                  onChanged: wallpaperService.setVideoAdvanceMode,
                 ),
                 const SizedBox(height: 10),
                 RoundedSwitchListTile(
@@ -209,7 +234,7 @@ class WallpaperPanelPage extends StatelessWidget {
                 if (wallpaperService.videoAdvanceMode == 'fixed_interval')
                   Padding(
                     padding: const EdgeInsets.only(top: 10),
-                    child: _WallpaperStepperSettingCard(
+                    child: SettingsStepperCard(
                       selectorKey:
                           const Key('video_switch_interval_seconds_stepper'),
                       buttonKeyPrefix: 'video_switch_interval_seconds',
@@ -275,44 +300,63 @@ class WallpaperPanelPage extends StatelessWidget {
                   secondary: const Icon(Icons.home_max_outlined),
                 ),
                 const SizedBox(height: 10),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.crop),
-                  title: Text(localizations.videoFitLabel),
-                  subtitle: Text(
-                    localizedVideoFit(localizations, wallpaperService.videoFit),
-                  ),
-                  onTap: wallpaperService.isVideoMode
-                      ? () => _showSimplePicker(
-                            context,
-                            title: localizations.videoFitLabel,
-                            options: const ['center-crop', 'fit', 'fill'],
-                            currentValue: wallpaperService.videoFit,
-                            onSelected: wallpaperService.setVideoFit,
-                          )
-                      : null,
+                SettingsChoiceCard<String>(
+                  selectorKey: const Key('wallpaper_video_fit_selector'),
+                  optionKeyPrefix: 'wallpaper_video_fit_option',
+                  title: localizations.videoFitLabel,
+                  subtitle: localizations.playbackAppearanceTitle,
+                  icon: Icons.crop,
+                  value: wallpaperService.videoFit,
+                  options: <SettingsChoiceOption<String>>[
+                    SettingsChoiceOption<String>(
+                      value: 'center-crop',
+                      label: localizations.videoFitCenterCrop,
+                    ),
+                    SettingsChoiceOption<String>(
+                      value: 'fit',
+                      label: localizations.videoFitFit,
+                    ),
+                    SettingsChoiceOption<String>(
+                      value: 'fill',
+                      label: localizations.videoFitFill,
+                    ),
+                  ],
+                  valueLabelBuilder: (value) =>
+                      localizedVideoFit(localizations, value),
+                  onChanged: wallpaperService.setVideoFit,
                 ),
                 const SizedBox(height: 10),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.blur_on_outlined),
-                  title: Text(localizations.videoBlurLabel),
-                  subtitle: Text(
-                    localizedVideoBlur(
-                        localizations, wallpaperService.videoBlur),
-                  ),
-                  onTap: wallpaperService.isVideoMode
-                      ? () => _showSimplePicker(
-                            context,
-                            title: localizations.videoBlurLabel,
-                            options: const ['off', 'low', 'medium', 'high'],
-                            currentValue: wallpaperService.videoBlur,
-                            onSelected: wallpaperService.setVideoBlur,
-                          )
-                      : null,
+                SettingsChoiceCard<String>(
+                  selectorKey: const Key('wallpaper_video_blur_selector'),
+                  optionKeyPrefix: 'wallpaper_video_blur_option',
+                  title: localizations.videoBlurLabel,
+                  subtitle: localizations.playbackAppearanceTitle,
+                  icon: Icons.blur_on_outlined,
+                  value: wallpaperService.videoBlur,
+                  options: <SettingsChoiceOption<String>>[
+                    SettingsChoiceOption<String>(
+                      value: 'off',
+                      label: localizations.videoBlurOff,
+                    ),
+                    SettingsChoiceOption<String>(
+                      value: 'low',
+                      label: localizations.videoBlurLow,
+                    ),
+                    SettingsChoiceOption<String>(
+                      value: 'medium',
+                      label: localizations.videoBlurMedium,
+                    ),
+                    SettingsChoiceOption<String>(
+                      value: 'high',
+                      label: localizations.videoBlurHigh,
+                    ),
+                  ],
+                  valueLabelBuilder: (value) =>
+                      localizedVideoBlur(localizations, value),
+                  onChanged: wallpaperService.setVideoBlur,
                 ),
                 const SizedBox(height: 10),
-                _WallpaperStepperSettingCard(
+                SettingsStepperCard(
                   selectorKey: const Key('video_dim_percent_stepper'),
                   buttonKeyPrefix: 'video_dim_percent',
                   title: localizations
@@ -364,38 +408,6 @@ class WallpaperPanelPage extends StatelessWidget {
     );
   }
 
-  Future<void> _showSimplePicker(
-    BuildContext context, {
-    required String title,
-    required List<String> options,
-    required String currentValue,
-    required Future<void> Function(String value) onSelected,
-  }) async {
-    final localizations = AppLocalizations.of(context)!;
-    final selected = await showDialog<String>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(title),
-        children: options
-            .map(
-              (option) => SimpleDialogOption(
-                onPressed: () => Navigator.of(context).pop(option),
-                child: Text(
-                  option == currentValue
-                      ? '${_localizedOption(localizations, option)} (${localizations.currentLabel})'
-                      : _localizedOption(localizations, option),
-                ),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    );
-
-    if (selected != null) {
-      await onSelected(selected);
-    }
-  }
-
   Future<void> _requestMediaPermission(
     BuildContext context,
     SystemBridgeService bridgeService,
@@ -416,27 +428,6 @@ class WallpaperPanelPage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _localizedOption(AppLocalizations localizations, String option) {
-    switch (option) {
-      case 'fit':
-        return localizations.videoFitFit;
-      case 'fill':
-        return localizations.videoFitFill;
-      case 'center-crop':
-        return localizations.videoFitCenterCrop;
-      case 'low':
-        return localizations.videoBlurLow;
-      case 'medium':
-        return localizations.videoBlurMedium;
-      case 'high':
-        return localizations.videoBlurHigh;
-      case 'off':
-        return localizations.videoBlurOff;
-      default:
-        return option;
-    }
   }
 }
 
@@ -487,42 +478,47 @@ class _VideoLibraryDialog extends StatelessWidget {
                               itemCount: folders.length,
                               itemBuilder: (context, index) {
                                 final folder = folders[index];
-                                return ListTile(
-                                  title: Text(folder['name']?.toString() ??
-                                      localizations.genericFolder),
-                                  subtitle: Text(localizations.videoCount(
-                                    ((folder['count'] as num?) ?? 0).toInt(),
-                                  )),
-                                  onTap: () async {
-                                    final wallpaper =
-                                        context.read<WallpaperService>();
-                                    final folderSnapshot =
-                                        await wallpaper.browseLocalVideoLibrary(
-                                      bucketId: folder['bucketId']?.toString(),
-                                    );
-                                    final uris =
-                                        ((folderSnapshot['videos'] as List?) ??
-                                                const [])
-                                            .map((item) => (item as Map)
-                                                .cast<String, dynamic>())
-                                            .map((item) =>
-                                                item['uri']?.toString() ?? '')
-                                            .where((item) => item.isNotEmpty)
-                                            .toList(growable: false);
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop(
-                                        _LibrarySelection(
-                                          sourceType: 'folder_playlist',
-                                          uris: uris,
-                                          bucketId:
-                                              folder['bucketId']?.toString() ??
-                                                  '',
-                                          folderName:
-                                              folder['name']?.toString() ?? '',
-                                        ),
+                                return EnsureVisible(
+                                  alignment: 0.12,
+                                  child: ListTile(
+                                    title: Text(folder['name']?.toString() ??
+                                        localizations.genericFolder),
+                                    subtitle: Text(localizations.videoCount(
+                                      ((folder['count'] as num?) ?? 0).toInt(),
+                                    )),
+                                    onTap: () async {
+                                      final wallpaper =
+                                          context.read<WallpaperService>();
+                                      final folderSnapshot = await wallpaper
+                                          .browseLocalVideoLibrary(
+                                        bucketId:
+                                            folder['bucketId']?.toString(),
                                       );
-                                    }
-                                  },
+                                      final uris = ((folderSnapshot['videos']
+                                                  as List?) ??
+                                              const [])
+                                          .map((item) => (item as Map)
+                                              .cast<String, dynamic>())
+                                          .map((item) =>
+                                              item['uri']?.toString() ?? '')
+                                          .where((item) => item.isNotEmpty)
+                                          .toList(growable: false);
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop(
+                                          _LibrarySelection(
+                                            sourceType: 'folder_playlist',
+                                            uris: uris,
+                                            bucketId: folder['bucketId']
+                                                    ?.toString() ??
+                                                '',
+                                            folderName:
+                                                folder['name']?.toString() ??
+                                                    '',
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
                                 );
                               },
                             ),
@@ -543,20 +539,24 @@ class _VideoLibraryDialog extends StatelessWidget {
                               itemCount: videos.length.clamp(0, 20).toInt(),
                               itemBuilder: (context, index) {
                                 final video = videos[index];
-                                return ListTile(
-                                  title: Text(
-                                      video['displayName']?.toString() ??
-                                          localizations.genericVideo),
-                                  subtitle: Text(
-                                      video['bucketName']?.toString() ?? ''),
-                                  onTap: () => Navigator.of(context).pop(
-                                    _LibrarySelection(
-                                      sourceType: 'single_file',
-                                      uris: [video['uri']?.toString() ?? ''],
-                                      bucketId:
-                                          video['bucketId']?.toString() ?? '',
-                                      folderName:
-                                          video['bucketName']?.toString() ?? '',
+                                return EnsureVisible(
+                                  alignment: 0.12,
+                                  child: ListTile(
+                                    title: Text(
+                                        video['displayName']?.toString() ??
+                                            localizations.genericVideo),
+                                    subtitle: Text(
+                                        video['bucketName']?.toString() ?? ''),
+                                    onTap: () => Navigator.of(context).pop(
+                                      _LibrarySelection(
+                                        sourceType: 'single_file',
+                                        uris: [video['uri']?.toString() ?? ''],
+                                        bucketId:
+                                            video['bucketId']?.toString() ?? '',
+                                        folderName:
+                                            video['bucketName']?.toString() ??
+                                                '',
+                                      ),
                                     ),
                                   ),
                                 );
@@ -589,188 +589,4 @@ class _LibrarySelection {
     required this.bucketId,
     required this.folderName,
   });
-}
-
-class _WallpaperStepperSettingCard extends StatefulWidget {
-  final Key? selectorKey;
-  final String? buttonKeyPrefix;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final int value;
-  final int minimum;
-  final int maximum;
-  final int step;
-  final String Function(int value) valueLabelBuilder;
-  final ValueChanged<int>? onChanged;
-
-  const _WallpaperStepperSettingCard({
-    this.selectorKey,
-    this.buttonKeyPrefix,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.value,
-    required this.minimum,
-    required this.maximum,
-    required this.step,
-    required this.valueLabelBuilder,
-    required this.onChanged,
-  });
-
-  @override
-  State<_WallpaperStepperSettingCard> createState() =>
-      _WallpaperStepperSettingCardState();
-}
-
-class _WallpaperStepperSettingCardState
-    extends State<_WallpaperStepperSettingCard> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final canDecrease =
-        widget.onChanged != null && widget.value > widget.minimum;
-    final canIncrease =
-        widget.onChanged != null && widget.value < widget.maximum;
-
-    return EnsureVisible(
-      alignment: 0.12,
-      child: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-              _shiftValue(-widget.step),
-          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-              _shiftValue(widget.step),
-        },
-        child: FocusableActionDetector(
-          onShowFocusHighlight: (value) {
-            if (_focused != value) {
-              setState(() => _focused = value);
-            }
-          },
-          child: SettingsFocusFrame(
-            key: widget.selectorKey,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 120),
-              opacity: _focused ? 1 : 0.96,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(widget.icon, color: Colors.white70),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.title,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.subtitle,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: Colors.white70),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      ExcludeFocus(
-                        child: FilledButton.tonal(
-                          onPressed:
-                              canDecrease ? () => _shiftValue(-widget.step) : null,
-                          key: widget.buttonKeyPrefix == null
-                              ? null
-                              : ValueKey<String>(
-                                  '${widget.buttonKeyPrefix}_decrease',
-                                ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Icon(Icons.remove),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.04),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.06),
-                            ),
-                          ),
-                          child: Text(
-                            widget.valueLabelBuilder(widget.value),
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ExcludeFocus(
-                        child: FilledButton.tonal(
-                          onPressed:
-                              canIncrease ? () => _shiftValue(widget.step) : null,
-                          key: widget.buttonKeyPrefix == null
-                              ? null
-                              : ValueKey<String>(
-                                  '${widget.buttonKeyPrefix}_increase',
-                                ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Icon(Icons.add),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _shiftValue(int delta) {
-    if (widget.onChanged == null) {
-      return;
-    }
-    final next = (widget.value + delta).clamp(widget.minimum, widget.maximum);
-    if (next != widget.value) {
-      widget.onChanged!(next);
-    }
-  }
 }

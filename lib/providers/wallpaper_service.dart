@@ -14,13 +14,20 @@ import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/gradients.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 
 class WallpaperService extends ChangeNotifier {
+  static const bool fastStartupEnabled = true;
+  static const Duration _videoWarmUpDelay = Duration(milliseconds: 400);
+
   final FLauncherChannel _fLauncherChannel;
   final SettingsService _settingsService;
 
   ImageProvider? _wallpaper;
   int? _videoTextureId;
+  bool _videoWarmUpScheduled = false;
+  bool _videoWarmUpCompleted = false;
+  final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
 
   ImageProvider? get wallpaper => _wallpaper;
   int? get videoTextureId => _videoTextureId;
@@ -57,9 +64,17 @@ class WallpaperService extends ChangeNotifier {
 
   Future<void> _init() async {
     await _reloadPreviewImage();
-    if (isVideoMode) {
-      await _ensureVideoTextureId();
-      await syncVideoOptionsToNative();
+    _logStartupMetric(
+      'time_to_wallpaper_poster',
+      DateTime.now().millisecondsSinceEpoch - _bootstrapStartedAt,
+    );
+    if (!isVideoMode) {
+      return;
+    }
+    if (fastStartupEnabled) {
+      _scheduleVideoWarmUp();
+    } else {
+      await _warmUpVideoController();
     }
   }
 
@@ -67,9 +82,9 @@ class WallpaperService extends ChangeNotifier {
     await _reloadPreviewImage();
     await _fLauncherChannel.setWallpaperMode(wallpaperMode);
     if (isVideoMode) {
-      await _ensureVideoTextureId();
-      await syncVideoOptionsToNative();
+      await _warmUpVideoController();
     } else {
+      _videoWarmUpCompleted = false;
       _videoTextureId = null;
       notifyListeners();
     }
@@ -91,6 +106,31 @@ class WallpaperService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _scheduleVideoWarmUp() {
+    if (!isVideoMode || _videoWarmUpScheduled || _videoWarmUpCompleted) {
+      return;
+    }
+    _videoWarmUpScheduled = true;
+    Future<void>.delayed(_videoWarmUpDelay, () async {
+      _videoWarmUpScheduled = false;
+      if (!isVideoMode) {
+        return;
+      }
+      await _warmUpVideoController();
+    });
+  }
+
+  Future<void> _warmUpVideoController() async {
+    final startedAt = DateTime.now().millisecondsSinceEpoch;
+    await _ensureVideoTextureId();
+    await syncVideoOptionsToNative();
+    _videoWarmUpCompleted = true;
+    _logStartupMetric(
+      'time_to_video_ready_request',
+      DateTime.now().millisecondsSinceEpoch - startedAt,
+    );
+  }
+
   Future<void> pickImageWallpaper() async {
     final result = await _fLauncherChannel.pickWallpaperAsset(kind: 'image');
     if (result['cancelled'] == true) {
@@ -102,6 +142,7 @@ class WallpaperService extends ChangeNotifier {
         .setWallpaperPreviewPath(result['previewPath']?.toString() ?? '');
     await _settingsService.setWallpaperMode('image');
     await _fLauncherChannel.setWallpaperMode('image');
+    _videoWarmUpCompleted = false;
     _videoTextureId = null;
     await _reloadPreviewImage();
   }
@@ -199,8 +240,8 @@ class WallpaperService extends ChangeNotifier {
     await _settingsService.setVideoWallpaperFolderName(folderName);
     await _fLauncherChannel.setWallpaperMode('video');
     await _reloadPreviewImage();
-    await _ensureVideoTextureId();
-    await syncVideoOptionsToNative();
+    _videoWarmUpCompleted = false;
+    await _warmUpVideoController();
   }
 
   Future<void> setGradient(FLauncherGradient fLauncherGradient) async {
@@ -208,6 +249,7 @@ class WallpaperService extends ChangeNotifier {
     await _settingsService.setWallpaperMode('gradient');
     await _fLauncherChannel.setWallpaperMode('gradient');
     _wallpaper = null;
+    _videoWarmUpCompleted = false;
     _videoTextureId = null;
     notifyListeners();
   }
@@ -285,5 +327,12 @@ class WallpaperService extends ChangeNotifier {
       autoResume: videoAutoResume,
     );
     notifyListeners();
+  }
+
+  void _logStartupMetric(String label, int elapsedMs) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('FLauncherPerf $label elapsedMs=$elapsedMs');
   }
 }

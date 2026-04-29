@@ -489,6 +489,17 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
       ) as _i2.Future<Map<String, dynamic>>);
 
   @override
+  _i2.Future<Map<String, dynamic>> getSystemBridgeStatusLite() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getSystemBridgeStatusLite,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
   _i2.Future<Map<String, dynamic>> getProvisioningChecklist() =>
       (super.noSuchMethod(
         Invocation.method(
@@ -785,6 +796,56 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
           #browseLocalVideoLibrary,
           [],
           {#bucketId: bucketId},
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> getTvInputs() => (super.noSuchMethod(
+        Invocation.method(
+          #getTvInputs,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<bool> launchTvInput(String? inputId) => (super.noSuchMethod(
+        Invocation.method(
+          #launchTvInput,
+          [inputId],
+        ),
+        returnValue: _i2.Future<bool>.value(false),
+      ) as _i2.Future<bool>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> querySearchableMedia() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #querySearchableMedia,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<bool> launchMediaUri(String? uri) => (super.noSuchMethod(
+        Invocation.method(
+          #launchMediaUri,
+          [uri],
+        ),
+        returnValue: _i2.Future<bool>.value(false),
+      ) as _i2.Future<bool>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> startSpeechRecognizer() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #startSpeechRecognizer,
+          [],
         ),
         returnValue:
             _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
@@ -1431,6 +1492,33 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
       ) as bool);
 
   @override
+  bool get staleCache => (super.noSuchMethod(
+        Invocation.getter(#staleCache),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  bool get hasRenderableHome => (super.noSuchMethod(
+        Invocation.getter(#hasRenderableHome),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  String get startupPhase => (super.noSuchMethod(
+        Invocation.getter(#startupPhase),
+        returnValue: _i12.dummyValue<String>(
+          this,
+          Invocation.getter(#startupPhase),
+        ),
+      ) as String);
+
+  @override
+  int get lastLiveSyncAt => (super.noSuchMethod(
+        Invocation.getter(#lastLiveSyncAt),
+        returnValue: 0,
+      ) as int);
+
+  @override
   List<_i16.App> get applications => (super.noSuchMethod(
         Invocation.getter(#applications),
         returnValue: <_i16.App>[],
@@ -1459,6 +1547,15 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
         Invocation.getter(#hasListeners),
         returnValue: false,
       ) as bool);
+
+  @override
+  void notifyListeners() => super.noSuchMethod(
+        Invocation.method(
+          #notifyListeners,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
 
   @override
   void sortCategory(_i17.Category? category) => super.noSuchMethod(
@@ -1877,6 +1974,15 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
       ) as _i2.Future<Map<String, dynamic>>);
 
   @override
+  void dispose() => super.noSuchMethod(
+        Invocation.method(
+          #dispose,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
   void addListener(_i14.VoidCallback? listener) => super.noSuchMethod(
         Invocation.method(
           #addListener,
@@ -1890,24 +1996,6 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
         Invocation.method(
           #removeListener,
           [listener],
-        ),
-        returnValueForMissingStub: null,
-      );
-
-  @override
-  void dispose() => super.noSuchMethod(
-        Invocation.method(
-          #dispose,
-          [],
-        ),
-        returnValueForMissingStub: null,
-      );
-
-  @override
-  void notifyListeners() => super.noSuchMethod(
-        Invocation.method(
-          #notifyListeners,
-          [],
         ),
         returnValueForMissingStub: null,
       );
@@ -1952,6 +2040,24 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as bool);
 
   @override
+  bool get showRamInStatusBar => (super.noSuchMethod(
+        Invocation.getter(#showRamInStatusBar),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  int get statusBarClockScalePercent => (super.noSuchMethod(
+        Invocation.getter(#statusBarClockScalePercent),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get settingsUiTransparencyPercent => (super.noSuchMethod(
+        Invocation.getter(#settingsUiTransparencyPercent),
+        returnValue: 0,
+      ) as int);
+
+  @override
   bool get showTimeInStatusBar => (super.noSuchMethod(
         Invocation.getter(#showTimeInStatusBar),
         returnValue: false,
@@ -1976,6 +2082,66 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as String);
 
   @override
+  int get homeDockRowsPreset => (super.noSuchMethod(
+        Invocation.getter(#homeDockRowsPreset),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get homeDockCollapsedRowsPreset => (super.noSuchMethod(
+        Invocation.getter(#homeDockCollapsedRowsPreset),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  bool get homeDockAutoCollapseEnabled => (super.noSuchMethod(
+        Invocation.getter(#homeDockAutoCollapseEnabled),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  int get homeDockAutoCollapseDelaySeconds => (super.noSuchMethod(
+        Invocation.getter(#homeDockAutoCollapseDelaySeconds),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get homeDockGlassIntensityPercent => (super.noSuchMethod(
+        Invocation.getter(#homeDockGlassIntensityPercent),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  bool get homeDockBlurEnabled => (super.noSuchMethod(
+        Invocation.getter(#homeDockBlurEnabled),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  String get homeDockPerformanceMode => (super.noSuchMethod(
+        Invocation.getter(#homeDockPerformanceMode),
+        returnValue: _i12.dummyValue<String>(
+          this,
+          Invocation.getter(#homeDockPerformanceMode),
+        ),
+      ) as String);
+
+  @override
+  int get homeDockRowSpacing => (super.noSuchMethod(
+        Invocation.getter(#homeDockRowSpacing),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  String get appLocaleMode => (super.noSuchMethod(
+        Invocation.getter(#appLocaleMode),
+        returnValue: _i12.dummyValue<String>(
+          this,
+          Invocation.getter(#appLocaleMode),
+        ),
+      ) as String);
+
+  @override
   String get timeFormat => (super.noSuchMethod(
         Invocation.getter(#timeFormat),
         returnValue: _i12.dummyValue<String>(
@@ -1983,6 +2149,24 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
           Invocation.getter(#timeFormat),
         ),
       ) as String);
+
+  @override
+  int get appCardCornerRadius => (super.noSuchMethod(
+        Invocation.getter(#appCardCornerRadius),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get appCardLayoutScalePercent => (super.noSuchMethod(
+        Invocation.getter(#appCardLayoutScalePercent),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get appCardMediaScalePercent => (super.noSuchMethod(
+        Invocation.getter(#appCardMediaScalePercent),
+        returnValue: 0,
+      ) as int);
 
   @override
   String get wallpaperMode => (super.noSuchMethod(
@@ -2250,6 +2434,101 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as _i2.Future<void>);
 
   @override
+  _i2.Future<void> setHomeDockRowsPreset(int? value) => (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockRowsPreset,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockCollapsedRowsPreset(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockCollapsedRowsPreset,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockAutoCollapseEnabled(bool? enabled) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockAutoCollapseEnabled,
+          [enabled],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockAutoCollapseDelaySeconds(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockAutoCollapseDelaySeconds,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockBlurEnabled(bool? enabled) => (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockBlurEnabled,
+          [enabled],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockGlassIntensityPercent(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockGlassIntensityPercent,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockPerformanceMode(String? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockPerformanceMode,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setHomeDockRowSpacing(int? value) => (super.noSuchMethod(
+        Invocation.method(
+          #setHomeDockRowSpacing,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setAppLocaleMode(String? value) => (super.noSuchMethod(
+        Invocation.method(
+          #setAppLocaleMode,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
   _i2.Future<void> setShowCategoryTitles(bool? show) => (super.noSuchMethod(
         Invocation.method(
           #setShowCategoryTitles,
@@ -2270,10 +2549,74 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as _i2.Future<void>);
 
   @override
+  _i2.Future<void> setShowRamInStatusBar(bool? show) => (super.noSuchMethod(
+        Invocation.method(
+          #setShowRamInStatusBar,
+          [show],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setStatusBarClockScalePercent(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setStatusBarClockScalePercent,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setSettingsUiTransparencyPercent(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setSettingsUiTransparencyPercent,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
   _i2.Future<void> setShowTimeInStatusBar(bool? show) => (super.noSuchMethod(
         Invocation.method(
           #setShowTimeInStatusBar,
           [show],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setAppCardCornerRadius(int? value) => (super.noSuchMethod(
+        Invocation.method(
+          #setAppCardCornerRadius,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setAppCardLayoutScalePercent(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setAppCardLayoutScalePercent,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setAppCardMediaScalePercent(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setAppCardMediaScalePercent,
+          [value],
         ),
         returnValue: _i2.Future<void>.value(),
         returnValueForMissingStub: _i2.Future<void>.value(),
@@ -2612,6 +2955,12 @@ class MockSystemBridgeService extends _i1.Mock
       ) as Map<String, dynamic>);
 
   @override
+  Map<String, dynamic> get homeGuardStatus => (super.noSuchMethod(
+        Invocation.getter(#homeGuardStatus),
+        returnValue: <String, dynamic>{},
+      ) as Map<String, dynamic>);
+
+  @override
   Map<String, dynamic> get densityStatus => (super.noSuchMethod(
         Invocation.getter(#densityStatus),
         returnValue: <String, dynamic>{},
@@ -2678,6 +3027,26 @@ class MockSystemBridgeService extends _i1.Mock
   _i2.Future<void> refresh() => (super.noSuchMethod(
         Invocation.method(
           #refresh,
+          [],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> refreshLite() => (super.noSuchMethod(
+        Invocation.method(
+          #refreshLite,
+          [],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> refreshFull() => (super.noSuchMethod(
+        Invocation.method(
+          #refreshFull,
           [],
         ),
         returnValue: _i2.Future<void>.value(),

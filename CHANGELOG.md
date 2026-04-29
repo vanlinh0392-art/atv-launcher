@@ -13,6 +13,7 @@ Các thay đổi dưới đây mô tả riêng bản fork hiện tại, không l
 
 - Tích hợp native system bridge ngay trong launcher với provisioning, diagnostics và recovery
 - Thêm Permission Center với checklist grant, wizard local ADB và trạng thái health
+- Chuẩn hóa install flow public sang local ADB one-time trong app, bỏ hướng dẫn provisioning bằng script PC và bỏ ví dụ IP hard-code
 - Bổ sung Resident Core, boot/wake heal flow và Xiaomi-specific recovery
 - Thêm ADB automation policy, battery optimization guidance và home guard
 

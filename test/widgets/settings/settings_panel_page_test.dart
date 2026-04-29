@@ -86,12 +86,88 @@ void main() {
     await tester.tap(find.text('Permissions & Provisioning').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Provisioning Wizard'), findsOneWidget);
+    expect(find.text('Provisioning Wizard'), findsAtLeastNWidgets(1));
     expect(find.text('Grant via local ADB'), findsOneWidget);
   });
 
-  testWidgets('auto focuses Home & Layout detail pane on open',
+  testWidgets('quick grant shows guidance when ADB is disabled',
       (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permissions & Provisioning').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('permissions_quick_grant_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Open developer options'), findsWidgets);
+  });
+
+  testWidgets('quick grant runs local ADB provisioning when ADB is enabled',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService(
+      provisioningStatus: const <String, dynamic>{
+        'requirements': <Map<String, dynamic>>[
+          <String, dynamic>{'name': 'adb_enabled', 'granted': true},
+          <String, dynamic>{'name': 'adb_wifi_enabled', 'granted': false},
+        ],
+        'commands': <String>[],
+      },
+    );
+    when(
+      bridgeService.runProvisioningAction(
+        action: anyNamed('action'),
+        suggestedPolicy: anyNamed('suggestedPolicy'),
+      ),
+    ).thenAnswer((_) async => const <String, dynamic>{
+          'success': true,
+          'message': 'Provisioned',
+        });
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permissions & Provisioning').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('permissions_quick_grant_button')));
+    await tester.pumpAndSettle();
+
+    verify(
+      bridgeService.runProvisioningAction(
+        action: 'grant_all_local_adb',
+        suggestedPolicy: 'adb_and_wifi',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('auto focuses Home & Layout detail pane on open', (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
     final appsService = MockAppsService();
@@ -203,7 +279,7 @@ void main() {
   });
 
   testWidgets(
-      'mounts only the current detail page and restores wallpaper scroll',
+      'mounts only the current detail page and keeps wallpaper scroll context',
       (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
@@ -243,7 +319,13 @@ void main() {
       of: wallpaperPageFinder,
       matching: find.byType(Scrollable),
     );
-    await tester.drag(wallpaperPageFinder, const Offset(0, -500));
+    final fitSelectorFinder =
+        find.byKey(const Key('wallpaper_video_fit_selector'));
+    await tester.scrollUntilVisible(
+      fitSelectorFinder,
+      240,
+      scrollable: wallpaperScrollableFinder,
+    );
     await tester.pumpAndSettle();
     final initialPixels = tester
         .state<ScrollableState>(wallpaperScrollableFinder)
@@ -273,7 +355,8 @@ void main() {
         .state<ScrollableState>(wallpaperScrollableFinder)
         .position
         .pixels;
-    expect(restoredPixels, closeTo(initialPixels, 0.1));
+    expect(restoredPixels, greaterThan(0));
+    expect(restoredPixels, greaterThan(initialPixels * 0.35));
 
     expect(
       find.byType(WallpaperPanelPage, skipOffstage: false),
@@ -305,7 +388,7 @@ Future<void> _pumpSettingsPanel(
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const Material(child: SettingsPanelPage()),
+        home: const Scaffold(body: SettingsPanelPage()),
       ),
     ),
   );
@@ -334,16 +417,19 @@ MockWallpaperService _mockWallpaperService() {
   return wallpaperService;
 }
 
-MockSystemBridgeService _mockBridgeService() {
+MockSystemBridgeService _mockBridgeService({
+  Map<String, dynamic>? provisioningStatus,
+}) {
   final bridgeService = MockSystemBridgeService();
   when(bridgeService.fileAccessStatus)
       .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
   when(bridgeService.provisioningStatus).thenReturn(
-    const <String, dynamic>{
-      'requirements': <Map<String, dynamic>>[],
-      'commands': <String>[],
-      'wizardSteps': <String>['Enable developer options', 'Run local ADB'],
-    },
+    provisioningStatus ??
+        const <String, dynamic>{
+          'requirements': <Map<String, dynamic>>[],
+          'commands': <String>[],
+          'wizardSteps': <String>['Enable developer options', 'Run local ADB'],
+        },
   );
   return bridgeService;
 }

@@ -18,8 +18,8 @@
 
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -106,147 +106,23 @@ class StatusBarPanelPage extends StatelessWidget {
                 secondary: const Icon(Icons.watch_later_outlined),
               ),
               const SizedBox(height: 10),
-              _ClockScaleSlider(
+              SettingsStepperCard(
+                selectorKey: const Key('status_bar_clock_scale_stepper'),
+                buttonKeyPrefix: 'status_bar_clock_scale',
+                title: localizations.dateAndTimeScaleTitle,
+                subtitle: localizations.dateAndTimeScaleDescription,
+                icon: Icons.text_fields_outlined,
                 value: settings.statusBarClockScalePercent,
+                minimum: SettingsService.statusBarClockScaleMin,
+                maximum: SettingsService.statusBarClockScaleMax,
+                step: SettingsService.statusBarClockScaleStep,
+                valueLabelBuilder: (value) => '$value%',
                 onChanged: settings.setStatusBarClockScalePercent,
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ClockScaleSlider extends StatefulWidget {
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  const _ClockScaleSlider({
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  State<_ClockScaleSlider> createState() => _ClockScaleSliderState();
-}
-
-class _ClockScaleSliderState extends State<_ClockScaleSlider> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context)!;
-    return CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-            _shiftValue(-SettingsService.statusBarClockScaleStep),
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-            _shiftValue(SettingsService.statusBarClockScaleStep),
-      },
-      child: FocusableActionDetector(
-        onShowFocusHighlight: (value) {
-          if (_focused != value) {
-            setState(() => _focused = value);
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 90),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(_focused ? 0.06 : 0.03),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: _focused
-                  ? const Color(0xFF8CCBFF)
-                  : Colors.white.withOpacity(0.05),
-              width: _focused ? 2 : 1,
-            ),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.text_fields_outlined, color: Colors.white70),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          localizations.dateAndTimeScaleTitle,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          localizations.dateAndTimeScaleDescription,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '${widget.value}%',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 8,
-                  overlayShape: SliderComponentShape.noOverlay,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 10),
-                  inactiveTrackColor: Colors.white24,
-                  activeTrackColor: const Color(0xFF8CCBFF),
-                  thumbColor: const Color(0xFFB7DBFF),
-                ),
-                child: Slider(
-                  value: widget.value.toDouble(),
-                  min: SettingsService.statusBarClockScaleMin.toDouble(),
-                  max: SettingsService.statusBarClockScaleMax.toDouble(),
-                  divisions: ((SettingsService.statusBarClockScaleMax -
-                              SettingsService.statusBarClockScaleMin) /
-                          SettingsService.statusBarClockScaleStep)
-                      .round(),
-                  label: '${widget.value}%',
-                  onChanged: (value) => widget.onChanged(_snapValue(value)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _shiftValue(int delta) {
-    final next = (widget.value + delta).clamp(
-      SettingsService.statusBarClockScaleMin,
-      SettingsService.statusBarClockScaleMax,
-    );
-    if (next != widget.value) {
-      widget.onChanged(next);
-    }
-  }
-
-  int _snapValue(double rawValue) {
-    final stepOffset =
-        ((rawValue - SettingsService.statusBarClockScaleMin) /
-                SettingsService.statusBarClockScaleStep)
-            .round();
-    return (SettingsService.statusBarClockScaleMin +
-            (stepOffset * SettingsService.statusBarClockScaleStep))
-        .clamp(
-      SettingsService.statusBarClockScaleMin,
-      SettingsService.statusBarClockScaleMax,
     );
   }
 }

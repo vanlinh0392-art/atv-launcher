@@ -28,7 +28,15 @@ import 'package:provider/provider.dart';
 
 import 'flauncher.dart';
 
-class FLauncherApp extends StatelessWidget {
+class FLauncherApp extends StatefulWidget {
+  const FLauncherApp({super.key});
+
+  @override
+  State<FLauncherApp> createState() => _FLauncherAppState();
+}
+
+class _FLauncherAppState extends State<FLauncherApp>
+    with WidgetsBindingObserver {
   static const PrioritizedIntents _backIntents =
       PrioritizedIntents(orderedIntents: [DismissIntent(), BackIntent()]);
 
@@ -45,12 +53,38 @@ class FLauncherApp extends StatelessWidget {
     900: Color(0xFF000000),
   });
 
-  const FLauncherApp();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshDefaultLauncherState(force: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshDefaultLauncherState();
+    }
+  }
+
+  void _refreshDefaultLauncherState({bool force = false}) {
+    if (!mounted) {
+      return;
+    }
+    final appsService = context.read<AppsService>();
+    context.read<LauncherState>().refresh(appsService, force: force);
+  }
 
   @override
   Widget build(BuildContext context) {
-    AppsService appsService = context.read<AppsService>();
-    LauncherState launcherState = context.read<LauncherState>();
     final Locale? locale = context.select<SettingsService, Locale?>((service) {
       switch (service.appLocaleMode) {
         case SettingsService.appLocaleEnglish:
@@ -61,7 +95,6 @@ class FLauncherApp extends StatelessWidget {
           return null;
       }
     });
-    launcherState.refresh(appsService);
 
     final colorScheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFF5AA9FF),

@@ -61,8 +61,10 @@ ATV Launcher không còn là một mirror tối giản của upstream. Bản for
 
 ### 1. Kết nối ADB tới TV
 
+Trong toàn bộ ví dụ bên dưới, thay `TV_IP` bằng địa chỉ IP của chính TV trên mạng nội bộ của bạn. Không dùng cứng `192.168.1.111`, vì mỗi thiết bị sẽ khác nhau.
+
 ```bash
-adb connect 192.168.1.111:5555
+adb connect TV_IP:5555
 adb devices
 ```
 
@@ -71,7 +73,7 @@ Nếu TV chưa bật ADB / Wireless debugging, mở trong `Developer options` tr
 ### 2. Cài APK
 
 ```bash
-adb -s 192.168.1.111:5555 install -r build/app/outputs/flutter-apk/app-debug.apk
+adb -s TV_IP:5555 install -r build/app/outputs/flutter-apk/app-debug.apk
 ```
 
 Hoặc dùng file phát hành từ GitHub Releases sau khi workflow CI build xong.
@@ -79,43 +81,30 @@ Hoặc dùng file phát hành từ GitHub Releases sau khi workflow CI build xon
 ### 3. Mở launcher
 
 ```bash
-adb -s 192.168.1.111:5555 shell monkey -p com.atv.launcher -c android.intent.category.LAUNCHER 1
+adb -s TV_IP:5555 shell monkey -p com.atv.launcher -c android.intent.category.LAUNCHER 1
 ```
 
 ### 4. Grant quyền cần thiết
 
-Đường cài đặt nhanh nhất là dùng script provisioning đi kèm:
+ATV Launcher không còn hướng dẫn provisioning bằng script PC đi kèm. Luồng khuyến nghị là cấp quyền một lần ngay trong app bằng local ADB:
 
-```bash
-python provision_atv_launcher.py --serial 192.168.1.111:5555
-```
+1. Mở `Permission Center` từ launcher.
+2. Nếu ADB hoặc Wireless debugging đang tắt, dùng nút mở `Developer options` và bật chúng trên TV.
+3. Quay lại `Permission Center` và bấm một nút `Grant via local ADB`.
+4. Đợi launcher tự grant các quyền cần thiết, chạy verify và cập nhật checklist health.
 
-Script này có thể:
-
-- cài / cập nhật launcher
-- grant `WRITE_SECURE_SETTINGS`
-- áp dụng appops cần thiết
-- whitelist battery optimization
-- verify trạng thái provisioning cuối cùng
-
-Nếu muốn grant tay:
-
-```bash
-adb -s 192.168.1.111:5555 shell pm grant com.atv.launcher android.permission.WRITE_SECURE_SETTINGS
-```
-
-Sau đó vào `Permission Center` trong launcher để kiểm tra lại toàn bộ checklist.
+Sau khi hoàn tất lần đầu, launcher sẽ dùng cơ chế heal / diagnostics tích hợp để tự duy trì trạng thái ổn định tốt hơn trên Xiaomi TV / Mi Box.
 
 ### 5. Cập nhật APK
 
 ```bash
-adb -s 192.168.1.111:5555 install -r path/to/atv-launcher-armeabi-v7a-debug.apk
+adb -s TV_IP:5555 install -r path/to/atv-launcher-armeabi-v7a-debug.apk
 ```
 
 ### 6. Gỡ launcher nếu cần
 
 ```bash
-adb -s 192.168.1.111:5555 uninstall com.atv.launcher
+adb -s TV_IP:5555 uninstall com.atv.launcher
 ```
 
 ## Build local

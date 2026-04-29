@@ -41,17 +41,23 @@ class SystemBridgeService extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    await refresh();
+    await refreshLite();
     _systemSubscription = _channel.addSystemChangedListener((event) {
-      _status = event;
+      _applyStatusSnapshot(event);
       notifyListeners();
     });
   }
 
-  Future<void> refresh() async {
-    _status = await _channel.getSystemBridgeStatus();
-    _diagnosticsReport = _status['diagnosticsReport']?.toString() ??
-        await _channel.getDiagnosticsReport();
+  Future<void> refresh() async => refreshLite();
+
+  Future<void> refreshLite() async {
+    _applyStatusSnapshot(await _channel.getSystemBridgeStatusLite());
+    _initialized = true;
+    notifyListeners();
+  }
+
+  Future<void> refreshFull() async {
+    _applyStatusSnapshot(await _channel.getSystemBridgeStatus());
     _initialized = true;
     notifyListeners();
   }
@@ -63,6 +69,9 @@ class SystemBridgeService extends ChangeNotifier {
 
   Future<void> refreshDiagnostics() async {
     _diagnosticsReport = await _channel.getDiagnosticsReport();
+    _applyStatusSnapshot(<String, dynamic>{
+      'diagnosticsReport': _diagnosticsReport,
+    });
     notifyListeners();
   }
 
@@ -76,25 +85,25 @@ class SystemBridgeService extends ChangeNotifier {
       keyCode: keyCode,
       interceptEnabled: interceptEnabled,
     );
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> setVoiceInterceptEnabled(bool enabled) async {
     final result = await _channel.setVoiceInterceptEnabled(enabled);
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> startKeyLearning() async {
     final result = await _channel.startKeyLearning();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> resetVoiceMapping() async {
     final result = await _channel.resetVoiceMapping();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
@@ -109,14 +118,14 @@ class SystemBridgeService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> repairAccessibility() async {
     final result = await _channel.repairAccessibility();
-    await refresh();
+    await refreshLite();
     await refreshAccessibilitySnapshot();
     return result;
   }
 
   Future<Map<String, dynamic>> grantWriteSecureSettingsWithLocalAdb() async {
     final result = await _channel.grantWriteSecureSettingsWithLocalAdb();
-    await refresh();
+    await refreshLite();
     await refreshAccessibilitySnapshot();
     return result;
   }
@@ -129,13 +138,13 @@ class SystemBridgeService extends ChangeNotifier {
       policy: policy,
       disableOnSleep: disableOnSleep,
     );
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> setAdbEnabledNow(bool enabled) async {
     final result = await _channel.setAdbEnabledNow(enabled);
-    await refresh();
+    await refreshLite();
     return result;
   }
 
@@ -147,7 +156,7 @@ class SystemBridgeService extends ChangeNotifier {
       action: action,
       suggestedPolicy: suggestedPolicy,
     );
-    await refresh();
+    await refreshLite();
     await refreshAccessibilitySnapshot();
     return result;
   }
@@ -156,19 +165,19 @@ class SystemBridgeService extends ChangeNotifier {
       String packageName, bool enabled) async {
     final result = await _channel.setManagedAccessibility(packageName, enabled);
     await refreshAccessibilitySnapshot();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> applyDensity(int density) async {
     final result = await _channel.applyDensity(density);
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> resetDensity() async {
     final result = await _channel.resetDensity();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
@@ -177,25 +186,25 @@ class SystemBridgeService extends ChangeNotifier {
     String? host,
   }) async {
     final result = await _channel.applyPrivateDns(mode: mode, host: host);
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> resetPrivateDns() async {
     final result = await _channel.resetPrivateDns();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> getFileAccessStatus() async {
     final result = await _channel.getFileAccessStatus();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> requestMediaReadPermission() async {
     final result = await _channel.requestMediaReadPermission();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
@@ -212,13 +221,13 @@ class SystemBridgeService extends ChangeNotifier {
       fileName: fileName,
       content: content,
     );
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   Future<Map<String, dynamic>> importSettingsBackup() async {
     final result = await _channel.importSettingsBackup();
-    await refresh();
+    await refreshLite();
     return result;
   }
 
@@ -235,12 +244,43 @@ class SystemBridgeService extends ChangeNotifier {
       summary: summary,
       restoredAt: restoredAt,
     );
-    await refresh();
+    await refreshLite();
     return result;
   }
 
   static Map<String, dynamic> _nestedMap(dynamic value) =>
       value is Map ? value.cast<String, dynamic>() : <String, dynamic>{};
+
+  void _applyStatusSnapshot(Map<String, dynamic> snapshot) {
+    _status = _mergeStatusMaps(_status, snapshot);
+    final diagnosticsReport = snapshot['diagnosticsReport']?.toString();
+    if (diagnosticsReport != null && diagnosticsReport.isNotEmpty) {
+      _diagnosticsReport = diagnosticsReport;
+    }
+  }
+
+  static Map<String, dynamic> _mergeStatusMaps(
+    Map<String, dynamic> current,
+    Map<String, dynamic> update,
+  ) {
+    if (current.isEmpty) {
+      return Map<String, dynamic>.from(update);
+    }
+
+    final merged = Map<String, dynamic>.from(current);
+    update.forEach((key, value) {
+      final existingValue = merged[key];
+      if (existingValue is Map && value is Map) {
+        merged[key] = _mergeStatusMaps(
+          existingValue.cast<String, dynamic>(),
+          value.cast<String, dynamic>(),
+        );
+      } else {
+        merged[key] = value;
+      }
+    });
+    return merged;
+  }
 
   @override
   void dispose() {

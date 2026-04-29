@@ -30,10 +30,25 @@ import '../models/app.dart';
 import '../models/category.dart';
 
 class AppsService extends ChangeNotifier {
+  static const bool fastStartupEnabled = true;
+  static const String startupPhaseBootstrapCached = 'bootstrap_cached';
+  static const String startupPhaseSyncingLive = 'syncing_live';
+  static const String startupPhaseReady = 'ready';
+  static const String startupPhaseDegradedCached = 'degraded_cached';
+  static const Duration _liveSyncRetryDelay = Duration(seconds: 6);
+  static const Duration _liveSyncWarmDelay = Duration(milliseconds: 350);
+
   final FLauncherChannel _fLauncherChannel;
   final FLauncherDatabase _database;
 
   bool _initialized = false;
+  bool _staleCache = false;
+  String _startupPhase = startupPhaseBootstrapCached;
+  int _lastLiveSyncAt = 0;
+  Timer? _liveSyncRetryTimer;
+  Future<void>? _liveSyncFuture;
+  final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
+  bool _firstRenderableLogged = false;
 
   List<LauncherSection> _launcherSections = List.empty(growable: true);
   Map<String, App> _applications = Map();
@@ -44,6 +59,13 @@ class AppsService extends ChangeNotifier {
   List<CategoryWithApps>? _categoriesWithAppsSnapshot;
 
   bool get initialized => _initialized;
+  bool get staleCache => _staleCache;
+  bool get hasRenderableHome =>
+      _launcherSections.isNotEmpty ||
+      _applications.isNotEmpty ||
+      _categoriesById.isNotEmpty;
+  String get startupPhase => _startupPhase;
+  int get lastLiveSyncAt => _lastLiveSyncAt;
 
   List<App> get applications => _applicationsSnapshot ??= List.unmodifiable(
       _applications.values.sortedBy((application) => application.name));
@@ -86,11 +108,6 @@ class AppsService extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    await _refreshState(shouldNotifyListeners: false);
-    if (_database.wasCreated) {
-      await _initDefaultCategories();
-    }
-
     _fLauncherChannel.addAppsChangedListener((event) async {
       String? changedImagePackageName;
       switch (event["action"]) {
@@ -135,11 +152,26 @@ class AppsService extends ChangeNotifier {
       if (changedImagePackageName != null) {
         _invalidateAppImageCache(changedImagePackageName);
       }
+      _staleCache = false;
+      _lastLiveSyncAt = DateTime.now().millisecondsSinceEpoch;
       notifyListeners();
     });
 
-    _initialized = true;
-    notifyListeners();
+    await _loadStateFromDatabase(shouldNotifyListeners: false);
+    if (fastStartupEnabled && hasRenderableHome) {
+      _initialized = true;
+      _staleCache = false;
+      _startupPhase = startupPhaseSyncingLive;
+      _logFirstRenderableHome('cached');
+      notifyListeners();
+      _scheduleLiveSync(reason: 'startup_cached');
+      return;
+    }
+
+    await _runLiveSync(
+      reason: 'startup_cold',
+      initializeDefaultCategoriesIfNeeded: _database.wasCreated,
+    );
   }
 
   AppsCompanion _buildAppCompanion(dynamic data) {
@@ -186,12 +218,80 @@ class AppsService extends ChangeNotifier {
     });
   }
 
+  Future<void> _loadStateFromDatabase({
+    bool shouldNotifyListeners = true,
+    Map<String, Tuple2<Map, AppsCompanion>>? appsFromSystemByPackageName,
+  }) async {
+    final appsFromDatabaseFuture = _database.getApplications();
+    final appsCategoriesFuture = _database.getAppsCategories();
+    final categoriesFuture = _database.getCategories();
+    final spacersFuture = _database.getLauncherSpacers();
+
+    await Future.wait([
+      appsFromDatabaseFuture,
+      appsCategoriesFuture,
+      categoriesFuture,
+      spacersFuture,
+    ]);
+
+    final appsFromDatabase = await appsFromDatabaseFuture;
+    final appsCategories = await appsCategoriesFuture;
+    final categories = await categoriesFuture;
+    final spacers = await spacersFuture;
+
+    _categoriesById = Map.fromEntries(
+      categories.map((category) => MapEntry(category.id, category)),
+    );
+    _applications = Map.fromEntries(
+      appsFromDatabase.map(
+        (application) => MapEntry(application.packageName, application),
+      ),
+    );
+
+    _launcherSections.clear();
+    _launcherSections.addAll(categories);
+    _launcherSections.addAll(spacers);
+    _launcherSections.sort((ls0, ls1) => ls0.order.compareTo(ls1.order));
+
+    for (final application in _applications.values) {
+      final applicationFromSystem =
+          appsFromSystemByPackageName?[application.packageName]?.item1;
+
+      if (applicationFromSystem != null) {
+        if (applicationFromSystem.containsKey('action')) {
+          application.action = applicationFromSystem['action'];
+        }
+        if (applicationFromSystem.containsKey('sideloaded')) {
+          application.sideloaded = applicationFromSystem['sideloaded'];
+        }
+      }
+
+      if (appsCategories.isNotEmpty && !application.hidden) {
+        final currentApplicationCategories = appsCategories.where(
+          (appCategory) =>
+              appCategory.appPackageName == application.packageName,
+        );
+
+        for (final appCategory in currentApplicationCategories) {
+          if (_categoriesById.containsKey(appCategory.categoryId)) {
+            final category = _categoriesById[appCategory.categoryId]!;
+            application.categoryOrders[category.id] = appCategory.order;
+            category.applications.add(application);
+          }
+        }
+      }
+    }
+
+    for (final category in _categoriesById.values) {
+      sortCategory(category);
+    }
+
+    if (shouldNotifyListeners) {
+      notifyListeners();
+    }
+  }
+
   Future<void> _refreshState({bool shouldNotifyListeners = true}) async {
-    Future<List<App>> appsFromDatabaseFuture = _database.getApplications();
-    Future<List<AppCategory>> appsCategoriesFuture =
-        _database.getAppsCategories();
-    Future<List<Category>> categoriesFuture = _database.getCategories();
-    Future<List<LauncherSpacer>> spacersFuture = _database.getLauncherSpacers();
     List<Map<dynamic, dynamic>> appsFromSystem =
         await _fLauncherChannel.getApplications();
     Iterable<MapEntry<String, Tuple2<Map, AppsCompanion>>> appEntries =
@@ -201,7 +301,7 @@ class AppsService extends ChangeNotifier {
     Map<String, Tuple2<Map, AppsCompanion>> appsFromSystemByPackageName =
         Map.fromEntries(appEntries);
 
-    List<App> appsFromDatabase = await appsFromDatabaseFuture;
+    List<App> appsFromDatabase = await _database.getApplications();
     final Iterable<App> appsRemovedFromSystem = appsFromDatabase.where(
         (app) => !appsFromSystemByPackageName.containsKey(app.packageName));
 
@@ -221,66 +321,105 @@ class AppsService extends ChangeNotifier {
           appsFromSystemByPackageName.values.map((tuple) => tuple.item2));
       await _database.deleteApps(uninstalledApplications);
     });
+    await _loadStateFromDatabase(
+      shouldNotifyListeners: shouldNotifyListeners,
+      appsFromSystemByPackageName: appsFromSystemByPackageName,
+    );
+  }
 
-    appsFromDatabaseFuture = _database.getApplications();
-
-    await Future.wait([
-      appsFromDatabaseFuture,
-      appsCategoriesFuture,
-      categoriesFuture,
-      spacersFuture
-    ]);
-
-    appsFromDatabase = await appsFromDatabaseFuture;
-    List<AppCategory> appsCategories = await appsCategoriesFuture;
-    List<Category> categories = await categoriesFuture;
-    List<LauncherSpacer> spacers = await spacersFuture;
-
-    _categoriesById = Map.fromEntries(
-        categories.map((category) => MapEntry(category.id, category)));
-    _applications = Map.fromEntries(appsFromDatabase
-        .map((application) => MapEntry(application.packageName, application)));
-
-    _launcherSections.clear();
-    _launcherSections.addAll(categories);
-    _launcherSections.addAll(spacers);
-    _launcherSections.sort((ls0, ls1) => ls0.order.compareTo(ls1.order));
-
-    for (App application in _applications.values) {
-      Map? applicationFromSystem =
-          appsFromSystemByPackageName[application.packageName]?.item1;
-
-      if (applicationFromSystem != null) {
-        if (applicationFromSystem.containsKey('action')) {
-          application.action = applicationFromSystem['action'];
-        }
-        if (applicationFromSystem.containsKey('sideloaded')) {
-          application.sideloaded = applicationFromSystem['sideloaded'];
-        }
-      }
-
-      if (appsCategories.isNotEmpty && !application.hidden) {
-        Iterable<AppCategory> currentApplicationCategories =
-            appsCategories.where((appCategory) =>
-                appCategory.appPackageName == application.packageName);
-
-        for (AppCategory appCategory in currentApplicationCategories) {
-          if (_categoriesById.containsKey(appCategory.categoryId)) {
-            Category category = _categoriesById[appCategory.categoryId]!;
-            application.categoryOrders[category.id] = appCategory.order;
-            category.applications.add(application);
-          }
-        }
-      }
+  Future<void> _runLiveSync({
+    required String reason,
+    bool initializeDefaultCategoriesIfNeeded = false,
+  }) async {
+    final currentSync = _liveSyncFuture;
+    if (currentSync != null) {
+      await currentSync;
+      return;
     }
 
-    for (Category category in _categoriesById.values) {
-      sortCategory(category);
-    }
+    final completer = Completer<void>();
+    _liveSyncFuture = completer.future;
+    final startedAt = DateTime.now().millisecondsSinceEpoch;
 
-    if (shouldNotifyListeners) {
+    try {
+      if (_initialized &&
+          hasRenderableHome &&
+          _startupPhase != startupPhaseSyncingLive) {
+        _startupPhase = startupPhaseSyncingLive;
+        notifyListeners();
+      }
+      await _refreshState(shouldNotifyListeners: false);
+      if (initializeDefaultCategoriesIfNeeded && _database.wasCreated) {
+        await _initDefaultCategories();
+      }
+      _initialized = true;
+      _staleCache = false;
+      _startupPhase = startupPhaseReady;
+      _lastLiveSyncAt = DateTime.now().millisecondsSinceEpoch;
+      _logFirstRenderableHome('live');
+      _logStartupMetric(
+        'time_to_first_live_sync',
+        DateTime.now().millisecondsSinceEpoch - _bootstrapStartedAt,
+      );
+      _logStartupMetric(
+        'live_sync_duration',
+        DateTime.now().millisecondsSinceEpoch - startedAt,
+      );
       notifyListeners();
+      completer.complete();
+    } catch (error, stackTrace) {
+      debugPrint('FLauncherPerf live_sync_failed reason=$reason error=$error');
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'apps_service',
+          context: ErrorDescription('while syncing launcher apps live'),
+        ),
+      );
+      if (hasRenderableHome) {
+        _initialized = true;
+        _staleCache = true;
+        _startupPhase = startupPhaseDegradedCached;
+        notifyListeners();
+      }
+      _scheduleLiveSyncRetry();
+      completer.complete();
+    } finally {
+      _liveSyncFuture = null;
     }
+  }
+
+  void _scheduleLiveSync({required String reason}) {
+    _liveSyncRetryTimer?.cancel();
+    _liveSyncRetryTimer = Timer(_liveSyncWarmDelay, () {
+      unawaited(_runLiveSync(reason: reason));
+    });
+  }
+
+  void _scheduleLiveSyncRetry() {
+    _liveSyncRetryTimer?.cancel();
+    _liveSyncRetryTimer = Timer(_liveSyncRetryDelay, () {
+      unawaited(_runLiveSync(reason: 'retry_live_sync'));
+    });
+  }
+
+  void _logFirstRenderableHome(String source) {
+    if (_firstRenderableLogged || !hasRenderableHome) {
+      return;
+    }
+    _firstRenderableLogged = true;
+    _logStartupMetric(
+      'time_to_first_home($source)',
+      DateTime.now().millisecondsSinceEpoch - _bootstrapStartedAt,
+    );
+  }
+
+  void _logStartupMetric(String label, int elapsedMs) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('FLauncherPerf $label elapsedMs=$elapsedMs');
   }
 
   void sortCategory(Category category) {
@@ -764,7 +903,7 @@ class AppsService extends ChangeNotifier {
       }
     });
 
-    await _refreshState();
+    await _loadStateFromDatabase();
     return <String, dynamic>{
       'success': true,
       'message': unresolvedPackages.isEmpty
@@ -813,5 +952,11 @@ class AppsService extends ChangeNotifier {
       (candidate) => candidate.name == value,
       orElse: () => fallback,
     );
+  }
+
+  @override
+  void dispose() {
+    _liveSyncRetryTimer?.cancel();
+    super.dispose();
   }
 }

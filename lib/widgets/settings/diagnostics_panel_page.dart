@@ -6,10 +6,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
-class DiagnosticsPanelPage extends StatelessWidget {
+class DiagnosticsPanelPage extends StatefulWidget {
   static const String routeName = "diagnostics_panel";
 
   const DiagnosticsPanelPage({super.key});
+
+  @override
+  State<DiagnosticsPanelPage> createState() => _DiagnosticsPanelPageState();
+}
+
+class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SystemBridgeService>().refreshFull();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +75,7 @@ class DiagnosticsPanelPage extends StatelessWidget {
                     runSpacing: 12,
                     children: [
                       FilledButton.icon(
-                        onPressed: () => bridgeService.refreshDiagnostics(),
+                        onPressed: () => bridgeService.refreshFull(),
                         icon: const Icon(Icons.refresh),
                         label: Text(localizations.refreshLabel),
                       ),

@@ -61,6 +61,36 @@ void main() {
     );
     expect(find.byType(Slider), findsNothing);
   });
+
+  testWidgets('uses TV-first selectors for wallpaper options', (tester) async {
+    _prepareView(tester);
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = MockSystemBridgeService();
+    when(bridgeService.fileAccessStatus)
+        .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
+
+    await _pumpWidget(tester, wallpaperService, bridgeService);
+
+    expect(
+        find.byKey(const Key('wallpaper_order_mode_selector')), findsOneWidget);
+    expect(
+      find.byKey(const Key('wallpaper_advance_mode_selector')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('wallpaper_video_fit_selector')),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const Key('wallpaper_video_fit_selector')), findsOneWidget);
+    expect(
+      find.byKey(const Key('wallpaper_video_blur_selector')),
+      findsOneWidget,
+    );
+    expect(find.byType(ChoiceChip), findsNothing);
+  });
 }
 
 Future<void> _pumpWidget(

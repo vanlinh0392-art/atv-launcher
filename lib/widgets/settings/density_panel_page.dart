@@ -1,5 +1,7 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -74,18 +76,26 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                     title: Text(localizations.executionPathLabel),
                     subtitle: Text(status['executionPath']?.toString() ?? '-'),
                   ),
-                  TextField(
-                    controller: _controller,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                        labelText: localizations.customDpiRange),
+                  EnsureVisible(
+                    alignment: 0.12,
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: false,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: localizations.customDpiRange,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  SettingsAdaptiveGrid(
+                    minChildWidth: 220,
+                    maxColumns: 2,
                     children: [
-                      FilledButton.icon(
+                      SettingsActionCard(
+                        title: localizations.applyLabel,
+                        subtitle: localizations.customDpiRange,
+                        icon: Icons.check_circle_outline,
                         onPressed: () async {
                           final density = int.tryParse(_controller.text.trim());
                           if (density == null) {
@@ -100,18 +110,17 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                                 localizations.densityUpdated,
                           );
                         },
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: Text(localizations.applyLabel),
                       ),
-                      FilledButton.tonalIcon(
+                      SettingsActionCard(
+                        title: localizations.reset,
+                        subtitle: localizations.factoryDpi,
+                        icon: Icons.restart_alt,
                         onPressed: () async => _showMessage(
                           context,
                           (await bridgeService.resetDensity())['message']
                                   ?.toString() ??
                               localizations.densityReset,
                         ),
-                        icon: const Icon(Icons.restart_alt),
-                        label: Text(localizations.reset),
                       ),
                     ],
                   ),

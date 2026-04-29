@@ -1,6 +1,8 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -62,65 +64,90 @@ class SystemCorePanelPage extends StatelessWidget {
                   Text(localizations.adbAutomationPolicyTitle,
                       style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _PolicyChip(
+                  SettingsChoiceCard<String>(
+                    selectorKey: const Key('system_core_adb_policy_selector'),
+                    optionKeyPrefix: 'system_core_adb_policy_option',
+                    title: localizations.adbAutomationPolicyTitle,
+                    subtitle: localizations.disableAdbOnSleepSubtitle,
+                    icon: Icons.adb_outlined,
+                    value: policy,
+                    options: <SettingsChoiceOption<String>>[
+                      SettingsChoiceOption<String>(
+                        value: 'off',
                         label: localizations.adbPolicyOff,
-                        selected: policy == 'off',
-                        onTap: () => bridgeService.setAdbAutomationPolicy(
-                          policy: 'off',
-                          disableOnSleep: disableOnSleep,
-                        ),
                       ),
-                      _PolicyChip(
+                      SettingsChoiceOption<String>(
+                        value: 'adb_only',
                         label: localizations.adbPolicyAdbOnly,
-                        selected: policy == 'adb_only',
-                        onTap: () => bridgeService.setAdbAutomationPolicy(
-                          policy: 'adb_only',
-                          disableOnSleep: disableOnSleep,
-                        ),
                       ),
-                      _PolicyChip(
+                      SettingsChoiceOption<String>(
+                        value: 'adb_and_wifi',
                         label: localizations.adbPolicyAdbAndWifi,
-                        selected: policy == 'adb_and_wifi',
-                        onTap: () => bridgeService.setAdbAutomationPolicy(
-                          policy: 'adb_and_wifi',
-                          disableOnSleep: disableOnSleep,
-                        ),
                       ),
                     ],
+                    valueLabelBuilder: (value) => localizedAdbPolicy(
+                      localizations,
+                      value,
+                    ),
+                    onChanged: (value) => bridgeService.setAdbAutomationPolicy(
+                      policy: value,
+                      disableOnSleep: disableOnSleep,
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  SwitchListTile(
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
                     value: disableOnSleep,
                     onChanged: (value) => bridgeService.setAdbAutomationPolicy(
                       policy: policy,
                       disableOnSleep: value,
                     ),
-                    title: Text(localizations.disableAdbOnSleepTitle),
-                    subtitle: Text(localizations.disableAdbOnSleepSubtitle),
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localizations.disableAdbOnSleepTitle,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          localizations.disableAdbOnSleepSubtitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    secondary: const Icon(Icons.power_settings_new_outlined),
                   ),
                   const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  SettingsAdaptiveGrid(
+                    minChildWidth: 210,
+                    maxColumns: 3,
                     children: [
-                      FilledButton.icon(
-                        onPressed: () => bridgeService.setAdbEnabledNow(true),
-                        icon: const Icon(Icons.flash_on_outlined),
-                        label: Text(localizations.enableNow),
+                      SettingsActionCard(
+                        title: localizations.enableNow,
+                        subtitle: localizations.adbLabel,
+                        icon: Icons.flash_on_outlined,
+                        onPressed: () async {
+                          await bridgeService.setAdbEnabledNow(true);
+                        },
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => bridgeService.setAdbEnabledNow(false),
-                        icon: const Icon(Icons.power_settings_new_outlined),
-                        label: Text(localizations.disableNow),
+                      SettingsActionCard(
+                        title: localizations.disableNow,
+                        subtitle: localizations.adbLabel,
+                        icon: Icons.power_settings_new_outlined,
+                        onPressed: () async {
+                          await bridgeService.setAdbEnabledNow(false);
+                        },
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => bridgeService.repairAccessibility(),
-                        icon: const Icon(Icons.build_outlined),
-                        label: Text(localizations.runHealNow),
+                      SettingsActionCard(
+                        title: localizations.runHealNow,
+                        subtitle: localizations.coreHealthLabel,
+                        icon: Icons.build_outlined,
+                        onPressed: () async {
+                          await bridgeService.repairAccessibility();
+                        },
                       ),
                     ],
                   ),
@@ -177,48 +204,29 @@ class SystemCorePanelPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            SettingsAdaptiveGrid(
+              minChildWidth: 220,
+              maxColumns: 2,
               children: [
-                FilledButton.tonalIcon(
-                  onPressed: () =>
-                      bridgeService.openSpecificSettingsPage('development'),
-                  icon: const Icon(Icons.developer_mode_outlined),
-                  label: Text(localizations.developerOptions),
+                SettingsActionCard(
+                  title: localizations.developerOptions,
+                  icon: Icons.developer_mode_outlined,
+                  onPressed: () async {
+                    await bridgeService.openSpecificSettingsPage('development');
+                  },
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () =>
-                      bridgeService.openSpecificSettingsPage('battery'),
-                  icon: const Icon(Icons.battery_charging_full_outlined),
-                  label: Text(localizations.batterySettings),
+                SettingsActionCard(
+                  title: localizations.batterySettings,
+                  icon: Icons.battery_charging_full_outlined,
+                  onPressed: () async {
+                    await bridgeService.openSpecificSettingsPage('battery');
+                  },
                 ),
               ],
             ),
           ],
         );
       },
-    );
-  }
-}
-
-class _PolicyChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _PolicyChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
     );
   }
 }

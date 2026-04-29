@@ -466,7 +466,7 @@ class _AppSecurityPackageManagerDialogState
                   const SizedBox(height: 10),
                   TextField(
                     controller: _filterController,
-                    autofocus: true,
+                    autofocus: false,
                     onChanged: (value) => setState(() => _filter = value),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search),
@@ -492,6 +492,7 @@ class _AppSecurityPackageManagerDialogState
                                       app.packageName,
                                     );
                               return RoundedSwitchListTile(
+                                autofocus: index == 0,
                                 value: enabled,
                                 onChanged: (value) {
                                   if (widget.hiddenMode) {
@@ -539,6 +540,7 @@ class _AppSecurityPackageManagerDialogState
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.tonal(
+                      autofocus: filteredApps.isEmpty,
                       onPressed: () => Navigator.of(context).pop(),
                       child: Text(localizations.closeAction),
                     ),

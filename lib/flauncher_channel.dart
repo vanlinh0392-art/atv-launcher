@@ -68,6 +68,9 @@ class FLauncherChannel {
   Future<Map<String, dynamic>> getSystemBridgeStatus() async =>
       _invokeMapMethod('getSystemBridgeStatus');
 
+  Future<Map<String, dynamic>> getSystemBridgeStatusLite() async =>
+      _invokeMapMethod('getSystemBridgeStatusLite');
+
   Future<Map<String, dynamic>> getProvisioningChecklist() async =>
       _invokeMapMethod('getProvisioningChecklist');
 

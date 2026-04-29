@@ -5,6 +5,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Surface;
 
 import androidx.media3.common.MediaItem;
@@ -24,6 +25,9 @@ import java.util.Map;
 import io.flutter.view.TextureRegistry;
 
 public final class VideoWallpaperController {
+    private static final String TAG = "FLauncherPerf";
+    private static final boolean FAST_STARTUP_ENABLED = true;
+
     private final Context appContext;
     private final TextureRegistry textureRegistry;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -38,6 +42,8 @@ public final class VideoWallpaperController {
     private int videoHeight = 1080;
     private int currentIndex = 0;
     private List<String> resolvedPlaylistUris = new ArrayList<>();
+    private boolean startupWarmupReady = !FAST_STARTUP_ENABLED;
+    private long videoWarmupStartedAtNanos = 0L;
 
     private final Runnable advanceRunnable = new Runnable() {
         @Override
@@ -64,7 +70,9 @@ public final class VideoWallpaperController {
     }
 
     public long ensureTextureId() {
+        startupWarmupReady = true;
         ensureSurface();
+        maybeStartPlayback();
         return surfaceTextureEntry.id();
     }
 
@@ -100,6 +108,9 @@ public final class VideoWallpaperController {
 
     public void onStart() {
         foregroundActive = true;
+        if (!startupWarmupReady) {
+            return;
+        }
         maybeStartPlayback();
     }
 
@@ -119,6 +130,7 @@ public final class VideoWallpaperController {
     }
 
     public void onVideoConfigChanged() {
+        startupWarmupReady = true;
         if (player != null) {
             resolvedPlaylistUris = resolvePlaylistUris();
             applyMediaItems();
@@ -137,6 +149,9 @@ public final class VideoWallpaperController {
         if (!foregroundActive) {
             return;
         }
+        if (!startupWarmupReady) {
+            return;
+        }
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
             return;
         }
@@ -152,6 +167,7 @@ public final class VideoWallpaperController {
         videoReady = false;
         lastError = "";
         currentIndex = 0;
+        videoWarmupStartedAtNanos = System.nanoTime();
 
         player = new ExoPlayer.Builder(appContext).build();
         player.setVideoSurface(surface);
@@ -160,6 +176,8 @@ public final class VideoWallpaperController {
             public void onPlaybackStateChanged(int playbackState) {
                 videoReady = playbackState == Player.STATE_READY;
                 if (videoReady) {
+                    logPerf("time_to_video_ready", videoWarmupStartedAtNanos);
+                    videoWarmupStartedAtNanos = 0L;
                     scheduleIntervalAdvance();
                 }
             }
@@ -304,5 +322,16 @@ public final class VideoWallpaperController {
         surfaceTextureEntry = textureRegistry.createSurfaceTexture();
         surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
         surface = new Surface(surfaceTextureEntry.surfaceTexture());
+    }
+
+    private void logPerf(String label, long startedAtNanos) {
+        if (startedAtNanos == 0L) {
+            return;
+        }
+        if ((appContext.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            return;
+        }
+        long elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
+        Log.d(TAG, label + " elapsedMs=" + elapsedMs);
     }
 }

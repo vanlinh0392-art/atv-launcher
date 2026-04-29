@@ -6,10 +6,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
-class PermissionsPanelPage extends StatelessWidget {
+class PermissionsPanelPage extends StatefulWidget {
   static const String routeName = "permissions_panel";
 
   const PermissionsPanelPage({super.key});
+
+  @override
+  State<PermissionsPanelPage> createState() => _PermissionsPanelPageState();
+}
+
+class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SystemBridgeService>().refreshFull();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +39,9 @@ class PermissionsPanelPage extends StatelessWidget {
         final requirements = ((status['requirements'] as List?) ?? const [])
             .map((item) => (item as Map).cast<String, dynamic>())
             .toList(growable: false);
+        final adbEnabled = _isRequirementGranted(requirements, 'adb_enabled');
+        final adbWifiEnabled =
+            _isRequirementGranted(requirements, 'adb_wifi_enabled');
         final commands = ((status['commands'] as List?) ?? const [])
             .map((item) => item.toString())
             .toList(growable: false);
@@ -34,6 +50,118 @@ class PermissionsPanelPage extends StatelessWidget {
         return ListView(
           key: const PageStorageKey<String>(PermissionsPanelPage.routeName),
           children: [
+            SettingsSurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          localizations.provisioningWizardTitle,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      SettingsStatusChip(
+                        label:
+                            '${localizations.adbLabel} ${adbEnabled ? localizations.yesLabel : localizations.noLabel}',
+                        color: adbEnabled
+                            ? const Color(0xFF7BE0A5)
+                            : const Color(0xFFFFC970),
+                      ),
+                      const SizedBox(width: 10),
+                      SettingsStatusChip(
+                        label:
+                            '${localizations.adbWifiLabel} ${adbWifiEnabled ? localizations.yesLabel : localizations.noLabel}',
+                        color: adbWifiEnabled
+                            ? const Color(0xFF8CCBFF)
+                            : const Color(0x66FFFFFF),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    adbEnabled
+                        ? localizations.provisioningWizardDescription
+                        : localizations.wizardStepOpenDeveloperOptions,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                  if (!adbEnabled) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0x22FFC970),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: const Color(0x66FFC970),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            localizations.requirementAdbEnabledGuidance,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(color: const Color(0xFFFFD99A)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            localizations.wizardStepGrantWss,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      FilledButton.icon(
+                        key: const Key('permissions_quick_grant_button'),
+                        onPressed: () async {
+                          if (!adbEnabled) {
+                            await _showAdbSetupGuidance(context, bridgeService);
+                            return;
+                          }
+                          _showActionResult(
+                            context,
+                            await bridgeService.runProvisioningAction(
+                              action: 'grant_all_local_adb',
+                              suggestedPolicy: 'adb_and_wifi',
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.auto_fix_high_outlined),
+                        label: Text(localizations.grantViaLocalAdb),
+                      ),
+                      if (!adbEnabled)
+                        FilledButton.tonalIcon(
+                          onPressed: () async => _showActionResult(
+                            context,
+                            await bridgeService.runProvisioningAction(
+                              action: 'open_development',
+                            ),
+                          ),
+                          icon: const Icon(Icons.developer_mode_outlined),
+                          label: Text(localizations.openDeveloperOptions),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
             SettingsAdaptiveGrid(
               children: [
                 SettingsMetricTile(
@@ -91,17 +219,6 @@ class PermissionsPanelPage extends StatelessWidget {
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      FilledButton.icon(
-                        onPressed: () async => _showActionResult(
-                          context,
-                          await bridgeService.runProvisioningAction(
-                            action: 'grant_all_local_adb',
-                            suggestedPolicy: 'adb_and_wifi',
-                          ),
-                        ),
-                        icon: const Icon(Icons.auto_fix_high_outlined),
-                        label: Text(localizations.grantViaLocalAdb),
-                      ),
                       FilledButton.tonalIcon(
                         onPressed: () async => _showActionResult(
                           context,
@@ -111,8 +228,12 @@ class PermissionsPanelPage extends StatelessWidget {
                         label: Text(localizations.grantMediaAccess),
                       ),
                       FilledButton.tonalIcon(
-                        onPressed: () => bridgeService.runProvisioningAction(
-                            action: 'open_development'),
+                        onPressed: () async => _showActionResult(
+                          context,
+                          await bridgeService.runProvisioningAction(
+                            action: 'open_development',
+                          ),
+                        ),
                         icon: const Icon(Icons.developer_mode_outlined),
                         label: Text(localizations.openDeveloperOptions),
                       ),
@@ -209,8 +330,51 @@ class PermissionsPanelPage extends StatelessWidget {
         (result['granted'] == true
             ? AppLocalizations.of(context)!.actionCompleted
             : AppLocalizations.of(context)!.actionDidNotComplete);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showAdbSetupGuidance(
+    BuildContext context,
+    SystemBridgeService bridgeService,
+  ) async {
+    final localizations = AppLocalizations.of(context)!;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(localizations.openDeveloperOptions),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(localizations.wizardStepOpenDeveloperOptions),
+            const SizedBox(height: 10),
+            Text(localizations.wizardStepGrantWss),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(localizations.closeAction),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              _showActionResult(
+                context,
+                await bridgeService.runProvisioningAction(
+                  action: 'open_development',
+                ),
+              );
+            },
+            child: Text(localizations.openDeveloperOptions),
+          ),
+        ],
+      ),
+    );
   }
 
   static List<String> _wizardSteps(AppLocalizations localizations) => [
@@ -279,5 +443,17 @@ class PermissionsPanelPage extends StatelessWidget {
       default:
         return fallback;
     }
+  }
+
+  static bool _isRequirementGranted(
+    List<Map<String, dynamic>> requirements,
+    String name,
+  ) {
+    for (final item in requirements) {
+      if (item['name']?.toString() == name) {
+        return item['granted'] == true;
+      }
+    }
+    return false;
   }
 }

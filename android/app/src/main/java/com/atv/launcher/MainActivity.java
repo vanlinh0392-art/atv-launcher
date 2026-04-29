@@ -101,11 +101,13 @@ import io.flutter.plugin.common.MethodChannel;
 
 public class MainActivity extends FlutterActivity {
     private static final String TAG = "FLauncherPerf";
+    private static final boolean FAST_STARTUP_ENABLED = true;
     private static final String METHOD_CHANNEL = "com.atv.launcher/method";
     private static final String APPS_EVENT_CHANNEL = "com.atv.launcher/event_apps";
     private static final String NETWORK_EVENT_CHANNEL = "com.atv.launcher/event_network";
     private static final String SYSTEM_EVENT_CHANNEL = "com.atv.launcher/event_system";
     private static final long SYSTEM_EVENT_INTERVAL_MS = 3000L;
+    private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
     private static final int MAX_IMAGE_CACHE_ENTRIES = 128;
     private static final int MAX_IMAGE_CACHE_BYTES = 16 * 1024 * 1024;
     private static final int MAX_BANNER_WIDTH = 640;
@@ -123,6 +125,7 @@ public class MainActivity extends FlutterActivity {
     private static final int REQUEST_SPEECH_RECOGNIZER = 4107;
 
     private final Handler systemEventHandler = new Handler(Looper.getMainLooper());
+    private final long activityBootstrapStartedAtNanos = System.nanoTime();
     private final LinkedHashMap<String, byte[]> appImageCache = new LinkedHashMap<>(16, 0.75f, true);
     private int appImageCacheBytes = 0;
     private EventChannel.EventSink systemEventSink;
@@ -138,12 +141,14 @@ public class MainActivity extends FlutterActivity {
     private String pendingBackupExportContent = "";
     private String pendingBackupExportFileName = "atv-launcher-backup.json";
     private String pendingBackupImportMode = "import";
+    private boolean firstBridgeSnapshotLogged;
+    private final Runnable initialSystemSnapshotRunnable = this::emitInitialSystemSnapshot;
 
     private final Runnable systemEventRunnable = new Runnable() {
         @Override
         public void run() {
             if (systemEventSink != null) {
-                systemEventSink.success(buildSystemBridgeStatus());
+                systemEventSink.success(buildSystemBridgeStatusLite());
                 systemEventHandler.postDelayed(this, SYSTEM_EVENT_INTERVAL_MS);
             }
         }
@@ -174,14 +179,19 @@ public class MainActivity extends FlutterActivity {
             @Override
             public void onListen(Object arguments, EventChannel.EventSink events) {
                 systemEventSink = events;
-                emitSystemSnapshot();
+                systemEventHandler.removeCallbacks(initialSystemSnapshotRunnable);
                 systemEventHandler.removeCallbacks(systemEventRunnable);
+                systemEventHandler.postDelayed(
+                        initialSystemSnapshotRunnable,
+                        INITIAL_SYSTEM_SNAPSHOT_DELAY_MS
+                );
                 systemEventHandler.postDelayed(systemEventRunnable, SYSTEM_EVENT_INTERVAL_MS);
             }
 
             @Override
             public void onCancel(Object arguments) {
                 systemEventSink = null;
+                systemEventHandler.removeCallbacks(initialSystemSnapshotRunnable);
                 systemEventHandler.removeCallbacks(systemEventRunnable);
             }
         });
@@ -194,7 +204,7 @@ public class MainActivity extends FlutterActivity {
             videoWallpaperController.onStart();
         }
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_start");
-        emitSystemSnapshot();
+        scheduleStartupSystemSnapshot();
     }
 
     @Override
@@ -204,7 +214,7 @@ public class MainActivity extends FlutterActivity {
             videoWallpaperController.onStart();
         }
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_resume");
-        emitSystemSnapshot();
+        scheduleStartupSystemSnapshot();
     }
 
     @Override
@@ -268,6 +278,7 @@ public class MainActivity extends FlutterActivity {
             case "checkForGetContentAvailability" -> result.success(checkForGetContentAvailability());
             case "startAmbientMode" -> result.success(startAmbientMode());
             case "getActiveNetworkInformation" -> result.success(getActiveNetworkInformation());
+            case "getSystemBridgeStatusLite" -> result.success(buildSystemBridgeStatusLite());
             case "getSystemBridgeStatus" -> result.success(buildSystemBridgeStatus());
             case "getProvisioningChecklist" -> result.success(buildProvisioningChecklist());
             case "getAdbAutomationStatus" -> result.success(SystemBridgeCoordinator.buildAdbAutomationStatus(this));
@@ -624,8 +635,10 @@ public class MainActivity extends FlutterActivity {
         return NetworkUtils.getNetworkInformation(this, connectivityManager.getActiveNetworkInfo());
     }
 
-    private Map<String, Object> buildSystemBridgeStatus() {
+    private Map<String, Object> buildSystemBridgeStatusLite() {
+        long startedAt = System.nanoTime();
         Map<String, Object> map = new LinkedHashMap<>();
+        map.put("snapshotKind", "lite");
         map.put("voice", buildVoiceStatus());
         map.put("systemCore", buildSystemCoreStatus());
         map.put("adbAutomation", SystemBridgeCoordinator.buildAdbAutomationStatus(this));
@@ -633,11 +646,21 @@ public class MainActivity extends FlutterActivity {
         map.put("density", DensityBridge.getStatus(this));
         map.put("privateDns", PrivateDnsController.getStatus(this));
         map.put("wallpaper", videoWallpaperController != null ? videoWallpaperController.getStatus() : new LinkedHashMap<>());
-        map.put("provisioning", buildProvisioningChecklist());
+        map.put("provisioning", buildProvisioningSummary());
         map.put("memory", buildMemoryStatus());
         map.put("fileAccess", VideoLibraryController.getFileAccessStatus(this));
         map.put("backup", buildBackupStatus());
+        logPerf("time_to_lite_bridge_status", startedAt);
+        return map;
+    }
+
+    private Map<String, Object> buildSystemBridgeStatus() {
+        long startedAt = System.nanoTime();
+        Map<String, Object> map = buildSystemBridgeStatusLite();
+        map.put("snapshotKind", "full");
+        map.put("provisioning", buildProvisioningChecklist());
         map.put("diagnosticsReport", SystemBridgeCoordinator.buildStatusReport(this));
+        logPerf("time_to_full_bridge_status", startedAt);
         return map;
     }
 
@@ -742,31 +765,7 @@ public class MainActivity extends FlutterActivity {
         return map;
     }
 
-    private Map<String, Object> buildProvisioningChecklist() {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("packageName", getPackageName());
-        List<String> commands = new ArrayList<>();
-        commands.add("adb install -r atv-launcher-armeabi-v7a.apk");
-        commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
-        commands.add("adb shell pm grant " + getPackageName() + " " + mediaReadPermissionName());
-        if (requiresNotificationRuntimePermission()) {
-            commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
-        }
-        commands.add("adb shell appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
-        commands.add("adb shell appops set " + getPackageName() + " WRITE_SETTINGS allow");
-        commands.add("adb shell dumpsys deviceidle whitelist +" + getPackageName());
-        commands.add("adb shell settings put global adb_enabled 1");
-        commands.add("adb shell settings put global adb_wifi_enabled 1");
-        map.put("commands", commands);
-        map.put("recommendedPolicy", BridgeStateStore.ADB_POLICY_ADB_AND_WIFI);
-        map.put("wizardSteps", Arrays.asList(
-                "Open developer options if ADB is disabled.",
-                "Grant WRITE_SECURE_SETTINGS using local ADB or PC ADB.",
-                "Grant video library access so the launcher can browse TV storage directly.",
-                "Allow overlay and WRITE_SETTINGS if your firmware requires it.",
-                "Whitelist battery optimization for Xiaomi TVs.",
-                "Select the long-term ADB automation policy."
-        ));
+    private ProvisioningEvaluation evaluateProvisioning() {
         List<Map<String, Object>> requirements = new ArrayList<>();
         requirements.add(buildPermissionItem(android.Manifest.permission.WRITE_SECURE_SETTINGS,
                 isDeclaredPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS),
@@ -813,6 +812,7 @@ public class MainActivity extends FlutterActivity {
                 hasPermission(mediaReadPermissionName()),
                 "Use the in-app prompt, local ADB wizard or PC ADB grant",
                 "required"));
+
         int missingRequiredCount = 0;
         int missingRecommendedCount = 0;
         int missingOptionalCount = 0;
@@ -830,13 +830,61 @@ public class MainActivity extends FlutterActivity {
                 default -> missingRequiredCount += 1;
             }
         }
-        map.put("requirements", requirements);
-        map.put("missingRequiredCount", missingRequiredCount);
-        map.put("missingRecommendedCount", missingRecommendedCount);
-        map.put("missingOptionalCount", missingOptionalCount);
-        map.put("health", missingRequiredCount > 0
+        String health = missingRequiredCount > 0
                 ? "missing_required"
-                : (missingRecommendedCount > 0 ? "recommended_missing" : "healthy"));
+                : (missingRecommendedCount > 0 ? "recommended_missing" : "healthy");
+        return new ProvisioningEvaluation(
+                requirements,
+                missingRequiredCount,
+                missingRecommendedCount,
+                missingOptionalCount,
+                health
+        );
+    }
+
+    private Map<String, Object> buildProvisioningSummary() {
+        ProvisioningEvaluation evaluation = evaluateProvisioning();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("packageName", getPackageName());
+        map.put("recommendedPolicy", BridgeStateStore.ADB_POLICY_ADB_AND_WIFI);
+        map.put("missingRequiredCount", evaluation.missingRequiredCount);
+        map.put("missingRecommendedCount", evaluation.missingRecommendedCount);
+        map.put("missingOptionalCount", evaluation.missingOptionalCount);
+        map.put("health", evaluation.health);
+        return map;
+    }
+
+    private Map<String, Object> buildProvisioningChecklist() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("packageName", getPackageName());
+        List<String> commands = new ArrayList<>();
+        commands.add("adb install -r atv-launcher-armeabi-v7a.apk");
+        commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
+        commands.add("adb shell pm grant " + getPackageName() + " " + mediaReadPermissionName());
+        if (requiresNotificationRuntimePermission()) {
+            commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
+        }
+        commands.add("adb shell appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
+        commands.add("adb shell appops set " + getPackageName() + " WRITE_SETTINGS allow");
+        commands.add("adb shell dumpsys deviceidle whitelist +" + getPackageName());
+        commands.add("adb shell settings put global adb_enabled 1");
+        commands.add("adb shell settings put global adb_wifi_enabled 1");
+        map.put("commands", commands);
+        map.put("recommendedPolicy", BridgeStateStore.ADB_POLICY_ADB_AND_WIFI);
+        map.put("wizardSteps", Arrays.asList(
+                "Open developer options if ADB is disabled.",
+                "Grant WRITE_SECURE_SETTINGS using local ADB or PC ADB.",
+                "Grant video library access so the launcher can browse TV storage directly.",
+                "Allow overlay and WRITE_SETTINGS if your firmware requires it.",
+                "Whitelist battery optimization for Xiaomi TVs.",
+                "Select the long-term ADB automation policy."
+        ));
+        ProvisioningEvaluation evaluation = evaluateProvisioning();
+        map.put("requirements", evaluation.requirements);
+        map.put("missingRequiredCount", evaluation.missingRequiredCount);
+        map.put("missingRecommendedCount", evaluation.missingRecommendedCount);
+        map.put("missingOptionalCount", evaluation.missingOptionalCount);
+        map.put("health", evaluation.health);
         return map;
     }
 
@@ -854,6 +902,28 @@ public class MainActivity extends FlutterActivity {
         item.put("guidance", guidance);
         item.put("importance", importance);
         return item;
+    }
+
+    private static final class ProvisioningEvaluation {
+        final List<Map<String, Object>> requirements;
+        final int missingRequiredCount;
+        final int missingRecommendedCount;
+        final int missingOptionalCount;
+        final String health;
+
+        ProvisioningEvaluation(
+                List<Map<String, Object>> requirements,
+                int missingRequiredCount,
+                int missingRecommendedCount,
+                int missingOptionalCount,
+                String health
+        ) {
+            this.requirements = requirements;
+            this.missingRequiredCount = missingRequiredCount;
+            this.missingRecommendedCount = missingRecommendedCount;
+            this.missingOptionalCount = missingOptionalCount;
+            this.health = health;
+        }
     }
 
     private Map<String, Object> setVoiceMode(MethodCall call) {
@@ -1767,8 +1837,31 @@ public class MainActivity extends FlutterActivity {
 
     private void emitSystemSnapshot() {
         if (systemEventSink != null) {
-            systemEventSink.success(buildSystemBridgeStatus());
+            systemEventSink.success(buildSystemBridgeStatusLite());
         }
+    }
+
+    private void emitInitialSystemSnapshot() {
+        emitSystemSnapshot();
+        if (!firstBridgeSnapshotLogged) {
+            firstBridgeSnapshotLogged = true;
+            logPerf(
+                    "time_to_first_bridge_snapshot",
+                    activityBootstrapStartedAtNanos
+            );
+        }
+    }
+
+    private void scheduleStartupSystemSnapshot() {
+        if (!FAST_STARTUP_ENABLED) {
+            emitSystemSnapshot();
+            return;
+        }
+        systemEventHandler.removeCallbacks(initialSystemSnapshotRunnable);
+        systemEventHandler.postDelayed(
+                initialSystemSnapshotRunnable,
+                INITIAL_SYSTEM_SNAPSHOT_DELAY_MS
+        );
     }
 
     private Set<String> readEnabledAccessibilityServices() {

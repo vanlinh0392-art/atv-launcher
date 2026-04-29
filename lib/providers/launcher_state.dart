@@ -26,8 +26,12 @@ import '../widgets/settings/back_button_actions.dart';
 import 'apps_service.dart';
 
 class LauncherState extends ChangeNotifier {
+  static const Duration _defaultLauncherRefreshThrottle = Duration(seconds: 2);
+
   bool _isDefaultLauncher;
   bool _launcherVisible;
+  int _lastRefreshAt = 0;
+  Future<void>? _refreshFuture;
 
   bool get isDefaultLauncher => _isDefaultLauncher;
   bool get launcherVisible => _launcherVisible;
@@ -41,8 +45,37 @@ class LauncherState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> refresh(AppsService appsService) async {
-    _isDefaultLauncher = await appsService.isDefaultLauncher();
+  Future<void> refresh(AppsService appsService, {bool force = false}) async {
+    final inFlightRefresh = _refreshFuture;
+    if (inFlightRefresh != null) {
+      return inFlightRefresh;
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (!force &&
+        _lastRefreshAt != 0 &&
+        now - _lastRefreshAt < _defaultLauncherRefreshThrottle.inMilliseconds) {
+      return;
+    }
+
+    final refreshFuture = _refreshInternal(appsService);
+    _refreshFuture = refreshFuture;
+    try {
+      await refreshFuture;
+    } finally {
+      if (identical(_refreshFuture, refreshFuture)) {
+        _refreshFuture = null;
+      }
+    }
+  }
+
+  Future<void> _refreshInternal(AppsService appsService) async {
+    final nextValue = await appsService.isDefaultLauncher();
+    _lastRefreshAt = DateTime.now().millisecondsSinceEpoch;
+    if (_isDefaultLauncher == nextValue) {
+      return;
+    }
+    _isDefaultLauncher = nextValue;
     notifyListeners();
   }
 
@@ -52,7 +85,7 @@ class LauncherState extends ChangeNotifier {
     SettingsService settingsService = context.read<SettingsService>();
 
     if (kDebugMode || launcherState.isDefaultLauncher) {
-      launcherState.refresh(appsService);
+      launcherState.refresh(appsService, force: true);
       String action = settingsService.backButtonAction;
 
       switch (action) {
