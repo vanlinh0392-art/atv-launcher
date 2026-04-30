@@ -30,10 +30,15 @@ class UpdatePanelPage extends StatefulWidget {
 class _UpdatePanelPageState extends State<UpdatePanelPage>
     with WidgetsBindingObserver {
   static const String _summaryDebugLabel = 'update_panel_summary_metrics';
+  static const String _statusDebugLabel = 'update_panel_status_section';
+  static const String _releaseDetailsDebugLabel =
+      'update_panel_release_details';
   static const Color _statusOkColor = Color(0xFF7BE0A5);
   static const Color _statusNeedsActionColor = Color(0xFFFFC970);
 
   late final LauncherUpdateClient _updateClient;
+  late final FocusNode _statusFocusNode;
+  late final FocusNode _releaseDetailsFocusNode;
 
   LauncherUpdateRelease? _latestRelease;
   bool _hasCheckedOfficialRelease = false;
@@ -45,6 +50,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
   int _downloadedBytes = 0;
   int _downloadTotalBytes = 0;
   double? _downloadProgress;
+  int _downloadedApkCount = 0;
   bool _busy = false;
   bool _resumeInstallAfterPermission = false;
 
@@ -52,19 +58,29 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
   void initState() {
     super.initState();
     _updateClient = widget.updateClient ?? LauncherUpdateClient();
+    _statusFocusNode = FocusNode(debugLabel: _statusDebugLabel);
+    _releaseDetailsFocusNode = FocusNode(debugLabel: _releaseDetailsDebugLabel);
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_loadInstalledVersion());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
       unawaited(context.read<SystemBridgeService>().refreshLite());
+      Future<void>.delayed(Duration.zero, () {
+        if (!mounted) {
+          return;
+        }
+        unawaited(_loadInstalledVersion());
+        unawaited(_refreshDownloadedArtifacts());
+      });
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _statusFocusNode.dispose();
+    _releaseDetailsFocusNode.dispose();
     super.dispose();
   }
 
@@ -103,8 +119,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
             : localizations.launcherUpdatePermissionMissing;
         final permissionColor =
             permissionReady ? _statusOkColor : _statusNeedsActionColor;
-        final downloadedLabel =
-            _downloadedAssetName ?? localizations.launcherUpdateNoDownloadedApk;
+        final downloadedLabel = _resolveDownloadedLabel(localizations);
 
         return ListView(
           key: const PageStorageKey<String>(UpdatePanelPage.routeName),
@@ -220,77 +235,98 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                               resumeInstallAfterPermission: false,
                             ),
                   ),
+                  SettingsActionCard(
+                    title: localizations.cleanupDownloadedApks,
+                    subtitle: _downloadedApkCount > 0
+                        ? localizations.launcherUpdateCleanupSubtitle(
+                            _downloadedApkCount,
+                          )
+                        : localizations.launcherUpdateCleanupEmpty,
+                    icon: Icons.delete_sweep_outlined,
+                    onPressed: _busy || _downloadedApkCount == 0
+                        ? null
+                        : _clearDownloadedApks,
+                  ),
                 ],
               ),
             ),
             if (_lastMessage.trim().isNotEmpty || _showDownloadProgress) ...[
               const SizedBox(height: 18),
               SettingsSurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      localizations.launcherUpdateStatusTitle,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    if (_lastMessage.trim().isNotEmpty) ...[
-                      const SizedBox(height: 10),
+                child: SettingsSummarySection(
+                  debugLabel: _statusDebugLabel,
+                  focusNode: _statusFocusNode,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        _lastMessage,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        localizations.launcherUpdateStatusTitle,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    ],
-                    if (_showDownloadProgress) ...[
-                      const SizedBox(height: 12),
-                      if ((_downloadFileName ?? '').trim().isNotEmpty) ...[
+                      if (_lastMessage.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
                         Text(
-                          _downloadFileName!,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          _lastMessage,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                      if (_showDownloadProgress) ...[
+                        const SizedBox(height: 12),
+                        if ((_downloadFileName ?? '').trim().isNotEmpty) ...[
+                          Text(
+                            _downloadFileName!,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        LinearProgressIndicator(
+                          value: _downloadProgress,
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(999),
+                          backgroundColor: Colors.white12,
+                          color: const Color(0xFF8ACBFF),
                         ),
                         const SizedBox(height: 8),
+                        Text(
+                          _downloadProgress == null
+                              ? localizations
+                                  .launcherUpdateDownloadIndeterminate
+                              : localizations.launcherUpdateDownloadProgress(
+                                  (_downloadProgress! * 100).round(),
+                                ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _resolveDownloadBytesLabel(localizations),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.white60),
+                        ),
                       ],
-                      LinearProgressIndicator(
-                        value: _downloadProgress,
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(999),
-                        backgroundColor: Colors.white12,
-                        color: const Color(0xFF8ACBFF),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _downloadProgress == null
-                            ? localizations.launcherUpdateDownloadIndeterminate
-                            : localizations.launcherUpdateDownloadProgress(
-                                (_downloadProgress! * 100).round(),
-                              ),
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.white70),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _resolveDownloadBytesLabel(localizations),
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.white60),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
             const SizedBox(height: 18),
             SettingsSurfaceCard(
-              child: _buildReleaseDetails(
-                context,
-                localizations,
-                permissionReady,
+              child: SettingsSummarySection(
+                debugLabel: _releaseDetailsDebugLabel,
+                focusNode: _releaseDetailsFocusNode,
+                child: _buildReleaseDetails(
+                  context,
+                  localizations,
+                  permissionReady,
+                ),
               ),
             ),
           ],
@@ -356,6 +392,9 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                     : release.displayName,
               );
       });
+      _requestSectionFocus(
+        release == null ? _statusFocusNode : _releaseDetailsFocusNode,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -364,6 +403,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         _lastMessage =
             localizations.launcherUpdateCheckFailed(error.toString());
       });
+      _requestSectionFocus(_statusFocusNode);
     } finally {
       if (mounted) {
         setState(() {
@@ -383,10 +423,9 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       _downloadTotalBytes = asset.sizeBytes;
       _lastMessage = localizations.launcherUpdateDownloadStarted(asset.name);
     });
+    _requestSectionFocus(_statusFocusNode);
     try {
-      final updateDirectory = Directory(
-        '${(await getTemporaryDirectory()).path}${Platform.pathSeparator}launcher_updates',
-      );
+      final updateDirectory = await _getUpdateDirectory();
       if (!await updateDirectory.exists()) {
         await updateDirectory.create(recursive: true);
       }
@@ -405,9 +444,11 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       if (!mounted) {
         return;
       }
+      await _refreshDownloadedArtifacts();
+      if (!mounted) {
+        return;
+      }
       setState(() {
-        _downloadedApkPath = downloadedApk.filePath;
-        _downloadedAssetName = downloadedApk.fileName;
         _downloadFileName = null;
         _downloadedBytes = 0;
         _downloadTotalBytes = 0;
@@ -415,6 +456,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         _lastMessage = localizations
             .launcherUpdateDownloadComplete(downloadedApk.fileName);
       });
+      _requestSectionFocus(_statusFocusNode);
     } catch (error) {
       if (!mounted) {
         return;
@@ -427,6 +469,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         _lastMessage =
             localizations.launcherUpdateDownloadFailed(error.toString());
       });
+      _requestSectionFocus(_statusFocusNode);
     } finally {
       if (mounted) {
         setState(() {
@@ -465,6 +508,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
             ? result['message'].toString()
             : localizations.launcherUpdateLocalAdbFallbackResult;
       });
+      _requestSectionFocus(_statusFocusNode);
     } finally {
       if (mounted) {
         setState(() {
@@ -491,6 +535,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
           ? localizations.launcherUpdatePermissionScreenOpened
           : localizations.launcherUpdatePermissionScreenFailed;
     });
+    _requestSectionFocus(_statusFocusNode);
   }
 
   Future<void> _installDownloadedApk({
@@ -527,6 +572,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                     apkPath.split(Platform.pathSeparator).last,
               );
       });
+      _requestSectionFocus(_statusFocusNode);
     } catch (error) {
       if (!mounted) {
         return;
@@ -535,6 +581,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         _lastMessage =
             localizations.launcherUpdateInstallFailed(error.toString());
       });
+      _requestSectionFocus(_statusFocusNode);
     } finally {
       if (mounted) {
         setState(() {
@@ -544,19 +591,58 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     }
   }
 
-  Future<void> _deleteOldDownloads(Directory directory) async {
-    if (!await directory.exists()) {
-      return;
+  Future<void> _clearDownloadedApks() async {
+    final localizations = AppLocalizations.of(context)!;
+    setState(() {
+      _busy = true;
+      _lastMessage = localizations.launcherUpdateCleanupWorking;
+    });
+    try {
+      final removed = await _deleteOldDownloads(await _getUpdateDirectory());
+      await _refreshDownloadedArtifacts();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastMessage = removed > 0
+            ? localizations.launcherUpdateCleanupComplete(removed)
+            : localizations.launcherUpdateCleanupEmpty;
+      });
+      _requestSectionFocus(_statusFocusNode);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastMessage =
+            localizations.launcherUpdateCleanupFailed(error.toString());
+      });
+      _requestSectionFocus(_statusFocusNode);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
+  }
+
+  Future<int> _deleteOldDownloads(Directory directory) async {
+    if (!await directory.exists()) {
+      return 0;
+    }
+    var removedCount = 0;
     await for (final entry in directory.list(followLinks: false)) {
       if (entry is File && entry.path.toLowerCase().endsWith('.apk')) {
         try {
           await entry.delete();
+          removedCount += 1;
         } catch (_) {
           // Best effort cleanup; keep the fresh download path deterministic.
         }
       }
     }
+    return removedCount;
   }
 
   String _safeFileName(String rawName) {
@@ -606,6 +692,48 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
   bool get _showDownloadProgress =>
       (_downloadFileName ?? '').trim().isNotEmpty && _busy;
 
+  Future<Directory> _getUpdateDirectory() async => Directory(
+        '${(await getTemporaryDirectory()).path}${Platform.pathSeparator}launcher_updates',
+      );
+
+  Future<void> _refreshDownloadedArtifacts() async {
+    final directory = await _getUpdateDirectory();
+    if (!await directory.exists()) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _downloadedApkCount = 0;
+        _downloadedApkPath = null;
+        _downloadedAssetName = null;
+      });
+      return;
+    }
+
+    final files = <File>[];
+    await for (final entry in directory.list(followLinks: false)) {
+      if (entry is File && entry.path.toLowerCase().endsWith('.apk')) {
+        files.add(entry);
+      }
+    }
+    files.sort(
+      (left, right) => right.statSync().modified.compareTo(
+            left.statSync().modified,
+          ),
+    );
+    final newestFile = files.isEmpty ? null : files.first;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _downloadedApkCount = files.length;
+      _downloadedApkPath = newestFile?.path;
+      _downloadedAssetName = newestFile == null
+          ? null
+          : newestFile.path.split(Platform.pathSeparator).last;
+    });
+  }
+
   void _handleDownloadProgress(LauncherUpdateDownloadProgress progress) {
     if (!mounted) {
       return;
@@ -615,6 +743,15 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       _downloadedBytes = progress.receivedBytes;
       _downloadTotalBytes = progress.totalBytes;
       _downloadProgress = progress.fraction;
+    });
+  }
+
+  void _requestSectionFocus(FocusNode node) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !node.canRequestFocus || node.context == null) {
+        return;
+      }
+      node.requestFocus();
     });
   }
 
@@ -637,6 +774,16 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       );
     }
     return localizations.launcherUpdateDownloadBytesReceived(downloaded);
+  }
+
+  String _resolveDownloadedLabel(AppLocalizations localizations) {
+    if (_downloadedApkCount <= 0) {
+      return localizations.launcherUpdateNoDownloadedApk;
+    }
+    if (_downloadedApkCount == 1 && (_downloadedAssetName ?? '').isNotEmpty) {
+      return _downloadedAssetName!;
+    }
+    return localizations.launcherUpdateDownloadedCount(_downloadedApkCount);
   }
 
   Widget _buildReleaseDetails(

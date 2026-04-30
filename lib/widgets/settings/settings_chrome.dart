@@ -6,6 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+bool _isSettingsChromeActivateKey(LogicalKeyboardKey key) =>
+    key == LogicalKeyboardKey.enter ||
+    key == LogicalKeyboardKey.select ||
+    key == LogicalKeyboardKey.space ||
+    key == LogicalKeyboardKey.gameButtonA;
+
 double _lerpOpacity(double solid, double transparent, double amount) =>
     solid + ((transparent - solid) * amount);
 
@@ -633,9 +639,7 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
           if (event is! KeyDownEvent) {
             return KeyEventResult.ignored;
           }
-          if (event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.space) {
+          if (_isSettingsChromeActivateKey(event.logicalKey)) {
             return KeyEventResult.handled;
           }
           return KeyEventResult.ignored;
@@ -759,9 +763,7 @@ class _SettingsSummarySectionState extends State<SettingsSummarySection> {
           if (event is! KeyDownEvent) {
             return KeyEventResult.ignored;
           }
-          if (event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.space) {
+          if (_isSettingsChromeActivateKey(event.logicalKey)) {
             return KeyEventResult.handled;
           }
           return KeyEventResult.ignored;

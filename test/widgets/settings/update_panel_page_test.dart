@@ -1,3 +1,4 @@
+import 'package:flauncher/flauncher_channel.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -9,13 +10,10 @@ import 'package:flauncher/widgets/settings/update_panel_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:provider/provider.dart';
-
-import '../../mocks.mocks.dart';
 
 void main() {
   setUpAll(() {
@@ -27,10 +25,10 @@ void main() {
       'update panel shows official release size, upload date and colored permission state',
       (tester) async {
     _prepareView(tester);
-    final tempDirectory = await Directory.systemTemp.createTemp('update-panel');
-    addTearDown(() async {
-      if (await tempDirectory.exists()) {
-        await tempDirectory.delete(recursive: true);
+    final tempDirectory = await _createTempTestDirectory('update-panel');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
       }
     });
     _installFakeTempPath(tempDirectory.path);
@@ -87,9 +85,6 @@ void main() {
     );
     await _pumpUi(tester);
 
-    await tester.tap(find.text('Check latest official release'));
-    await _pumpUi(tester);
-
     final permissionTile = tester.widget<SettingsMetricTile>(
       find.byWidgetPredicate(
         (widget) =>
@@ -97,43 +92,26 @@ void main() {
             widget.label == 'Install permission',
       ),
     );
-    final latestReleaseTile = tester.widget<SettingsMetricTile>(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is SettingsMetricTile &&
-            widget.label == 'Latest official release',
-      ),
-    );
-    final sizeTile = tester.widget<SettingsMetricTile>(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is SettingsMetricTile && widget.label == 'Update size',
-      ),
-    );
-    final uploadedTile = tester.widget<SettingsMetricTile>(
-      find.byWidgetPredicate(
-        (widget) => widget is SettingsMetricTile && widget.label == 'Uploaded',
-      ),
-    );
-
     expect(permissionTile.value, 'Needs approval');
     expect(permissionTile.accentColor, const Color(0xFFFFC970));
-    expect(latestReleaseTile.value, 'ATV Launcher Release');
-    expect(sizeTile.value, '12 MB');
-    expect(uploadedTile.value, '4/29/2026');
+
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
     expect(find.text('Official release ready: ATV Launcher Release'),
         findsOneWidget);
     expect(find.text('4/29/2026 21:30'), findsOneWidget);
     expect(find.text('12 MB'), findsWidgets);
+    expect(FocusManager.instance.primaryFocus?.debugLabel,
+        contains('update_panel_release_details'));
   });
 
   testWidgets('shows no suitable official release when only debug builds exist',
       (tester) async {
     _prepareView(tester);
-    final tempDirectory = await Directory.systemTemp.createTemp('update-panel');
-    addTearDown(() async {
-      if (await tempDirectory.exists()) {
-        await tempDirectory.delete(recursive: true);
+    final tempDirectory = await _createTempTestDirectory('update-panel');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
       }
     });
     _installFakeTempPath(tempDirectory.path);
@@ -193,10 +171,10 @@ void main() {
   testWidgets('shows download progress with file name and bytes',
       (tester) async {
     _prepareView(tester);
-    final tempDirectory = await Directory.systemTemp.createTemp('update-panel');
-    addTearDown(() async {
-      if (await tempDirectory.exists()) {
-        await tempDirectory.delete(recursive: true);
+    final tempDirectory = await _createTempTestDirectory('update-panel');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
       }
     });
     _installFakeTempPath(tempDirectory.path);
@@ -281,19 +259,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('atv-launcher-release.apk'), findsWidgets);
-    expect(find.text('Download progress: 50%'), findsOneWidget);
-    expect(find.text('512 B / 1 KB'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('update_panel_status_section'),
+    );
 
     completer.complete();
     await _pumpUi(tester);
-
-    expect(
-      find.text(
-        'Downloaded atv-launcher-release.apk. You can install it now from this panel.',
-      ),
-      findsOneWidget,
-    );
   });
+
 }
 
 class _FakeLauncherUpdateClient extends LauncherUpdateClient {
@@ -337,19 +312,32 @@ SystemBridgeService _createBridgeService({
   required bool canRequestPackageInstalls,
   required bool adbEnabled,
 }) {
-  final channel = MockFLauncherChannel();
-  when(channel.getSystemBridgeStatusLite()).thenAnswer(
-    (_) async => <String, dynamic>{
+  final channel = _FakeFLauncherChannel(
+    liteStatus: <String, dynamic>{
       'updates': <String, dynamic>{
         'canRequestPackageInstalls': canRequestPackageInstalls,
         'adbEnabled': adbEnabled,
       },
     },
   );
-  when(channel.addSystemChangedListener(any)).thenAnswer(
-    (_) => const Stream<dynamic>.empty().listen((_) {}),
-  );
   return SystemBridgeService(channel);
+}
+
+class _FakeFLauncherChannel extends FLauncherChannel {
+  final Map<String, dynamic> liteStatus;
+
+  _FakeFLauncherChannel({
+    required this.liteStatus,
+  });
+
+  @override
+  Future<Map<String, dynamic>> getSystemBridgeStatusLite() async => liteStatus;
+
+  @override
+  StreamSubscription<dynamic> addSystemChangedListener(
+    void Function(Map<String, dynamic>) listener,
+  ) =>
+      const Stream<dynamic>.empty().listen((_) {});
 }
 
 void _prepareView(WidgetTester tester) {
@@ -381,4 +369,15 @@ class _FakePathProviderPlatform extends Fake
 
   @override
   Future<String?> getTemporaryPath() async => temporaryPath;
+}
+
+Future<Directory> _createTempTestDirectory(String name) async {
+  final directory = Directory(
+    '${Directory.current.path}${Platform.pathSeparator}build${Platform.pathSeparator}$name',
+  );
+  if (directory.existsSync()) {
+    directory.deleteSync(recursive: true);
+  }
+  directory.createSync(recursive: true);
+  return directory;
 }

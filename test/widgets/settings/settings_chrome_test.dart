@@ -2,6 +2,7 @@ import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -21,6 +22,10 @@ void main() {
     );
     expect(high.panelSurfaceOpacity, lessThan(0.08));
     expect(high.dialogGradientOpacity, lessThan(0.12));
+  });
+
+  test('settings activate keys accept remote gameButtonA', () {
+    expect(isSettingsActivateKey(LogicalKeyboardKey.gameButtonA), isTrue);
   });
 
   test(

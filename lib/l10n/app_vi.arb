@@ -359,6 +359,33 @@
     "grantInstallPermissionViaLocalAdb": "Cấp quyền cài qua local ADB",
     "launcherUpdateLocalAdbSubtitle": "Thử fallback local ADB trước khi mở màn hình quyền của Android.",
     "allowAppInstalls": "Cho phép cài ứng dụng",
+    "cleanupDownloadedApks": "Dọn APK đã tải",
+    "launcherUpdateCleanupSubtitle": "Xóa {count} tệp APK cập nhật đã tải khỏi bộ nhớ launcher.",
+    "@launcherUpdateCleanupSubtitle": {
+        "placeholders": {
+            "count": {}
+        }
+    },
+    "launcherUpdateCleanupEmpty": "Không có APK cập nhật đã tải để dọn.",
+    "launcherUpdateCleanupWorking": "Đang dọn các APK cập nhật đã tải...",
+    "launcherUpdateCleanupComplete": "Đã xóa {count} tệp APK cập nhật đã tải.",
+    "@launcherUpdateCleanupComplete": {
+        "placeholders": {
+            "count": {}
+        }
+    },
+    "launcherUpdateCleanupFailed": "Không thể dọn APK đã tải: {error}",
+    "@launcherUpdateCleanupFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateDownloadedCount": "Đã tải {count} tệp APK",
+    "@launcherUpdateDownloadedCount": {
+        "placeholders": {
+            "count": {}
+        }
+    },
     "launcherUpdateStatusTitle": "Trạng thái cập nhật",
     "launcherUpdateEmptyState": "Hãy kiểm tra GitHub releases để xem bản ATV Launcher chính thức mới nhất và tải trực tiếp ngay trên TV này.",
     "launcherUpdateChecking": "Đang kiểm tra bản phát hành chính thức mới nhất trên GitHub...",

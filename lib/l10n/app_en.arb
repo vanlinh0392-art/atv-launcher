@@ -254,6 +254,33 @@
     "grantInstallPermissionViaLocalAdb": "Grant install via local ADB",
     "launcherUpdateLocalAdbSubtitle": "Try the local ADB fallback before opening Android permission screens.",
     "allowAppInstalls": "Allow app installs",
+    "cleanupDownloadedApks": "Clean downloaded APKs",
+    "launcherUpdateCleanupSubtitle": "Remove {count} downloaded update APK file(s) from launcher storage.",
+    "@launcherUpdateCleanupSubtitle": {
+        "placeholders": {
+            "count": {}
+        }
+    },
+    "launcherUpdateCleanupEmpty": "No downloaded update APKs to remove.",
+    "launcherUpdateCleanupWorking": "Cleaning downloaded update APKs...",
+    "launcherUpdateCleanupComplete": "Removed {count} downloaded update APK file(s).",
+    "@launcherUpdateCleanupComplete": {
+        "placeholders": {
+            "count": {}
+        }
+    },
+    "launcherUpdateCleanupFailed": "Could not clean downloaded APKs: {error}",
+    "@launcherUpdateCleanupFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateDownloadedCount": "{count} APK files downloaded",
+    "@launcherUpdateDownloadedCount": {
+        "placeholders": {
+            "count": {}
+        }
+    },
     "launcherUpdateStatusTitle": "Update status",
     "launcherUpdateEmptyState": "Check GitHub releases to see the latest official ATV Launcher build and download it directly on this TV.",
     "launcherUpdateChecking": "Checking the latest official GitHub release...",

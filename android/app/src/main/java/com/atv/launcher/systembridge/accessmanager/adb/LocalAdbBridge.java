@@ -45,7 +45,7 @@ public final class LocalAdbBridge {
     private static final String LOCAL_ADB_HOST = "127.0.0.1";
     private static final int LOCAL_ADB_PORT = 5555;
     private static final int CONNECT_TIMEOUT_MS = 2000;
-    private static final int SOCKET_TIMEOUT_MS = 4000;
+    private static final int SOCKET_TIMEOUT_MS = 15000;
     private static final AdbBase64 ADB_BASE64 = data -> Base64.encodeToString(data, Base64.NO_WRAP);
 
     private LocalAdbBridge() {
@@ -68,9 +68,44 @@ public final class LocalAdbBridge {
                 crypto.saveAdbKeyPair(privateKey, publicKey);
                 generatedNewKey = true;
             }
-            return runShellCommand(shellCommand, crypto, generatedNewKey);
+            Result result = runShellCommand(shellCommand, crypto, generatedNewKey);
+            if (result.success || generatedNewKey || !shouldRetryWithFreshKey(result.detail)) {
+                return result;
+            }
+
+            // The stored key may have been revoked on the TV. Replace it once so
+            // the next local ADB attempt can trigger a fresh authorize prompt.
+            deleteQuietly(privateKey);
+            deleteQuietly(publicKey);
+
+            AdbCrypto refreshedCrypto = AdbCrypto.generateAdbKeyPair(ADB_BASE64);
+            refreshedCrypto.saveAdbKeyPair(privateKey, publicKey);
+            Result retryResult = runShellCommand(shellCommand, refreshedCrypto, true);
+            if (!retryResult.success && !TextUtils.isEmpty(result.detail)) {
+                return Result.failure(retryResult.detail + " Previous local ADB key was reset and retried.");
+            }
+            return retryResult;
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException exception) {
             return Result.failure(exception.toString());
+        }
+    }
+
+    private static boolean shouldRetryWithFreshKey(String detail) {
+        if (TextUtils.isEmpty(detail)) {
+            return false;
+        }
+        String normalized = detail.toLowerCase(Locale.US);
+        return normalized.contains("connection failed")
+                || normalized.contains("timed out")
+                || normalized.contains("actively rejected")
+                || normalized.contains("stream closed")
+                || normalized.contains("authentication")
+                || normalized.contains("unknown@unknown");
+    }
+
+    private static void deleteQuietly(File file) {
+        if (file != null && file.exists() && !file.delete()) {
+            file.deleteOnExit();
         }
     }
 
@@ -105,7 +140,10 @@ public final class LocalAdbBridge {
             String lowerOutput = rawOutput.toLowerCase(Locale.US);
             boolean success = !lowerOutput.contains("permission denial")
                     && !lowerOutput.contains("security exception")
-                    && !lowerOutput.contains("not found");
+                    && !lowerOutput.contains("not found")
+                    && !lowerOutput.startsWith("failure")
+                    && !lowerOutput.contains("failure [")
+                    && !lowerOutput.contains("error:");
             return success ? Result.success(rawOutput) : Result.failure(rawOutput);
         } catch (SocketTimeoutException exception) {
             String detail = generatedNewKey

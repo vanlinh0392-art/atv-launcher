@@ -8,7 +8,8 @@ import 'settings_chrome.dart';
 bool isSettingsActivateKey(LogicalKeyboardKey key) =>
     key == LogicalKeyboardKey.enter ||
     key == LogicalKeyboardKey.select ||
-    key == LogicalKeyboardKey.space;
+    key == LogicalKeyboardKey.space ||
+    key == LogicalKeyboardKey.gameButtonA;
 
 typedef SettingsBoundaryMoveHandler = bool Function();
 

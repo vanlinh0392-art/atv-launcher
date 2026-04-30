@@ -74,6 +74,7 @@ import com.atv.launcher.systembridge.wallpaper.VideoWallpaperController;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -1161,11 +1162,15 @@ public class MainActivity extends FlutterActivity {
         if (readGlobalInt(Settings.Global.ADB_ENABLED, 0) != 1) {
             message = "ADB is disabled. Enable Developer options first.";
         } else {
-            log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
+            String grantResult = runLocalAdbBestEffort(
+                    "appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"
+            );
+            log.add(grantResult);
             success = canInstallPackageUpdates();
             message = success
                     ? "Install permission granted for this launcher."
-                    : "Install permission still needs user approval from Android settings.";
+                    : "Install permission still needs user approval from Android settings. Local ADB result: "
+                    + grantResult;
         }
         map.put("success", success);
         map.put("message", message);
@@ -1368,11 +1373,13 @@ public class MainActivity extends FlutterActivity {
                 success = false;
                 message = "ADB is disabled. Enable Developer options first.";
             } else {
-                log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
+                String grantDetail = runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow");
+                log.add(grantDetail);
                 success = canInstallPackageUpdates();
                 message = success
                         ? "Install permission granted for this launcher."
-                        : "Install permission still needs user approval from Android settings.";
+                        : "Install permission still needs user approval from Android settings. Local ADB result: "
+                        + grantDetail;
             }
         } else if (TextUtils.equals(normalizedAction, "open_development")) {
             success = openSpecificSettingsPage("development");
@@ -2151,10 +2158,39 @@ public class MainActivity extends FlutterActivity {
             map.put("message", "Downloaded APK file could not be found.");
             return map;
         }
-        if (!canInstallPackageUpdates()) {
+        Map<String, Object> localAdbInstallAttempt = tryInstallDownloadedApkViaLocalAdb(apkFile);
+        if (Boolean.TRUE.equals(localAdbInstallAttempt.get("attempted"))) {
+            map.put("attemptedLocalAdbInstall", true);
+            map.put("localAdbInstallPath", localAdbInstallAttempt.get("stagedPath"));
+            map.put("localAdbInstallDetail", localAdbInstallAttempt.get("detail"));
+            if (Boolean.TRUE.equals(localAdbInstallAttempt.get("success"))) {
+                map.put("success", true);
+                map.put("usedLocalAdbInstall", true);
+                map.put("message", localAdbInstallAttempt.get("message"));
+                return map;
+            }
+        }
+        boolean permissionReady = canInstallPackageUpdates();
+        String localAdbGrantDetail = "";
+        if (!permissionReady && readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1) {
+            localAdbGrantDetail = runLocalAdbBestEffort(
+                    "appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"
+            );
+            permissionReady = canInstallPackageUpdates();
+            map.put("attemptedLocalAdbGrant", true);
+            map.put("localAdbGrantDetail", localAdbGrantDetail);
+        }
+        if (!permissionReady) {
             map.put("success", false);
             map.put("needsPermission", true);
-            map.put("message", "Allow installs from this launcher before installing the update.");
+            map.put(
+                    "message",
+                    TextUtils.isEmpty(localAdbGrantDetail)
+                            ? fallbackInstallPermissionMessage(localAdbInstallAttempt)
+                            : "Allow installs from this launcher before installing the update. Local ADB result: "
+                            + localAdbGrantDetail
+                            + appendLocalAdbInstallFailure(localAdbInstallAttempt)
+            );
             return map;
         }
         try {
@@ -2163,20 +2199,142 @@ public class MainActivity extends FlutterActivity {
                     getPackageName() + ".fileprovider",
                     apkFile
             );
-            Intent intent = new Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(apkUri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            boolean success = tryStartActivity(intent);
+            boolean success = tryStartApkInstaller(apkUri);
             map.put("success", success);
             map.put("message", success
                     ? "Package installer opened for the downloaded update."
-                    : "Package installer could not be opened.");
+                    : "Package installer could not be opened."
+                    + appendLocalAdbInstallFailure(localAdbInstallAttempt));
             return map;
         } catch (Exception exception) {
             map.put("success", false);
-            map.put("message", exception.toString());
+            map.put("message", exception.toString() + appendLocalAdbInstallFailure(localAdbInstallAttempt));
             return map;
         }
+    }
+
+    private Map<String, Object> tryInstallDownloadedApkViaLocalAdb(File apkFile) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        boolean adbEnabled = readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1;
+        map.put("attempted", adbEnabled);
+        if (!adbEnabled) {
+            return map;
+        }
+        try {
+            File stagedApkFile = stageDownloadedApkForLocalAdb(apkFile);
+            map.put("stagedPath", stagedApkFile.getAbsolutePath());
+            String command = "pm install -r " + shellQuote(stagedApkFile.getAbsolutePath());
+            LocalAdbBridge.Result result = LocalAdbBridge.executeShell(this, command);
+            String detail = result.success
+                    ? (TextUtils.isEmpty(result.output) ? "pm install -r -> ok" : result.output.trim())
+                    : (TextUtils.isEmpty(result.detail) ? "pm install -r failed" : result.detail.trim());
+            map.put("detail", detail);
+            map.put("success", result.success);
+            map.put(
+                    "message",
+                    result.success
+                            ? "Update install was handed off through local ADB. If the launcher restarts, the APK update is being applied."
+                            : "Local ADB direct install could not complete: " + detail
+            );
+            return map;
+        } catch (Exception exception) {
+            map.put("success", false);
+            map.put("detail", exception.toString());
+            map.put("message", "Local ADB direct install could not complete: " + exception);
+            return map;
+        }
+    }
+
+    private File stageDownloadedApkForLocalAdb(File sourceFile) throws Exception {
+        File externalDir = getExternalFilesDir("launcher_updates");
+        if (externalDir == null) {
+            throw new IllegalStateException("External app storage is unavailable for local ADB install staging.");
+        }
+        if (!externalDir.exists() && !externalDir.mkdirs()) {
+            throw new IllegalStateException("Could not create the launcher update staging directory.");
+        }
+        File stagedFile = new File(externalDir, sourceFile.getName());
+        copyFile(sourceFile, stagedFile);
+        stagedFile.setReadable(true, false);
+        return stagedFile;
+    }
+
+    private void copyFile(File sourceFile, File destinationFile) throws Exception {
+        try (InputStream inputStream = new FileInputStream(sourceFile);
+             OutputStream outputStream = new FileOutputStream(destinationFile, false)) {
+            byte[] buffer = new byte[16 * 1024];
+            int read;
+            while ((read = inputStream.read(buffer)) >= 0) {
+                outputStream.write(buffer, 0, read);
+            }
+            outputStream.flush();
+        }
+    }
+
+    private String shellQuote(String raw) {
+        if (raw == null) {
+            return "''";
+        }
+        return "'" + raw.replace("'", "'\\''") + "'";
+    }
+
+    private String fallbackInstallPermissionMessage(Map<String, Object> localAdbInstallAttempt) {
+        return "Allow installs from this launcher before installing the update."
+                + appendLocalAdbInstallFailure(localAdbInstallAttempt);
+    }
+
+    private String appendLocalAdbInstallFailure(Map<String, Object> localAdbInstallAttempt) {
+        if (!Boolean.TRUE.equals(localAdbInstallAttempt.get("attempted"))
+                || Boolean.TRUE.equals(localAdbInstallAttempt.get("success"))) {
+            return "";
+        }
+        Object detail = localAdbInstallAttempt.get("detail");
+        if (detail == null || TextUtils.isEmpty(detail.toString())) {
+            return "";
+        }
+        return " Local ADB direct install result: " + detail;
+    }
+
+    private boolean tryStartApkInstaller(Uri apkUri) {
+        Intent explicitInstallIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
+                .setClassName("com.android.packageinstaller", "com.android.packageinstaller.InstallStart")
+                .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (tryStartActivity(explicitInstallIntent)) {
+            return true;
+        }
+
+        Intent explicitViewIntent = new Intent(Intent.ACTION_VIEW)
+                .setClassName("com.android.packageinstaller", "com.android.packageinstaller.InstallStart")
+                .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (tryStartActivity(explicitViewIntent)) {
+            return true;
+        }
+
+        Intent implicitInstallIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
+                .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (tryStartActivity(implicitInstallIntent)) {
+            return true;
+        }
+
+        Intent implicitViewIntent = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return tryStartActivity(implicitViewIntent);
     }
 
     private boolean openSpecificSettingsPage(String page) {
