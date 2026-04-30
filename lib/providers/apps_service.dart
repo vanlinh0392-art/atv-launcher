@@ -35,11 +35,14 @@ class AppsService extends ChangeNotifier {
   static const String startupPhaseSyncingLive = 'syncing_live';
   static const String startupPhaseReady = 'ready';
   static const String startupPhaseDegradedCached = 'degraded_cached';
-  static const Duration _liveSyncRetryDelay = Duration(seconds: 6);
-  static const Duration _liveSyncWarmDelay = Duration(milliseconds: 350);
+  static const Duration _liveSyncRetryDelayDefault = Duration(seconds: 6);
+  static const Duration _liveSyncWarmDelayDefault =
+      Duration(milliseconds: 1800);
 
   final FLauncherChannel _fLauncherChannel;
   final FLauncherDatabase _database;
+  final Duration _liveSyncRetryDelay;
+  final Duration _liveSyncWarmDelay;
 
   bool _initialized = false;
   bool _staleCache = false;
@@ -86,7 +89,13 @@ class AppsService extends ChangeNotifier {
           )
           .toList(growable: false);
 
-  AppsService(this._fLauncherChannel, this._database) {
+  AppsService(
+    this._fLauncherChannel,
+    this._database, {
+    Duration liveSyncRetryDelay = _liveSyncRetryDelayDefault,
+    Duration liveSyncWarmDelay = _liveSyncWarmDelayDefault,
+  })  : _liveSyncRetryDelay = liveSyncRetryDelay,
+        _liveSyncWarmDelay = liveSyncWarmDelay {
     _init();
   }
 
@@ -392,6 +401,10 @@ class AppsService extends ChangeNotifier {
 
   void _scheduleLiveSync({required String reason}) {
     _liveSyncRetryTimer?.cancel();
+    if (_liveSyncWarmDelay <= Duration.zero) {
+      unawaited(_runLiveSync(reason: reason));
+      return;
+    }
     _liveSyncRetryTimer = Timer(_liveSyncWarmDelay, () {
       unawaited(_runLiveSync(reason: reason));
     });
@@ -399,6 +412,10 @@ class AppsService extends ChangeNotifier {
 
   void _scheduleLiveSyncRetry() {
     _liveSyncRetryTimer?.cancel();
+    if (_liveSyncRetryDelay <= Duration.zero) {
+      unawaited(_runLiveSync(reason: 'retry_live_sync'));
+      return;
+    }
     _liveSyncRetryTimer = Timer(_liveSyncRetryDelay, () {
       unawaited(_runLiveSync(reason: 'retry_live_sync'));
     });

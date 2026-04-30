@@ -46,12 +46,17 @@ typedef AppCardFocusCallback = void Function(BuildContext itemContext);
 
 class AppCard extends StatefulWidget {
   static const int _maxImageCacheSize = 96;
+  static const int _maxConcurrentImageLoads = 2;
+  static const Duration _deferredImageLoadDelay = Duration(milliseconds: 900);
   static final LinkedHashMap<String, Tuple2<AppImageType, ImageProvider>>
       _resolvedImageCache =
       LinkedHashMap<String, Tuple2<AppImageType, ImageProvider>>();
   static final LinkedHashMap<String,
           Future<Tuple2<AppImageType, ImageProvider>>> _imageLoadCache =
       LinkedHashMap<String, Future<Tuple2<AppImageType, ImageProvider>>>();
+  static final Queue<_QueuedAppImageLoad> _pendingImageLoads =
+      Queue<_QueuedAppImageLoad>();
+  static int _activeImageLoads = 0;
 
   final App application;
   final Category category;
@@ -84,15 +89,20 @@ class AppCard extends StatefulWidget {
 
   static Future<Tuple2<AppImageType, ImageProvider>> _putImageLoadFuture(
     String packageName,
-    Future<Tuple2<AppImageType, ImageProvider>> Function() loader,
-  ) {
+    Future<Tuple2<AppImageType, ImageProvider>> Function() loader, {
+    bool priority = false,
+  }) {
     final cachedFuture = _imageLoadCache.remove(packageName);
     if (cachedFuture != null) {
       _imageLoadCache[packageName] = cachedFuture;
+      if (priority) {
+        _promotePendingImageLoad(packageName);
+      }
       return cachedFuture;
     }
 
-    final future = loader().then((image) {
+    final completer = Completer<Tuple2<AppImageType, ImageProvider>>();
+    final future = completer.future.then((image) {
       _rememberImage(packageName, image);
       return image;
     }).catchError((Object error) {
@@ -100,7 +110,18 @@ class AppCard extends StatefulWidget {
       throw error;
     });
     _imageLoadCache[packageName] = future;
+    final request = _QueuedAppImageLoad(
+      packageName: packageName,
+      loader: loader,
+      completer: completer,
+    );
+    if (priority) {
+      _pendingImageLoads.addFirst(request);
+    } else {
+      _pendingImageLoads.addLast(request);
+    }
     _trimImageCaches();
+    _drainPendingImageLoads();
     return future;
   }
 
@@ -116,11 +137,22 @@ class AppCard extends StatefulWidget {
   static void _evictImage(String packageName) {
     _resolvedImageCache.remove(packageName);
     _imageLoadCache.remove(packageName);
+    _QueuedAppImageLoad? pendingRequest;
+    for (final request in _pendingImageLoads) {
+      if (request.packageName == packageName) {
+        pendingRequest = request;
+        break;
+      }
+    }
+    if (pendingRequest != null) {
+      _pendingImageLoads.remove(pendingRequest);
+    }
   }
 
   static void _clearImageCaches() {
     _resolvedImageCache.clear();
     _imageLoadCache.clear();
+    _pendingImageLoads.clear();
   }
 
   static void _trimImageCaches() {
@@ -132,6 +164,55 @@ class AppCard extends StatefulWidget {
       _imageLoadCache.remove(_imageLoadCache.keys.first);
     }
   }
+
+  static void _promotePendingImageLoad(String packageName) {
+    _QueuedAppImageLoad? pendingRequest;
+    for (final request in _pendingImageLoads) {
+      if (request.packageName == packageName) {
+        pendingRequest = request;
+        break;
+      }
+    }
+    if (pendingRequest == null) {
+      return;
+    }
+    _pendingImageLoads.remove(pendingRequest);
+    _pendingImageLoads.addFirst(pendingRequest);
+    _drainPendingImageLoads();
+  }
+
+  static void _drainPendingImageLoads() {
+    while (_activeImageLoads < _maxConcurrentImageLoads &&
+        _pendingImageLoads.isNotEmpty) {
+      final request = _pendingImageLoads.removeFirst();
+      _activeImageLoads += 1;
+      request.loader().then((image) {
+        if (!request.completer.isCompleted) {
+          request.completer.complete(image);
+        }
+      }, onError: (Object error, StackTrace stackTrace) {
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(error, stackTrace);
+        }
+      }).whenComplete(() {
+        _activeImageLoads =
+            (_activeImageLoads - 1).clamp(0, _maxConcurrentImageLoads).toInt();
+        _drainPendingImageLoads();
+      });
+    }
+  }
+}
+
+class _QueuedAppImageLoad {
+  final String packageName;
+  final Future<Tuple2<AppImageType, ImageProvider>> Function() loader;
+  final Completer<Tuple2<AppImageType, ImageProvider>> completer;
+
+  _QueuedAppImageLoad({
+    required this.packageName,
+    required this.loader,
+    required this.completer,
+  });
 }
 
 class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
@@ -141,6 +222,8 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   Tuple2<AppImageType, ImageProvider>? _resolvedAppImage;
   Object? _appImageLoadError;
   int? _lastSeenImageCacheRevision;
+  Timer? _deferredImageLoadTimer;
+  int _imageLoadRevision = 0;
   late final AnimationController _animation = AnimationController(
     vsync: this,
     lowerBound: 0,
@@ -171,6 +254,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     FocusManager.instance
         .removeHighlightModeListener(_focusHighlightModeChanged);
     AppImageCacheInvalidator.instance.removeListener(_syncImageCacheRevision);
+    _deferredImageLoadTimer?.cancel();
     _animation.dispose();
 
     super.dispose();
@@ -243,6 +327,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                   if (!focused) {
                                     return;
                                   }
+                                  _ensureAppImageLoaded(priority: true);
                                   widget.onFocused?.call(context);
                                 },
                               ),
@@ -453,39 +538,24 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   }
 
   void _bindAppImage() {
+    _deferredImageLoadTimer?.cancel();
+    final loadRevision = ++_imageLoadRevision;
     final packageName = widget.application.packageName;
     _resolvedAppImage = AppCard._getCachedImage(packageName);
     _appImageLoadError = null;
-    _appImageLoadFuture = AppCard._putImageLoadFuture(
-      packageName,
-      () async {
-        final image = await _loadAppBannerOrIcon(
-          Provider.of<AppsService>(context, listen: false),
-        );
-        return image;
-      },
-    );
     if (_resolvedAppImage != null) {
       return;
     }
-    unawaited(
-      _appImageLoadFuture.then((value) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _resolvedAppImage = value;
-          _appImageLoadError = null;
-        });
-      }).catchError((Object error) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _appImageLoadError = error;
-        });
-      }),
-    );
+    if (widget.autofocus) {
+      _ensureAppImageLoaded(priority: true, loadRevision: loadRevision);
+      return;
+    }
+    _deferredImageLoadTimer = Timer(AppCard._deferredImageLoadDelay, () {
+      if (!mounted) {
+        return;
+      }
+      _ensureAppImageLoaded(priority: false, loadRevision: loadRevision);
+    });
   }
 
   void _syncImageCacheRevision() {
@@ -504,6 +574,50 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       AppCard._evictImage(packageName);
       _bindAppImage();
     }
+  }
+
+  void _ensureAppImageLoaded({
+    required bool priority,
+    int? loadRevision,
+  }) {
+    if (_resolvedAppImage != null) {
+      return;
+    }
+    _deferredImageLoadTimer?.cancel();
+    final packageName = widget.application.packageName;
+    final expectedRevision = loadRevision ?? _imageLoadRevision;
+    _appImageLoadFuture = AppCard._putImageLoadFuture(
+      packageName,
+      () async {
+        final image = await _loadAppBannerOrIcon(
+          Provider.of<AppsService>(context, listen: false),
+        );
+        return image;
+      },
+      priority: priority,
+    );
+    unawaited(
+      _appImageLoadFuture.then((value) {
+        if (!mounted ||
+            expectedRevision != _imageLoadRevision ||
+            packageName != widget.application.packageName) {
+          return;
+        }
+        setState(() {
+          _resolvedAppImage = value;
+          _appImageLoadError = null;
+        });
+      }).catchError((Object error) {
+        if (!mounted ||
+            expectedRevision != _imageLoadRevision ||
+            packageName != widget.application.packageName) {
+          return;
+        }
+        setState(() {
+          _appImageLoadError = error;
+        });
+      }),
+    );
   }
 
   void _focusHighlightModeChanged(FocusHighlightMode mode) {

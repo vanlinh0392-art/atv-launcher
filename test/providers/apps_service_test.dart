@@ -198,7 +198,11 @@ void main() {
       ),
     ]);
 
-    final service = AppsService(channel, database);
+    final service = AppsService(
+      channel,
+      database,
+      liveSyncWarmDelay: Duration.zero,
+    );
     addTearDown(service.dispose);
     addTearDown(database.close);
 

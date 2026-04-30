@@ -44,6 +44,14 @@ secretProperties.setProperty("signing_keystore_password", "${System.getenv('FLAU
 secretProperties.setProperty("signing_key_password", "${System.getenv('FLAUNCHER_SIGNING_KEY_PASSWORD')}")
 secretProperties.setProperty("signing_key_alias", "${System.getenv('FLAUNCHER_SIGNING_KEY_ALIAS')}")
 
+def hasReleaseSigningCredentials =
+        secretProperties['signing_keystore_password'] &&
+        secretProperties['signing_keystore_password'] != 'null' &&
+        secretProperties['signing_key_password'] &&
+        secretProperties['signing_key_password'] != 'null' &&
+        secretProperties['signing_key_alias'] &&
+        secretProperties['signing_key_alias'] != 'null'
+
 android {
     namespace 'com.atv.launcher'
     compileSdk 35
@@ -74,7 +82,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig hasReleaseSigningCredentials
+                    ? signingConfigs.release
+                    : signingConfigs.debug
         }
     }
 

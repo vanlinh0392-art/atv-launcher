@@ -8,8 +8,12 @@ import 'package:provider/provider.dart';
 
 class DensityPanelPage extends StatefulWidget {
   static const String routeName = "density_panel";
+  final FocusNode? primaryFocusNode;
 
-  const DensityPanelPage({super.key});
+  const DensityPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   State<DensityPanelPage> createState() => _DensityPanelPageState();
@@ -77,7 +81,8 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                     subtitle: Text(status['executionPath']?.toString() ?? '-'),
                   ),
                   EnsureVisible(
-                    alignment: 0.12,
+                    alignment: EnsureVisible.settingsAlignment,
+                    preferImmediate: true,
                     child: TextField(
                       controller: _controller,
                       autofocus: false,
@@ -93,6 +98,8 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                     maxColumns: 2,
                     children: [
                       SettingsActionCard(
+                        key: const Key('density_apply_button'),
+                        focusNode: widget.primaryFocusNode,
                         title: localizations.applyLabel,
                         subtitle: localizations.customDpiRange,
                         icon: Icons.check_circle_outline,

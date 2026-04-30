@@ -9,8 +9,12 @@ import 'package:provider/provider.dart';
 
 class SystemCorePanelPage extends StatelessWidget {
   static const String routeName = "system_core_panel";
+  final FocusNode? primaryFocusNode;
 
-  const SystemCorePanelPage({super.key});
+  const SystemCorePanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -64,10 +68,11 @@ class SystemCorePanelPage extends StatelessWidget {
                   Text(localizations.adbAutomationPolicyTitle,
                       style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 12),
-                  SettingsChoiceCard<String>(
-                    selectorKey: const Key('system_core_adb_policy_selector'),
-                    optionKeyPrefix: 'system_core_adb_policy_option',
-                    title: localizations.adbAutomationPolicyTitle,
+                SettingsChoiceCard<String>(
+                  focusNode: primaryFocusNode,
+                  selectorKey: const Key('system_core_adb_policy_selector'),
+                  optionKeyPrefix: 'system_core_adb_policy_option',
+                  title: localizations.adbAutomationPolicyTitle,
                     subtitle: localizations.disableAdbOnSleepSubtitle,
                     icon: Icons.adb_outlined,
                     value: policy,

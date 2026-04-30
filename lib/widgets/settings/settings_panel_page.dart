@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flauncher/custom_traversal_policy.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
 import 'package:flauncher/widgets/settings/backup_restore_panel_page.dart';
@@ -8,6 +10,8 @@ import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
 import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/settings_perf_probe.dart';
+import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flauncher/widgets/settings/system_core_panel_page.dart';
 import 'package:flauncher/widgets/settings/voice_search_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
@@ -17,8 +21,18 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SettingsPanelPage extends StatefulWidget {
   static const String routeName = "settings_panel";
+  final String? initialSelectedRoute;
+  final bool autoFocusDetailOnOpen;
+  final ValueChanged<String>? onBenchmarkReady;
+  final ValueChanged<SettingsBenchmarkDpadSample>? onBenchmarkDpadSample;
 
-  const SettingsPanelPage({super.key});
+  const SettingsPanelPage({
+    super.key,
+    this.initialSelectedRoute,
+    this.autoFocusDetailOnOpen = false,
+    this.onBenchmarkReady,
+    this.onBenchmarkDpadSample,
+  });
 
   @override
   State<SettingsPanelPage> createState() => _SettingsPanelPageState();
@@ -26,35 +40,96 @@ class SettingsPanelPage extends StatefulWidget {
 
 class _SettingsPanelPageState extends State<SettingsPanelPage> {
   late String _selectedRoute;
-  late final FocusNode _detailEntryNode;
   late final FocusScopeNode _detailScopeNode;
   final PageStorageBucket _detailPageStorageBucket = PageStorageBucket();
   List<FocusNode> _railFocusNodes = const [];
+  late final Map<String, FocusNode> _detailPrimaryFocusNodes;
   bool _detailPaneActive = false;
+  bool _detailContentReady = false;
+  bool _pendingDetailFocus = false;
+  bool _benchmarkReadyReported = false;
+  Timer? _benchmarkSettleTimer;
+  _PendingBenchmarkSample? _pendingBenchmarkSample;
 
   @override
   void initState() {
     super.initState();
-    _selectedRoute = HomeLayoutPanelPage.routeName;
-    _detailEntryNode = FocusNode(debugLabel: 'settings_detail_entry');
     _detailScopeNode = FocusScopeNode(debugLabel: 'settings_detail_scope');
+    _detailPrimaryFocusNodes = <String, FocusNode>{
+      HomeLayoutPanelPage.routeName:
+          FocusNode(debugLabel: 'home_layout_target_appLocale'),
+      WallpaperPanelPage.routeName:
+          FocusNode(debugLabel: 'wallpaper_primary_source_action'),
+      VoiceSearchPanelPage.routeName:
+          FocusNode(debugLabel: 'voice_search_primary_mode'),
+      PrivateDnsPanelPage.routeName:
+          FocusNode(debugLabel: 'private_dns_primary_hostname_action'),
+      PermissionsPanelPage.routeName:
+          FocusNode(debugLabel: 'permissions_primary_quick_grant'),
+      BackupRestorePanelPage.routeName:
+          FocusNode(debugLabel: 'backup_restore_primary_export'),
+      SystemCorePanelPage.routeName:
+          FocusNode(debugLabel: 'system_core_primary_policy'),
+      StatusBarPanelPage.routeName:
+          FocusNode(debugLabel: 'status_bar_primary_toggle'),
+      ProfilesSecurityPanelPage.routeName:
+          FocusNode(debugLabel: 'profiles_security_primary_lock'),
+      AccessibilityManagerPanelPage.routeName:
+          FocusNode(debugLabel: 'accessibility_primary_toggle_apps'),
+      DensityPanelPage.routeName:
+          FocusNode(debugLabel: 'density_primary_apply'),
+      DiagnosticsPanelPage.routeName:
+          FocusNode(debugLabel: 'diagnostics_primary_refresh'),
+    };
+    _selectedRoute = _detailPrimaryFocusNodes.containsKey(
+      widget.initialSelectedRoute,
+    )
+        ? widget.initialSelectedRoute!
+        : HomeLayoutPanelPage.routeName;
+    if (_benchmarkEnabled) {
+      HardwareKeyboard.instance.addHandler(_handleBenchmarkRawKey);
+      FocusManager.instance.addListener(_handleBenchmarkFocusChange);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      _focusDetailPane();
+      setState(() {
+        _detailContentReady = true;
+      });
+      if (widget.autoFocusDetailOnOpen) {
+        _pendingDetailFocus = true;
+      }
+      if (_pendingDetailFocus) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          _focusDetailPane();
+        });
+      }
     });
   }
 
   @override
   void dispose() {
-    _detailEntryNode.dispose();
+    if (_benchmarkEnabled) {
+      HardwareKeyboard.instance.removeHandler(_handleBenchmarkRawKey);
+      FocusManager.instance.removeListener(_handleBenchmarkFocusChange);
+    }
+    _benchmarkSettleTimer?.cancel();
     _detailScopeNode.dispose();
     for (final node in _railFocusNodes) {
       node.dispose();
     }
+    for (final node in _detailPrimaryFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
   }
+
+  bool get _benchmarkEnabled =>
+      widget.onBenchmarkReady != null || widget.onBenchmarkDpadSample != null;
 
   @override
   Widget build(BuildContext context) {
@@ -69,124 +144,132 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
       orElse: () => destinations.first,
     );
 
-    return SettingsContentView(
-      title: localizations.settingsShellTitle,
-      subtitle: localizations.settingsShellSubtitle,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          RepaintBoundary(
-            child: SizedBox(
-              width: 320,
-              child: SettingsSurfaceCard(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-                      child: Text(
-                        localizations.settingsControlCenterTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        key: const PageStorageKey<String>(
-                          'settings_destination_rail',
+    return PopScope(
+      canPop: !_detailPaneActive,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !_detailPaneActive) {
+          return;
+        }
+        _focusSelectedRail();
+      },
+      child: SettingsContentView(
+        title: localizations.settingsShellTitle,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            RepaintBoundary(
+              child: SizedBox(
+                width: 320,
+                child: SettingsSurfaceCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+                        child: Text(
+                          localizations.settingsControlCenterTitle,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        physics: const ClampingScrollPhysics(),
-                        itemCount: destinations.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
-                        itemBuilder: (context, index) {
-                          final item = destinations[index];
-                          final selected = item.route == _selectedRoute;
-                          return _RailTile(
-                            focusNode: _railFocusNodes[index],
-                            item: item,
-                            selected: selected,
-                            autofocus: index == 0,
-                            onPressed: () => _selectRoute(item.route),
-                            onEnterDetail: _focusDetailPane,
-                          );
-                        },
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: ListView.separated(
+                          key: const PageStorageKey<String>(
+                            'settings_destination_rail',
+                          ),
+                          physics: const ClampingScrollPhysics(),
+                          itemCount: destinations.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 6),
+                          itemBuilder: (context, index) {
+                            final item = destinations[index];
+                            final selected = item.route == _selectedRoute;
+                            return _RailTile(
+                              focusNode: _railFocusNodes[index],
+                              item: item,
+                              selected: selected,
+                              autofocus: index ==
+                                  (selectedIndex < 0 ? 0 : selectedIndex),
+                              onPressed: () => _selectRoute(item.route),
+                              onEnterDetail: _focusDetailPane,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: RepaintBoundary(
-              child: Focus(
-                focusNode: _detailEntryNode,
-                onFocusChange: (hasFocus) {
-                  if (!hasFocus || !_detailEntryNode.hasFocus) {
-                    return;
-                  }
-                  _detailScopeNode.nextFocus();
-                },
-                onKeyEvent: (_, event) {
-                  if (event is! KeyDownEvent) {
-                    return KeyEventResult.ignored;
-                  }
-                  if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                    if (_moveFocusWithinDetail(TraversalDirection.left)) {
+            const SizedBox(width: 18),
+            Expanded(
+              child: RepaintBoundary(
+                child: Focus(
+                  canRequestFocus: false,
+                  onKeyEvent: (_, event) {
+                    if (event is! KeyDownEvent) {
+                      return KeyEventResult.ignored;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                      if (_moveFocusWithinDetail(TraversalDirection.left)) {
+                        return KeyEventResult.handled;
+                      }
+                      _focusSelectedRail();
                       return KeyEventResult.handled;
                     }
-                    _focusSelectedRail();
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: FocusScope(
-                  node: _detailScopeNode,
-                  onFocusChange: _handleDetailScopeFocusChange,
-                  child: SettingsSurfaceCard(
-                    key: const Key('settings_detail_pane_card'),
-                    highlighted: _detailPaneActive,
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          destination.title,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          destination.subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                        const SizedBox(height: 12),
-                        Expanded(
-                          child: PageStorage(
-                            bucket: _detailPageStorageBucket,
-                            child: KeyedSubtree(
-                              key: ValueKey<String>(_selectedRoute),
-                              child: _buildPage(
-                                selectedIndex < 0
-                                    ? destinations.first.route
-                                    : _selectedRoute,
-                              ),
-                            ),
+                    return KeyEventResult.ignored;
+                  },
+                  child: FocusScope(
+                    node: _detailScopeNode,
+                    onFocusChange: _handleDetailScopeFocusChange,
+                    child: SettingsSurfaceCard(
+                      key: const Key('settings_detail_pane_card'),
+                      highlighted: _detailPaneActive,
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            destination.title,
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            destination.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.white70),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: _detailContentReady
+                                ? PageStorage(
+                                    bucket: _detailPageStorageBucket,
+                                    child: KeyedSubtree(
+                                      key: ValueKey<String>(_selectedRoute),
+                                      child: _buildPage(
+                                        selectedIndex < 0
+                                            ? destinations.first.route
+                                            : _selectedRoute,
+                                      ),
+                                    ),
+                                  )
+                                : _SettingsDetailPlaceholder(
+                                    label: localizations.loading,
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -219,12 +302,23 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
     if (!mounted) {
       return;
     }
+    if (!_detailContentReady) {
+      _pendingDetailFocus = true;
+      return;
+    }
+    _pendingDetailFocus = false;
     if (!_detailPaneActive) {
       setState(() {
         _detailPaneActive = true;
       });
     }
-    _detailEntryNode.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _requestDetailFocus(
+          preferredNode: _detailPrimaryFocusNodes[_selectedRoute]);
+    });
   }
 
   void _focusSelectedRail() {
@@ -265,6 +359,174 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
     }
     searcher.findBestFocusNode(candidates, current).requestFocus();
     return true;
+  }
+
+  void _requestDetailFocus({FocusNode? preferredNode}) {
+    if (_tryRequestDetailFocusNode(preferredNode) ||
+        _tryRequestDetailFocusNode(_firstFocusableDetailNode())) {
+      _scheduleDetailFocusVerification(preferredNode);
+      _maybeReportBenchmarkReady();
+      return;
+    }
+    if (_detailScopeNode.context != null) {
+      _detailScopeNode.nextFocus();
+      _scheduleDetailFocusVerification(preferredNode);
+      _maybeReportBenchmarkReady();
+    }
+  }
+
+  bool _tryRequestDetailFocusNode(FocusNode? node) {
+    if (node == null || !node.canRequestFocus || node.context == null) {
+      return false;
+    }
+    node.requestFocus();
+    return true;
+  }
+
+  void _scheduleDetailFocusVerification(FocusNode? preferredNode) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _isPrimaryFocusWithinDetail) {
+        return;
+      }
+      if (_tryRequestDetailFocusNode(preferredNode) ||
+          _tryRequestDetailFocusNode(_firstFocusableDetailNode())) {
+        _maybeReportBenchmarkReady();
+        return;
+      }
+      if (_detailScopeNode.context != null) {
+        _detailScopeNode.nextFocus();
+        _maybeReportBenchmarkReady();
+      }
+    });
+  }
+
+  FocusNode? _firstFocusableDetailNode() {
+    final candidates = _detailScopeNode.traversalDescendants
+        .where(
+          (node) =>
+              node.canRequestFocus &&
+              node.context != null &&
+              node.enclosingScope != null,
+        )
+        .toList(growable: false);
+    if (candidates.isEmpty) {
+      return null;
+    }
+    return candidates.first;
+  }
+
+  bool get _isPrimaryFocusWithinDetail {
+    final current = FocusManager.instance.primaryFocus;
+    return current != null && _isFocusWithinDetail(current);
+  }
+
+  bool _handleBenchmarkRawKey(KeyEvent event) {
+    if (!_benchmarkEnabled || event is! KeyDownEvent) {
+      return false;
+    }
+    final key = _benchmarkKeyLabel(event.logicalKey);
+    if (key == null) {
+      return false;
+    }
+    final current = FocusManager.instance.primaryFocus;
+    if (current == null || !_isFocusWithinDetail(current)) {
+      return false;
+    }
+    _benchmarkSettleTimer?.cancel();
+    _pendingBenchmarkSample = _PendingBenchmarkSample(
+      key: key,
+      fromFocus: _focusDebugLabel(current),
+      startedAt: DateTime.now(),
+    );
+    return false;
+  }
+
+  void _handleBenchmarkFocusChange() {
+    _maybeReportBenchmarkReady();
+    final pending = _pendingBenchmarkSample;
+    if (pending == null) {
+      return;
+    }
+    final current = FocusManager.instance.primaryFocus;
+    if (current == null) {
+      return;
+    }
+    final nextFocus = _focusDebugLabel(current);
+    if (nextFocus.isEmpty || nextFocus == pending.fromFocus) {
+      return;
+    }
+    _pendingBenchmarkSample = pending.copyWith(toFocus: nextFocus);
+    _benchmarkSettleTimer?.cancel();
+    _benchmarkSettleTimer = Timer(
+      const Duration(milliseconds: 32),
+      _finalizeBenchmarkSample,
+    );
+  }
+
+  void _finalizeBenchmarkSample() {
+    final pending = _pendingBenchmarkSample;
+    if (pending == null) {
+      return;
+    }
+    _pendingBenchmarkSample = null;
+    final toFocus = pending.toFocus;
+    if (toFocus == null || toFocus == pending.fromFocus) {
+      return;
+    }
+    widget.onBenchmarkDpadSample?.call(
+      SettingsBenchmarkDpadSample(
+        key: pending.key,
+        fromFocus: pending.fromFocus,
+        toFocus: toFocus,
+        inputToSettledFrameMs:
+            DateTime.now().difference(pending.startedAt).inMilliseconds,
+      ),
+    );
+  }
+
+  void _maybeReportBenchmarkReady() {
+    if (!_benchmarkEnabled ||
+        _benchmarkReadyReported ||
+        !widget.autoFocusDetailOnOpen) {
+      return;
+    }
+    final current = FocusManager.instance.primaryFocus;
+    if (current == null || !_isFocusWithinDetail(current)) {
+      return;
+    }
+    _benchmarkReadyReported = true;
+    widget.onBenchmarkReady?.call(_focusDebugLabel(current));
+  }
+
+  bool _isFocusWithinDetail(FocusNode node) =>
+      _detailScopeNode.traversalDescendants.contains(node);
+
+  String _focusDebugLabel(FocusNode node) {
+    FocusNode? current = node;
+    while (current != null) {
+      final label = current.debugLabel?.trim() ?? '';
+      if (label.isNotEmpty) {
+        return label.replaceAll(' ', '_');
+      }
+      current = current.parent;
+    }
+    return 'unknown_focus';
+  }
+
+  String? _benchmarkKeyLabel(LogicalKeyboardKey key) {
+    if (key == LogicalKeyboardKey.arrowUp) {
+      return 'UP';
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      return 'DOWN';
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      return 'LEFT';
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      return 'RIGHT';
+    }
+    return null;
   }
 
   List<_SettingsDestination> _destinations(AppLocalizations localizations) => [
@@ -337,33 +599,91 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
       ];
 
   Widget _buildPage(String route) {
+    final primaryFocusNode = _detailPrimaryFocusNodes[route];
     switch (route) {
       case HomeLayoutPanelPage.routeName:
-        return HomeLayoutPanelPage();
+        return HomeLayoutPanelPage(primaryFocusNode: primaryFocusNode);
       case WallpaperPanelPage.routeName:
-        return WallpaperPanelPage();
+        return WallpaperPanelPage(primaryFocusNode: primaryFocusNode);
       case VoiceSearchPanelPage.routeName:
-        return VoiceSearchPanelPage();
+        return VoiceSearchPanelPage(primaryFocusNode: primaryFocusNode);
       case ProfilesSecurityPanelPage.routeName:
-        return ProfilesSecurityPanelPage();
+        return ProfilesSecurityPanelPage(primaryFocusNode: primaryFocusNode);
       case AccessibilityManagerPanelPage.routeName:
-        return AccessibilityManagerPanelPage();
+        return AccessibilityManagerPanelPage(
+            primaryFocusNode: primaryFocusNode);
       case SystemCorePanelPage.routeName:
-        return SystemCorePanelPage();
+        return SystemCorePanelPage(primaryFocusNode: primaryFocusNode);
       case DensityPanelPage.routeName:
-        return DensityPanelPage();
+        return DensityPanelPage(primaryFocusNode: primaryFocusNode);
       case PrivateDnsPanelPage.routeName:
-        return PrivateDnsPanelPage();
+        return PrivateDnsPanelPage(primaryFocusNode: primaryFocusNode);
       case PermissionsPanelPage.routeName:
-        return PermissionsPanelPage();
+        return PermissionsPanelPage(primaryFocusNode: primaryFocusNode);
       case BackupRestorePanelPage.routeName:
-        return BackupRestorePanelPage();
+        return BackupRestorePanelPage(primaryFocusNode: primaryFocusNode);
       case DiagnosticsPanelPage.routeName:
-        return DiagnosticsPanelPage();
+        return DiagnosticsPanelPage(primaryFocusNode: primaryFocusNode);
+      case StatusBarPanelPage.routeName:
+        return StatusBarPanelPage(primaryFocusNode: primaryFocusNode);
       default:
         return const SizedBox.shrink();
     }
   }
+}
+
+class _SettingsDetailPlaceholder extends StatelessWidget {
+  final String label;
+
+  const _SettingsDetailPlaceholder({
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(strokeWidth: 2.2),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+}
+
+class _PendingBenchmarkSample {
+  final String key;
+  final String fromFocus;
+  final DateTime startedAt;
+  final String? toFocus;
+
+  const _PendingBenchmarkSample({
+    required this.key,
+    required this.fromFocus,
+    required this.startedAt,
+    this.toFocus,
+  });
+
+  _PendingBenchmarkSample copyWith({
+    String? toFocus,
+  }) =>
+      _PendingBenchmarkSample(
+        key: key,
+        fromFocus: fromFocus,
+        startedAt: startedAt,
+        toFocus: toFocus ?? this.toFocus,
+      );
 }
 
 class _RailTile extends StatefulWidget {

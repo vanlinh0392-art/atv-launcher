@@ -6,6 +6,7 @@ import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -13,8 +14,12 @@ import 'package:provider/provider.dart';
 
 class ProfilesSecurityPanelPage extends StatefulWidget {
   static const String routeName = 'profiles_security_panel';
+  final FocusNode? primaryFocusNode;
 
-  const ProfilesSecurityPanelPage({super.key});
+  const ProfilesSecurityPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   State<ProfilesSecurityPanelPage> createState() =>
@@ -82,6 +87,7 @@ class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
             const SizedBox(height: 14),
             _LauncherSecurityCard(
               security: security,
+              primaryFocusNode: widget.primaryFocusNode,
             ),
           ],
         );
@@ -118,6 +124,7 @@ class _AppVisibilityCard extends StatelessWidget {
             icon: Icons.visibility_off_outlined,
             title: localizations.manageHiddenAppsAction,
             subtitle: localizations.manageHiddenAppsDescription,
+            debugLabel: 'profiles_security_manage_hidden_apps',
             onPressed: () => _openManager(context, hiddenMode: true),
           ),
           const SizedBox(height: 10),
@@ -125,6 +132,7 @@ class _AppVisibilityCard extends StatelessWidget {
             icon: Icons.lock_outline,
             title: localizations.manageLockedAppsAction,
             subtitle: localizations.manageLockedAppsDescription,
+            debugLabel: 'profiles_security_manage_locked_apps',
             onPressed: () => _openManager(context, hiddenMode: false),
           ),
         ],
@@ -147,9 +155,11 @@ class _AppVisibilityCard extends StatelessWidget {
 
 class _LauncherSecurityCard extends StatelessWidget {
   final ProfileSecurityService security;
+  final FocusNode? primaryFocusNode;
 
   const _LauncherSecurityCard({
     required this.security,
+    this.primaryFocusNode,
   });
 
   @override
@@ -164,17 +174,10 @@ class _LauncherSecurityCard extends StatelessWidget {
             localizations.settingsLockTitle,
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 4),
-          Text(
-            localizations.settingsLockSubtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.white70, height: 1.35),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           RoundedSwitchListTile(
-            autofocus: true,
+            focusNode: primaryFocusNode,
+            debugLabel: 'profiles_security_primary_lock',
             value: security.settingsLockEnabled,
             onChanged: security.setSettingsLockEnabled,
             title: Text(
@@ -189,14 +192,15 @@ class _LauncherSecurityCard extends StatelessWidget {
             title: security.hasPin
                 ? localizations.changeOwnerPinAction
                 : localizations.setOwnerPinAction,
+            debugLabel: 'profiles_security_owner_pin_upsert',
             onPressed: () => _upsertOwnerPin(context),
           ),
           const SizedBox(height: 10),
           _ProfileActionTile(
             icon: Icons.no_encryption_gmailerrorred_outlined,
             title: localizations.clearOwnerPinAction,
-            subtitle: localizations.clearOwnerPinDescription,
             enabled: security.hasPin,
+            debugLabel: 'profiles_security_owner_pin_clear',
             onPressed: () => _clearOwnerPin(context),
           ),
         ],
@@ -328,6 +332,7 @@ class _ProfileActionTile extends StatefulWidget {
   final String title;
   final String? subtitle;
   final bool enabled;
+  final String? debugLabel;
   final VoidCallback onPressed;
 
   const _ProfileActionTile({
@@ -335,6 +340,7 @@ class _ProfileActionTile extends StatefulWidget {
     required this.title,
     this.subtitle,
     this.enabled = true,
+    this.debugLabel,
     required this.onPressed,
   });
 
@@ -343,67 +349,141 @@ class _ProfileActionTile extends StatefulWidget {
 }
 
 class _ProfileActionTileState extends State<_ProfileActionTile> {
+  late FocusNode _focusNode;
+  late bool _ownsFocusNode;
   bool _focused = false;
 
   @override
+  void initState() {
+    super.initState();
+    _configureFocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileActionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.debugLabel == widget.debugLabel &&
+        oldWidget.title == widget.title) {
+      return;
+    }
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    _configureFocusNode();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final iconColor = widget.enabled
+        ? (_focused ? Colors.white : Colors.white70)
+        : Colors.white38;
+    final titleColor = widget.enabled
+        ? (_focused ? Colors.white : Colors.white.withOpacity(0.96))
+        : Colors.white38;
+    final subtitleColor = widget.enabled
+        ? (_focused ? Colors.white.withOpacity(0.86) : Colors.white70)
+        : Colors.white38;
     return EnsureVisible(
-      alignment: 0.12,
-      child: SettingsFocusFrame(
-        padding: EdgeInsets.zero,
-        child: FocusableActionDetector(
-          enabled: widget.enabled,
-          autofocus: false,
-          onShowFocusHighlight: (value) {
-            if (_focused != value) {
-              setState(() => _focused = value);
-            }
-          },
-          shortcuts: const <ShortcutActivator, Intent>{
-            SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-            SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
-            SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-          },
-          actions: <Type, Action<Intent>>{
-            ActivateIntent: CallbackAction<ActivateIntent>(
-              onInvoke: (_) {
-                if (widget.enabled) {
-                  widget.onPressed();
-                }
-                return null;
-              },
-            ),
-          },
+      alignment: EnsureVisible.settingsAlignment,
+      preferImmediate: true,
+      child: Focus(
+        focusNode: _focusNode,
+        canRequestFocus: widget.enabled,
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (isSettingsActivateKey(event.logicalKey) && widget.enabled) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SettingsFocusFrame(
+          padding: EdgeInsets.zero,
+          variant: SettingsFocusFrameVariant.rowOnly,
+          focusEmphasis: 1.28,
+          focused: _focused,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.enabled ? widget.onPressed : null,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 110),
               opacity: widget.enabled ? (_focused ? 1 : 0.97) : 0.46,
-              child: ListTile(
-                dense: true,
-                visualDensity: const VisualDensity(horizontal: 0, vertical: -2),
-                minVerticalPadding: 0,
-                contentPadding: const EdgeInsets.symmetric(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 4,
+                  vertical: 8,
                 ),
-                enabled: widget.enabled,
-                leading: Icon(widget.icon),
-                title: Text(widget.title),
-                subtitle: widget.subtitle == null
-                    ? null
-                    : Text(
-                        widget.subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(widget.icon, color: iconColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: titleColor,
+                                      fontWeight: _focused
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
+                          ),
+                          if (widget.subtitle != null) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              widget.subtitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: subtitleColor),
+                            ),
+                          ],
+                        ],
                       ),
-                trailing: const Icon(Icons.chevron_right),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.chevron_right, color: iconColor),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  void _configureFocusNode() {
+    _ownsFocusNode = true;
+    _focusNode = FocusNode(
+      debugLabel: widget.debugLabel ??
+          'profile_action_${widget.title}'.replaceAll(' ', '_'),
     );
   }
 }

@@ -1,11 +1,13 @@
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
+import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/application_info_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../mocks.dart';
 import '../mocks.mocks.dart';
@@ -66,6 +68,48 @@ void main() {
 
     verify(appsService.removeFromCategory(app, category)).called(1);
   });
+
+  testWidgets('Application info dialog opens without provider select crash',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final app = fakeApp();
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    final settings = SettingsService(await SharedPreferences.getInstance());
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          Provider<ProfileSecurityService?>.value(value: null),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => ApplicationInfoPanel(
+                  category: null,
+                  application: app,
+                ),
+              ),
+              child: const Text('Open dialog'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open dialog'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(app.name), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpPanel(
@@ -74,10 +118,13 @@ Future<void> _pumpPanel(
   dynamic app,
   dynamic category,
 ) async {
+  SharedPreferences.setMockInitialValues(const <String, Object>{});
+  final settings = SettingsService(await SharedPreferences.getInstance());
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<AppsService>.value(value: appsService),
+        ChangeNotifierProvider<SettingsService>.value(value: settings),
         Provider<ProfileSecurityService?>.value(value: null),
       ],
       child: MaterialApp(

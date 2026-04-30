@@ -106,8 +106,11 @@ void main() async {
         settingsService.homeDockAutoCollapseDelaySeconds,
         SettingsService.homeDockAutoCollapseDelayDefault,
       );
-      expect(settingsService.homeDockBlurEnabled, false);
-      expect(settingsService.homeDockGlassIntensityPercent, 0);
+      expect(settingsService.homeDockBlurEnabled, true);
+      expect(
+        settingsService.homeDockGlassIntensityPercent,
+        SettingsService.homeDockGlassIntensityDefault,
+      );
       expect(
         settingsService.homeDockPerformanceMode,
         SettingsService.homeDockPerformanceModeDefault,
@@ -132,6 +135,10 @@ void main() async {
       expect(
         settingsService.appCardMediaScalePercent,
         SettingsService.appCardMediaScaleDefault,
+      );
+      expect(
+        settingsService.videoWallpaperRepeatCountPerItem,
+        SettingsService.videoWallpaperRepeatCountPerItemDefault,
       );
       expect(
         settingsService.showRamInStatusBar,
@@ -202,6 +209,17 @@ void main() async {
       expect(backup['statusBarClockScalePercent'], 150);
     });
 
+    test("backup and restore include wallpaper repeat count", () async {
+      await settingsService.applyBackupMap(const <String, dynamic>{
+        'videoWallpaperRepeatCountPerItem': 5,
+      });
+
+      final backup = settingsService.toBackupMap();
+
+      expect(settingsService.videoWallpaperRepeatCountPerItem, 5);
+      expect(backup['videoWallpaperRepeatCountPerItem'], 5);
+    });
+
     test("missing new backup keys fall back to defaults", () async {
       await settingsService.setAppLocaleMode(SettingsService.appLocaleEnglish);
       await settingsService.setHomeDockAutoCollapseEnabled(false);
@@ -211,6 +229,7 @@ void main() async {
       );
       await settingsService.setAppCardLayoutScalePercent(110);
       await settingsService.setAppCardMediaScalePercent(125);
+      await settingsService.setVideoWallpaperRepeatCountPerItem(8);
       await settingsService.setStatusBarClockScalePercent(180);
 
       await settingsService.applyBackupMap(const <String, dynamic>{
@@ -227,8 +246,11 @@ void main() async {
         settingsService.homeDockAutoCollapseDelaySeconds,
         SettingsService.homeDockAutoCollapseDelayDefault,
       );
-      expect(settingsService.homeDockBlurEnabled, false);
-      expect(settingsService.homeDockGlassIntensityPercent, 0);
+      expect(settingsService.homeDockBlurEnabled, true);
+      expect(
+        settingsService.homeDockGlassIntensityPercent,
+        SettingsService.homeDockGlassIntensityDefault,
+      );
       expect(
         settingsService.homeDockPerformanceMode,
         SettingsService.homeDockPerformanceModeDefault,
@@ -249,6 +271,10 @@ void main() async {
       expect(
         settingsService.appCardMediaScalePercent,
         SettingsService.appCardMediaScaleDefault,
+      );
+      expect(
+        settingsService.videoWallpaperRepeatCountPerItem,
+        SettingsService.videoWallpaperRepeatCountPerItemDefault,
       );
       expect(
         settingsService.statusBarClockScalePercent,
@@ -296,6 +322,20 @@ void main() async {
       expect(
         settingsService.appCardLayoutScalePercent,
         SettingsService.appCardLayoutScaleMin,
+      );
+    });
+
+    test("video repeat count snaps to supported range", () async {
+      await settingsService.setVideoWallpaperRepeatCountPerItem(27);
+      expect(
+        settingsService.videoWallpaperRepeatCountPerItem,
+        SettingsService.videoWallpaperRepeatCountPerItemMax,
+      );
+
+      await settingsService.setVideoWallpaperRepeatCountPerItem(0);
+      expect(
+        settingsService.videoWallpaperRepeatCountPerItem,
+        SettingsService.videoWallpaperRepeatCountPerItemMin,
       );
     });
 

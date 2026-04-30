@@ -16,33 +16,74 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 class EnsureVisible extends StatelessWidget {
+  static const double settingsAlignment = 0.24;
+
   final Widget child;
   final double alignment;
+  final int settleFrameCount;
+  final bool preferImmediate;
 
-  const EnsureVisible({Key? key, required this.child, this.alignment = 0.0})
-      : super(key: key);
+  const EnsureVisible({
+    Key? key,
+    required this.child,
+    this.alignment = 0.0,
+    this.settleFrameCount = 3,
+    this.preferImmediate = false,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) => Focus(
         canRequestFocus: false,
         onFocusChange: (focused) {
           if (focused) {
-            ensureVisible(
+            scheduleEnsureVisible(
               context,
               alignment: alignment,
+              remainingPasses: settleFrameCount,
+              preferImmediate: preferImmediate,
             );
           }
         },
         child: child,
       );
 
+  static void scheduleEnsureVisible(
+    BuildContext context, {
+    required double alignment,
+    required int remainingPasses,
+    bool preferImmediate = false,
+  }) {
+    ensureVisible(
+      context,
+      alignment: alignment,
+      preferImmediate: preferImmediate,
+    );
+    if (remainingPasses <= 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) {
+        return;
+      }
+      scheduleEnsureVisible(
+        context,
+        alignment: alignment,
+        remainingPasses: remainingPasses - 1,
+        preferImmediate: preferImmediate,
+      );
+    });
+  }
+
   static void ensureVisible(
     BuildContext context, {
     double alignment = 0.0,
+    bool preferImmediate = false,
   }) {
     final scrollable = Scrollable.maybeOf(context);
     final renderObject = context.findRenderObject();
@@ -66,15 +107,7 @@ class EnsureVisible extends StatelessWidget {
     }
 
     final position = scrollable.position;
-    final leadingOffset = viewport.getOffsetToReveal(renderObject, 0).offset;
-    final trailingOffset = viewport.getOffsetToReveal(renderObject, 1).offset;
     final currentOffset = position.pixels;
-    final viewportEnd = currentOffset + position.viewportDimension;
-    final alreadyVisible = leadingOffset >= currentOffset + 1 &&
-        trailingOffset <= viewportEnd - 1;
-    if (alreadyVisible) {
-      return;
-    }
 
     final targetOffset = viewport
         .getOffsetToReveal(renderObject, alignment.clamp(0.0, 1.0))
@@ -84,10 +117,14 @@ class EnsureVisible extends StatelessWidget {
           position.maxScrollExtent,
         );
     final delta = (targetOffset - currentOffset).abs();
-    if (delta < 1) {
+    final tolerance = math.max(
+      6.0,
+      math.min(position.viewportDimension * 0.03, 18.0),
+    );
+    if (delta <= tolerance) {
       return;
     }
-    if (delta < 18) {
+    if (preferImmediate || delta < 18) {
       position.jumpTo(targetOffset);
       return;
     }

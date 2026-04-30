@@ -905,6 +905,7 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
     String? orderMode,
     String? advanceMode,
     int? switchIntervalSeconds,
+    int? repeatCountPerItem,
     bool? playlistLoop,
     bool? loop,
     bool? mute,
@@ -926,6 +927,7 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
             #orderMode: orderMode,
             #advanceMode: advanceMode,
             #switchIntervalSeconds: switchIntervalSeconds,
+            #repeatCountPerItem: repeatCountPerItem,
             #playlistLoop: playlistLoop,
             #loop: loop,
             #mute: mute,
@@ -933,6 +935,24 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
             #dimPercent: dimPercent,
             #blur: blur,
             #autoResume: autoResume,
+          },
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> setVideoWallpaperPlaybackSuppressed({
+    required bool? suppressed,
+    String? reason,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setVideoWallpaperPlaybackSuppressed,
+          [],
+          {
+            #suppressed: suppressed,
+            #reason: reason,
           },
         ),
         returnValue:
@@ -1076,6 +1096,12 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
       ) as bool);
 
   @override
+  bool get settingsPlaybackSuppressed => (super.noSuchMethod(
+        Invocation.getter(#settingsPlaybackSuppressed),
+        returnValue: false,
+      ) as bool);
+
+  @override
   String get wallpaperMode => (super.noSuchMethod(
         Invocation.getter(#wallpaperMode),
         returnValue: _i12.dummyValue<String>(
@@ -1165,6 +1191,12 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
   @override
   int get videoSwitchIntervalSeconds => (super.noSuchMethod(
         Invocation.getter(#videoSwitchIntervalSeconds),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get videoRepeatCountPerItem => (super.noSuchMethod(
+        Invocation.getter(#videoRepeatCountPerItem),
         returnValue: 0,
       ) as int);
 
@@ -1361,6 +1393,17 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
       ) as _i2.Future<void>);
 
   @override
+  _i2.Future<void> setVideoRepeatCountPerItem(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setVideoRepeatCountPerItem,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
   _i2.Future<void> setVideoPlaylistLoop(bool? value) => (super.noSuchMethod(
         Invocation.method(
           #setVideoPlaylistLoop,
@@ -1425,6 +1468,17 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
         Invocation.method(
           #setVideoAutoResume,
           [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setSettingsPlaybackSuppressed(bool? suppressed) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setSettingsPlaybackSuppressed,
+          [suppressed],
         ),
         returnValue: _i2.Future<void>.value(),
         returnValueForMissingStub: _i2.Future<void>.value(),

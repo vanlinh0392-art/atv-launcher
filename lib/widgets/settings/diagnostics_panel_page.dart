@@ -8,8 +8,12 @@ import 'package:provider/provider.dart';
 
 class DiagnosticsPanelPage extends StatefulWidget {
   static const String routeName = "diagnostics_panel";
+  final FocusNode? primaryFocusNode;
 
-  const DiagnosticsPanelPage({super.key});
+  const DiagnosticsPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   State<DiagnosticsPanelPage> createState() => _DiagnosticsPanelPageState();
@@ -75,6 +79,8 @@ class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
                     runSpacing: 12,
                     children: [
                       FilledButton.icon(
+                        key: const Key('diagnostics_refresh_button'),
+                        focusNode: widget.primaryFocusNode,
                         onPressed: () => bridgeService.refreshFull(),
                         icon: const Icon(Icons.refresh),
                         label: Text(localizations.refreshLabel),

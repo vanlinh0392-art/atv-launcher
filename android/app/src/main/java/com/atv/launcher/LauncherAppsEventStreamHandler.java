@@ -15,14 +15,14 @@ import io.flutter.plugin.common.EventChannel;
 public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandler
 {
     private final LauncherApps _launcherApps;
-    private final MainActivity _activity;
+    private final Context _context;
 
     private LauncherApps.Callback _launcherAppsCallback;
 
-    public LauncherAppsEventStreamHandler(MainActivity activity)
+    public LauncherAppsEventStreamHandler(Context context)
     {
-        _activity = activity;
-        _launcherApps = (LauncherApps) _activity.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+        _context = context.getApplicationContext();
+        _launcherApps = (LauncherApps) _context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
     }
 
     @Override
@@ -50,14 +50,15 @@ public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandle
 
         @Override
         public void onPackageRemoved(String packageName, UserHandle user) {
-            _activity.clearAppImageCache(packageName);
+            MainActivity.clearAppImageCacheForPackage(packageName);
             _eventSink.success(eventMap("PACKAGE_REMOVED", packageName, null, null));
         }
 
         @Override
         public void onPackageAdded(String packageName, UserHandle user) {
-            _activity.clearAppImageCache(packageName);
-            Map<String, Serializable> application = _activity.getApplication(packageName);
+            MainActivity.clearAppImageCacheForPackage(packageName);
+            Map<String, Serializable> application =
+                    MainActivity.getApplicationForPackage(_context, packageName);
 
             if (!application.isEmpty()) {
                 _eventSink.success(eventMap("PACKAGE_ADDED", null, application, null));
@@ -66,8 +67,9 @@ public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandle
 
         @Override
         public void onPackageChanged(String packageName, UserHandle user) {
-            _activity.clearAppImageCache(packageName);
-            Map<String, Serializable> application = _activity.getApplication(packageName);
+            MainActivity.clearAppImageCacheForPackage(packageName);
+            Map<String, Serializable> application =
+                    MainActivity.getApplicationForPackage(_context, packageName);
 
             if (!application.isEmpty()) {
                 _eventSink.success(eventMap("PACKAGE_CHANGED", null, application, null));
@@ -79,8 +81,9 @@ public class LauncherAppsEventStreamHandler implements EventChannel.StreamHandle
             List<Map<String, Serializable>> applications = new ArrayList<>(packageNames.length);
 
             for (String name : packageNames) {
-                _activity.clearAppImageCache(name);
-                Map<String, Serializable> application = _activity.getApplication(name);
+                MainActivity.clearAppImageCacheForPackage(name);
+                Map<String, Serializable> application =
+                        MainActivity.getApplicationForPackage(_context, name);
 
                 if (!application.isEmpty()) {
                     applications.add(application);

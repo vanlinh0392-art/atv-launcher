@@ -80,6 +80,8 @@
     "statusBar": "Status bar",
     "settings": "Settings",
     "show": "Show",
+    "showManagedAccessibilityAppsAction": "Show managed accessibility apps",
+    "hideManagedAccessibilityAppsAction": "Hide managed accessibility apps",
     "showCategoryTitles": "Show category titles",
     "showRamInStatusBar": "Show RAM in status bar",
     "sort": "Sort",
@@ -456,6 +458,7 @@
     "pickMultipleVideos": "Pick multiple videos",
     "pickFolder": "Pick folder",
     "browseTvStorage": "Browse TV storage",
+    "folderPickerFallbackToTvStorage": "This TV could not open the folder picker. Opening TV storage instead.",
     "folderNameLabel": "Folder: {name}",
     "@folderNameLabel": {
         "placeholders": {
@@ -470,6 +473,15 @@
     "onCompletion": "On completion",
     "fixedInterval": "Fixed interval",
     "loopPlaylist": "Loop playlist",
+    "repeatEachVideoCount": "Repeat each video {count}x",
+    "@repeatEachVideoCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "repeatEachVideoDescription": "Play the current video this many times before moving to the next playlist item.",
     "switchIntervalSeconds": "Switch interval {seconds}s",
     "@switchIntervalSeconds": {
         "placeholders": {

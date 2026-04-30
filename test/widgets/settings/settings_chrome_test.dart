@@ -1,4 +1,7 @@
+import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -20,7 +23,8 @@ void main() {
     expect(high.dialogGradientOpacity, lessThan(0.12));
   });
 
-  test('settings focus hierarchy keeps detail frames lighter than action buttons',
+  test(
+      'settings focus hierarchy keeps detail frames lighter than action buttons',
       () {
     final spec = SettingsChromeSpec.fromTransparencyPercent(15);
 
@@ -38,6 +42,35 @@ void main() {
     );
   });
 
+  test(
+      'row-only focus visuals are clearer than detail frames but softer than options',
+      () {
+    final spec = SettingsChromeSpec.fromTransparencyPercent(15);
+    final detail = spec.resolveFocusFrameVisuals(
+      variant: SettingsFocusFrameVariant.detailPane,
+      focused: true,
+    );
+    final rowOnly = spec.resolveFocusFrameVisuals(
+      variant: SettingsFocusFrameVariant.rowOnly,
+      focused: true,
+    );
+    final option = spec.resolveFocusFrameVisuals(
+      variant: SettingsFocusFrameVariant.optionButton,
+      focused: true,
+    );
+    final idleRowOnly = spec.resolveFocusFrameVisuals(
+      variant: SettingsFocusFrameVariant.rowOnly,
+      focused: false,
+    );
+
+    expect(rowOnly.borderWidth, greaterThan(detail.borderWidth));
+    expect(rowOnly.glowBlurRadius, greaterThan(detail.glowBlurRadius));
+    expect(
+        rowOnly.fillColor.opacity, greaterThan(idleRowOnly.fillColor.opacity));
+    expect(option.borderWidth, greaterThan(rowOnly.borderWidth));
+    expect(option.glowColor.opacity, greaterThan(rowOnly.glowColor.opacity));
+  });
+
   test('settings button variants keep distinct semantic accents', () {
     expect(
       SettingsButtonStyles.accentForVariant(SettingsButtonVariant.primary),
@@ -52,4 +85,120 @@ void main() {
       ),
     );
   });
+
+  testWidgets('rounded switch tiles use the shared row-only focus frame',
+      (tester) async {
+    await tester.pumpWidget(
+      _settingsHarness(
+        RoundedSwitchListTile(
+          value: true,
+          onChanged: (_) {},
+          title: const Text('Launcher lock'),
+          secondary: const Icon(Icons.lock_outline),
+        ),
+      ),
+    );
+
+    final frame =
+        tester.widget<SettingsFocusFrame>(find.byType(SettingsFocusFrame));
+    expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
+  });
+
+  testWidgets('settings action cards use the shared row-only focus frame',
+      (tester) async {
+    await tester.pumpWidget(
+      _settingsHarness(
+        SettingsActionCard(
+          title: 'Manage apps',
+          subtitle: 'Open the row-only action card',
+          icon: Icons.apps_outlined,
+          onPressed: () async {},
+        ),
+      ),
+    );
+
+    final frame =
+        tester.widget<SettingsFocusFrame>(find.byType(SettingsFocusFrame));
+    expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
+  });
+
+  testWidgets('explicit row-only focus binding produces a visible focus frame',
+      (tester) async {
+    await tester.pumpWidget(
+      _settingsHarness(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SettingsFocusFrame(
+              variant: SettingsFocusFrameVariant.rowOnly,
+              focused: false,
+              child: SizedBox(width: 160, height: 48),
+            ),
+            SizedBox(height: 12),
+            SettingsFocusFrame(
+              variant: SettingsFocusFrameVariant.rowOnly,
+              focused: true,
+              child: SizedBox(width: 160, height: 48),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final frames =
+        tester.widgetList<AnimatedContainer>(find.byType(AnimatedContainer));
+    final idleDecoration = frames.first.decoration! as BoxDecoration;
+    final focusedDecoration = frames.last.decoration! as BoxDecoration;
+
+    expect(
+      focusedDecoration.border!.top.width,
+      greaterThan(idleDecoration.border!.top.width),
+    );
+    expect(
+      focusedDecoration.boxShadow!.length,
+      greaterThan(idleDecoration.boxShadow!.length),
+    );
+    expect(
+      focusedDecoration.border!.top.color.opacity,
+      greaterThan(idleDecoration.border!.top.color.opacity),
+    );
+  });
+
+  testWidgets(
+      'choice rows keep the parent frame on the shared row-only variant',
+      (tester) async {
+    await tester.pumpWidget(
+      _settingsHarness(
+        SettingsChoiceCard<int>(
+          title: 'Rows',
+          subtitle: 'How many rows are visible',
+          icon: Icons.view_stream_outlined,
+          value: 3,
+          options: const [
+            SettingsChoiceOption<int>(value: 2, label: '2'),
+            SettingsChoiceOption<int>(value: 3, label: '3'),
+            SettingsChoiceOption<int>(value: 4, label: '4'),
+          ],
+          valueLabelBuilder: (value) => '$value rows',
+          onChanged: (_) {},
+        ),
+      ),
+    );
+
+    final frame =
+        tester.widget<SettingsFocusFrame>(find.byType(SettingsFocusFrame));
+    expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
+  });
 }
+
+Widget _settingsHarness(Widget child) => MaterialApp(
+      home: Material(
+        color: Colors.black,
+        child: Center(
+          child: SizedBox(
+            width: 680,
+            child: child,
+          ),
+        ),
+      ),
+    );

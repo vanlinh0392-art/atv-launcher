@@ -60,6 +60,8 @@ const _videoWallpaperOrderMode = "video_wallpaper_order_mode";
 const _videoWallpaperAdvanceMode = "video_wallpaper_advance_mode";
 const _videoWallpaperSwitchIntervalSeconds =
     "video_wallpaper_switch_interval_seconds";
+const _videoWallpaperRepeatCountPerItem =
+    "video_wallpaper_repeat_count_per_item";
 const _videoWallpaperPlaylistLoop = "video_wallpaper_playlist_loop";
 const _videoWallpaperLoop = "video_wallpaper_loop";
 const _videoWallpaperMute = "video_wallpaper_mute";
@@ -101,7 +103,7 @@ class SettingsService extends ChangeNotifier {
   static const int settingsUiTransparencyStep = 5;
   static const int homeDockGlassIntensityMin = 0;
   static const int homeDockGlassIntensityMax = 100;
-  static const int homeDockGlassIntensityDefault = 0;
+  static const int homeDockGlassIntensityDefault = 20;
   static const int homeDockGlassIntensityStep = 5;
   static const int homeDockGlassIntensityLegacyOnDefault = 55;
   static const String homeDockPerformanceModeQuality = "quality";
@@ -122,6 +124,10 @@ class SettingsService extends ChangeNotifier {
   static const int homeDockRowSpacingDefault = 2;
   static const int homeDockRowSpacingStep = 1;
   static const bool showRamInStatusBarDefault = true;
+  static const int videoWallpaperRepeatCountPerItemMin = 1;
+  static const int videoWallpaperRepeatCountPerItemMax = 20;
+  static const int videoWallpaperRepeatCountPerItemDefault = 1;
+  static const int videoWallpaperRepeatCountPerItemStep = 1;
 
   final SharedPreferences _sharedPreferences;
 
@@ -189,9 +195,12 @@ class SettingsService extends ChangeNotifier {
             homeDockGlassIntensityDefault,
       );
     }
-    final legacyBlurEnabled =
-        _sharedPreferences.getBool(_homeDockBlurEnabled) ?? false;
-    return legacyBlurEnabled ? homeDockGlassIntensityLegacyOnDefault : 0;
+    if (_sharedPreferences.containsKey(_homeDockBlurEnabled)) {
+      final legacyBlurEnabled =
+          _sharedPreferences.getBool(_homeDockBlurEnabled) ?? false;
+      return legacyBlurEnabled ? homeDockGlassIntensityLegacyOnDefault : 0;
+    }
+    return homeDockGlassIntensityDefault;
   }
 
   bool get homeDockBlurEnabled => homeDockGlassIntensityPercent > 0;
@@ -258,6 +267,12 @@ class SettingsService extends ChangeNotifier {
 
   int get videoWallpaperSwitchIntervalSeconds =>
       _sharedPreferences.getInt(_videoWallpaperSwitchIntervalSeconds) ?? 30;
+
+  int get videoWallpaperRepeatCountPerItem =>
+      _normalizeVideoWallpaperRepeatCountPerItem(
+        _sharedPreferences.getInt(_videoWallpaperRepeatCountPerItem) ??
+            videoWallpaperRepeatCountPerItemDefault,
+      );
 
   bool get videoWallpaperPlaylistLoop =>
       _sharedPreferences.getBool(_videoWallpaperPlaylistLoop) ?? true;
@@ -512,6 +527,14 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setVideoWallpaperRepeatCountPerItem(int value) async {
+    await _sharedPreferences.setInt(
+      _videoWallpaperRepeatCountPerItem,
+      _normalizeVideoWallpaperRepeatCountPerItem(value),
+    );
+    notifyListeners();
+  }
+
   Future<void> setVideoWallpaperPlaylistLoop(bool value) async {
     await _sharedPreferences.setBool(_videoWallpaperPlaylistLoop, value);
     notifyListeners();
@@ -606,6 +629,7 @@ class SettingsService extends ChangeNotifier {
       'videoWallpaperAdvanceMode': videoWallpaperAdvanceMode,
       'videoWallpaperSwitchIntervalSeconds':
           videoWallpaperSwitchIntervalSeconds,
+      'videoWallpaperRepeatCountPerItem': videoWallpaperRepeatCountPerItem,
       'videoWallpaperPlaylistLoop': videoWallpaperPlaylistLoop,
       'videoWallpaperLoop': videoWallpaperLoop,
       'videoWallpaperMute': videoWallpaperMute,
@@ -828,6 +852,16 @@ class SettingsService extends ChangeNotifier {
             .clamp(5, 86400)
             .toInt(),
       ),
+      _sharedPreferences.setInt(
+        _videoWallpaperRepeatCountPerItem,
+        _normalizeVideoWallpaperRepeatCountPerItem(
+          _readInt(
+            data,
+            'videoWallpaperRepeatCountPerItem',
+            videoWallpaperRepeatCountPerItemDefault,
+          ),
+        ),
+      ),
       _sharedPreferences.setBool(
         _videoWallpaperPlaylistLoop,
         _readBool(
@@ -984,6 +1018,17 @@ class SettingsService extends ChangeNotifier {
     return homeDockRowSpacingMin + (snappedStep * homeDockRowSpacingStep);
   }
 
+  static int _normalizeVideoWallpaperRepeatCountPerItem(int value) {
+    final normalized = value.clamp(
+      videoWallpaperRepeatCountPerItemMin,
+      videoWallpaperRepeatCountPerItemMax,
+    );
+    final offset = normalized - videoWallpaperRepeatCountPerItemMin;
+    final snappedStep = (offset / videoWallpaperRepeatCountPerItemStep).round();
+    return videoWallpaperRepeatCountPerItemMin +
+        (snappedStep * videoWallpaperRepeatCountPerItemStep);
+  }
+
   static int _resolveHomeDockGlassIntensityForBackup(
       Map<String, dynamic> data) {
     if (data.containsKey('homeDockGlassIntensityPercent')) {
@@ -995,8 +1040,11 @@ class SettingsService extends ChangeNotifier {
         ),
       );
     }
-    final legacyBlurEnabled = _readBool(data, 'homeDockBlurEnabled', false);
-    return legacyBlurEnabled ? homeDockGlassIntensityLegacyOnDefault : 0;
+    if (data.containsKey('homeDockBlurEnabled')) {
+      final legacyBlurEnabled = _readBool(data, 'homeDockBlurEnabled', false);
+      return legacyBlurEnabled ? homeDockGlassIntensityLegacyOnDefault : 0;
+    }
+    return homeDockGlassIntensityDefault;
   }
 
   static bool _resolveHomeDockBlurEnabledForBackup(Map<String, dynamic> data) {

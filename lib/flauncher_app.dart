@@ -20,6 +20,9 @@ import 'package:flauncher/actions.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/settings_service.dart';
+import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
+import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -53,6 +56,12 @@ class _FLauncherAppState extends State<FLauncherApp>
     900: Color(0xFF000000),
   });
 
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  SystemBridgeService? _systemBridgeService;
+  int _lastHandledHomeSequence = 0;
+  int _lastHandledBenchmarkSequence = 0;
+  bool _bridgeSnapshotPrimed = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +72,34 @@ class _FLauncherAppState extends State<FLauncherApp>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextBridgeService = context.read<SystemBridgeService>();
+    if (identical(_systemBridgeService, nextBridgeService)) {
+      return;
+    }
+    final initialBenchmark = _readBenchmarkCommand(nextBridgeService);
+    _systemBridgeService?.removeListener(_handleSystemBridgeChanged);
+    _systemBridgeService = nextBridgeService;
+    _lastHandledHomeSequence = _readHomeSequence(nextBridgeService);
+    _lastHandledBenchmarkSequence = initialBenchmark.sequence;
+    _bridgeSnapshotPrimed = nextBridgeService.initialized;
+    _systemBridgeService?.addListener(_handleSystemBridgeChanged);
+    if (nextBridgeService.initialized &&
+        initialBenchmark.sequence > 0 &&
+        initialBenchmark.action.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_systemBridgeService, nextBridgeService)) {
+          return;
+        }
+        _handleBenchmarkCommand(initialBenchmark);
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _systemBridgeService?.removeListener(_handleSystemBridgeChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -81,6 +117,94 @@ class _FLauncherAppState extends State<FLauncherApp>
     }
     final appsService = context.read<AppsService>();
     context.read<LauncherState>().refresh(appsService, force: force);
+  }
+
+  void _handleSystemBridgeChanged() {
+    final bridgeService = _systemBridgeService;
+    if (bridgeService == null) {
+      return;
+    }
+    final benchmark = _readBenchmarkCommand(bridgeService);
+    if (!_bridgeSnapshotPrimed && bridgeService.initialized) {
+      _lastHandledHomeSequence = _readHomeSequence(bridgeService);
+      _bridgeSnapshotPrimed = true;
+      if (benchmark.sequence <= 0 || benchmark.action.isEmpty) {
+        _lastHandledBenchmarkSequence = benchmark.sequence;
+        return;
+      }
+    }
+    if (benchmark.sequence > _lastHandledBenchmarkSequence) {
+      _lastHandledBenchmarkSequence = benchmark.sequence;
+      _handleBenchmarkCommand(benchmark);
+    }
+    final nextSequence = _readHomeSequence(bridgeService);
+    if (nextSequence <= _lastHandledHomeSequence) {
+      return;
+    }
+    _lastHandledHomeSequence = nextSequence;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null) {
+        return;
+      }
+      navigator.popUntil((route) => route.isFirst);
+    });
+  }
+
+  void _handleBenchmarkCommand(_BenchmarkSnapshot benchmark) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final navigator = _navigatorKey.currentState;
+      final rootContext = _navigatorKey.currentContext;
+      navigator?.popUntil((route) => route.isFirst);
+      if (benchmark.action != 'open_launcher_settings' ||
+          rootContext == null ||
+          !benchmark.bypassSettingsSecurity) {
+        return;
+      }
+      Future<void>.microtask(() {
+        if (!mounted) {
+          return;
+        }
+        showDialog<void>(
+          context: rootContext,
+          useRootNavigator: true,
+          builder: (_) => SettingsPanel(
+            selectedRouteOnShell: benchmark.route.isEmpty
+                ? HomeLayoutPanelPage.routeName
+                : benchmark.route,
+            autoFocusDetailOnOpen: benchmark.autoFocusDetail,
+            benchmarkSessionId: benchmark.sessionId,
+          ),
+        );
+      });
+    });
+  }
+
+  int _readHomeSequence(SystemBridgeService bridgeService) {
+    final navigation = bridgeService.status['navigation'];
+    final map = navigation is Map ? navigation.cast<String, dynamic>() : null;
+    return ((map?['homeSequence'] as num?) ?? 0).toInt();
+  }
+
+  _BenchmarkSnapshot _readBenchmarkCommand(
+    SystemBridgeService bridgeService,
+  ) {
+    final raw = bridgeService.status['benchmarkCommand'];
+    final map = raw is Map ? raw.cast<String, dynamic>() : null;
+    return (
+      sequence: ((map?['sequence'] as num?) ?? 0).toInt(),
+      action: map?['action']?.toString() ?? '',
+      route: map?['route']?.toString() ?? '',
+      sessionId: map?['sessionId']?.toString() ?? '',
+      autoFocusDetail: map?['autoFocusDetail'] == true,
+      bypassSettingsSecurity: map?['bypassSettingsSecurity'] == true,
+    );
   }
 
   @override
@@ -106,6 +230,7 @@ class _FLauncherAppState extends State<FLauncherApp>
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
       locale: locale,
       shortcuts: {
         ...WidgetsApp.defaultShortcuts,
@@ -178,3 +303,12 @@ class _FLauncherAppState extends State<FLauncherApp>
     );
   }
 }
+
+typedef _BenchmarkSnapshot = ({
+  int sequence,
+  String action,
+  String route,
+  String sessionId,
+  bool autoFocusDetail,
+  bool bypassSettingsSecurity,
+});

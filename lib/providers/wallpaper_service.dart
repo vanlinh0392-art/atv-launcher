@@ -27,11 +27,13 @@ class WallpaperService extends ChangeNotifier {
   int? _videoTextureId;
   bool _videoWarmUpScheduled = false;
   bool _videoWarmUpCompleted = false;
+  int _settingsPlaybackSuppressionCount = 0;
   final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
 
   ImageProvider? get wallpaper => _wallpaper;
   int? get videoTextureId => _videoTextureId;
   bool get isVideoMode => _settingsService.wallpaperMode == 'video';
+  bool get settingsPlaybackSuppressed => _settingsPlaybackSuppressionCount > 0;
   String get wallpaperMode => _settingsService.wallpaperMode;
   String get wallpaperAssetUri => _settingsService.wallpaperAssetUri;
   String get wallpaperPreviewPath => _settingsService.wallpaperPreviewPath;
@@ -45,6 +47,8 @@ class WallpaperService extends ChangeNotifier {
   String get videoAdvanceMode => _settingsService.videoWallpaperAdvanceMode;
   int get videoSwitchIntervalSeconds =>
       _settingsService.videoWallpaperSwitchIntervalSeconds;
+  int get videoRepeatCountPerItem =>
+      _settingsService.videoWallpaperRepeatCountPerItem;
   bool get videoPlaylistLoop => _settingsService.videoWallpaperPlaylistLoop;
   bool get videoLoop => _settingsService.videoWallpaperLoop;
   bool get videoMute => _settingsService.videoWallpaperMute;
@@ -269,6 +273,11 @@ class WallpaperService extends ChangeNotifier {
     await syncVideoOptionsToNative();
   }
 
+  Future<void> setVideoRepeatCountPerItem(int value) async {
+    await _settingsService.setVideoWallpaperRepeatCountPerItem(value);
+    await syncVideoOptionsToNative();
+  }
+
   Future<void> setVideoPlaylistLoop(bool value) async {
     await _settingsService.setVideoWallpaperPlaylistLoop(value);
     await syncVideoOptionsToNative();
@@ -304,6 +313,25 @@ class WallpaperService extends ChangeNotifier {
     await syncVideoOptionsToNative();
   }
 
+  Future<void> setSettingsPlaybackSuppressed(bool suppressed) async {
+    final previousSuppressed = settingsPlaybackSuppressed;
+    if (suppressed) {
+      _settingsPlaybackSuppressionCount += 1;
+    } else if (_settingsPlaybackSuppressionCount > 0) {
+      _settingsPlaybackSuppressionCount -= 1;
+    }
+
+    final nextSuppressed = settingsPlaybackSuppressed;
+    if (previousSuppressed == nextSuppressed) {
+      return;
+    }
+
+    await _fLauncherChannel.setVideoWallpaperPlaybackSuppressed(
+      suppressed: nextSuppressed,
+      reason: nextSuppressed ? 'settings_panel' : 'settings_panel_release',
+    );
+  }
+
   Future<void> syncVideoOptionsToNative() async {
     await _fLauncherChannel.setVideoWallpaperOptions(
       sourceType: videoSourceType,
@@ -318,6 +346,7 @@ class WallpaperService extends ChangeNotifier {
       orderMode: videoOrderMode,
       advanceMode: videoAdvanceMode,
       switchIntervalSeconds: videoSwitchIntervalSeconds,
+      repeatCountPerItem: videoRepeatCountPerItem,
       playlistLoop: videoPlaylistLoop,
       loop: videoLoop,
       mute: videoMute,

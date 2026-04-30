@@ -1,11 +1,17 @@
 import 'package:flauncher/gradients.dart';
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/providers/profile_security_service.dart';
+import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
+import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/widgets/settings/settings_panel_page.dart';
+import 'package:flauncher/widgets/settings/voice_search_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -167,7 +173,84 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('auto focuses Home & Layout detail pane on open', (tester) async {
+  testWidgets(
+      'permissions advanced section stays collapsed until explicitly expanded',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService(
+      provisioningStatus: const <String, dynamic>{
+        'health': 'missing_required',
+        'missingRequiredCount': 1,
+        'missingRecommendedCount': 0,
+        'requirements': <Map<String, dynamic>>[
+          <String, dynamic>{'name': 'adb_enabled', 'granted': true},
+          <String, dynamic>{'name': 'overlay', 'granted': false},
+        ],
+        'commands': <String>[
+          'adb shell pm grant com.atv.launcher android.permission.TEST_PERMISSION',
+        ],
+      },
+    );
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permissions & Provisioning').first);
+    await tester.pumpAndSettle();
+
+    final permissionsPageFinder = find.byKey(
+      const PageStorageKey<String>(PermissionsPanelPage.routeName),
+    );
+    final permissionsScrollableFinder = find.descendant(
+      of: permissionsPageFinder,
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permissions_advanced_toggle')),
+      260,
+      scrollable: permissionsScrollableFinder,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+        find.byKey(const Key('permissions_advanced_toggle')), findsOneWidget);
+    final advancedToggleFrame = tester.widget<SettingsFocusFrame>(
+      find.descendant(
+        of: find.byKey(const Key('permissions_advanced_toggle')),
+        matching: find.byType(SettingsFocusFrame),
+      ),
+    );
+    expect(advancedToggleFrame.variant, SettingsFocusFrameVariant.rowOnly);
+    expect(
+      find.text(
+        'adb shell pm grant com.atv.launcher android.permission.TEST_PERMISSION',
+      ),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('permissions_advanced_toggle')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'adb shell pm grant com.atv.launcher android.permission.TEST_PERMISSION',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('keeps rail focused on open and enters detail on RIGHT',
+      (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
     final appsService = MockAppsService();
@@ -185,7 +268,23 @@ void main() {
     expect(find.text('App language'), findsAtLeastNWidgets(1));
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      'home_layout_target_appLocale',
+      contains('settings_rail_0'),
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isFalse,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('home_layout_target_appLocale_option_2'),
     );
     expect(
       tester
@@ -196,7 +295,7 @@ void main() {
       isTrue,
     );
 
-    for (var index = 0; index < 4; index++) {
+    for (var index = 0; index < 5; index++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
       final label = tester.binding.focusManager.primaryFocus?.debugLabel ?? '';
@@ -232,7 +331,7 @@ void main() {
 
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      isNot(contains('settings_rail_')),
+      'wallpaper_primary_source_action',
     );
     expect(
       tester
@@ -243,7 +342,7 @@ void main() {
       isTrue,
     );
 
-    for (var index = 0; index < 4; index++) {
+    for (var index = 0; index < 2; index++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
       final highlighted = tester
@@ -276,6 +375,548 @@ void main() {
           .highlighted,
       isFalse,
     );
+  });
+
+  testWidgets(
+      'moving down the rail does not auto-enter detail on profiles route',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    when(appsService.applications).thenReturn(const []);
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(ProfilesSecurityPanelPage, skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_rail_3'),
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isFalse,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(AccessibilityManagerPanelPage, skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_rail_4'),
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isFalse,
+    );
+  });
+
+  testWidgets('enters Diagnostics with refresh button focused', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1000));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Diagnostics').first);
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('diagnostics_refresh_button')), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'diagnostics_primary_refresh',
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isTrue,
+    );
+  });
+
+  testWidgets('enters Display / DPI with Apply button focused', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -420));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Display / DPI').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Current DPI'), findsOneWidget);
+
+    await tester.tap(find.text('Display / DPI').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('density_apply_button')), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'density_primary_apply',
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isTrue,
+    );
+  });
+
+  testWidgets('enters Voice Search with press mode focused', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(tester, 'Voice & Search');
+
+    expect(find.byKey(const Key('voice_search_mode_selector')), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('voice_search_primary_mode_option_0'),
+    );
+  });
+
+  testWidgets('enters Private DNS with hostname action focused',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(
+      tester,
+      'Network / Private DNS',
+      railDragOffset: -620,
+    );
+
+    expect(find.text('Private DNS hostname'), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'private_dns_primary_hostname_action',
+    );
+  });
+
+  testWidgets('enters Permissions with quick grant focused', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(
+      tester,
+      'Permissions & Provisioning',
+      railDragOffset: -720,
+    );
+
+    expect(
+      find.byKey(const Key('permissions_quick_grant_button')),
+      findsOneWidget,
+    );
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'permissions_primary_quick_grant',
+    );
+  });
+
+  testWidgets('permissions actions stay reachable with vertical DPAD',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(
+      tester,
+      'Permissions & Provisioning',
+      railDragOffset: -720,
+    );
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'permissions_primary_quick_grant',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('Open_developer_options'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('Grant_media_access'),
+    );
+  });
+
+  testWidgets('enters Backup & Restore with export action focused',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(
+      tester,
+      'Backup & Restore',
+      railDragOffset: -820,
+    );
+
+    expect(find.text('Export backup'), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'backup_restore_primary_export',
+    );
+  });
+
+  testWidgets(
+      'Wallpaper source actions support horizontal DPAD movement and activation',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+    final primaryFocusNode = FocusNode(
+      debugLabel: 'wallpaper_primary_source_action',
+    );
+    addTearDown(primaryFocusNode.dispose);
+
+    when(wallpaperService.pickImageWallpaper()).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<WallpaperService>.value(
+            value: wallpaperService,
+          ),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: WallpaperPanelPage(primaryFocusNode: primaryFocusNode),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    primaryFocusNode.requestFocus();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'wallpaper_primary_source_action',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Picture'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    verify(wallpaperService.pickImageWallpaper()).called(1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'wallpaper_primary_source_action',
+    );
+  });
+
+  testWidgets(
+      'settings panel suppresses wallpaper playback while mounted and releases on close',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    when(wallpaperService.setSettingsPlaybackSuppressed(true))
+        .thenAnswer((_) async {});
+    when(wallpaperService.setSettingsPlaybackSuppressed(false))
+        .thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<WallpaperService>.value(
+            value: wallpaperService,
+          ),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const SettingsPanel(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    verify(wallpaperService.setSettingsPlaybackSuppressed(true)).called(1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+
+    verify(wallpaperService.setSettingsPlaybackSuppressed(false)).called(1);
+  });
+
+  testWidgets('accessibility action buttons keep uniform size', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final bridgeService = _mockBridgeService();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: AccessibilityManagerPanelPage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Size sizeForLabel(String label) => tester.getSize(
+          find.ancestor(
+            of: find.text(label),
+            matching: find.byType(SettingsFocusFrame),
+          ),
+        );
+
+    final repairSize = sizeForLabel('Repair');
+    final grantSize = sizeForLabel('Grant WSS via local ADB');
+    final openSettingsSize = sizeForLabel('Open accessibility settings');
+    final showSize = sizeForLabel('Show managed accessibility apps');
+
+    expect(repairSize.width, equals(grantSize.width));
+    expect(repairSize.width, equals(openSettingsSize.width));
+    expect(repairSize.width, equals(showSize.width));
+    expect(repairSize.height, equals(grantSize.height));
+    expect(repairSize.height, equals(openSettingsSize.height));
+    expect(repairSize.height, equals(showSize.height));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('voice action buttons keep uniform size', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final bridgeService = _mockBridgeService();
+    final channel = MockFLauncherChannel();
+    final searchService = SearchService(
+      await SharedPreferences.getInstance(),
+      channel,
+    );
+
+    when(channel.startSpeechRecognizer()).thenAnswer(
+      (_) async => const <String, dynamic>{'text': 'hello'},
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+          ChangeNotifierProvider<SearchService>.value(value: searchService),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: VoiceSearchPanelPage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Size sizeForLabel(String label) => tester.getSize(
+          find.ancestor(
+            of: find.text(label),
+            matching: find.byType(SettingsFocusFrame),
+          ),
+        );
+
+    final captureSize = sizeForLabel('Test speech capture');
+    final learnSize = sizeForLabel('Learn remote key');
+    final launchSize = sizeForLabel('Test voice launch');
+    final resetSize = sizeForLabel('Reset Xiaomi default');
+    final repairSize = sizeForLabel('Repair accessibility');
+    final openSettingsSize = sizeForLabel('Open accessibility settings');
+
+    expect(captureSize.width, equals(learnSize.width));
+    expect(learnSize.width, equals(launchSize.width));
+    expect(learnSize.width, equals(resetSize.width));
+    expect(learnSize.width, equals(repairSize.width));
+    expect(learnSize.width, equals(openSettingsSize.width));
+    expect(captureSize.height, equals(learnSize.height));
+    expect(learnSize.height, equals(launchSize.height));
+    expect(learnSize.height, equals(resetSize.height));
+    expect(learnSize.height, equals(repairSize.height));
+    expect(learnSize.height, equals(openSettingsSize.height));
+  });
+
+  testWidgets(
+      'voice search page adapts Vietnamese action card content without overflow',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final bridgeService = _mockBridgeService();
+    final channel = MockFLauncherChannel();
+    final searchService = SearchService(
+      await SharedPreferences.getInstance(),
+      channel,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+          ChangeNotifierProvider<SearchService>.value(value: searchService),
+        ],
+        child: MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: VoiceSearchPanelPage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -319,18 +960,17 @@ void main() {
       of: wallpaperPageFinder,
       matching: find.byType(Scrollable),
     );
-    final fitSelectorFinder =
-        find.byKey(const Key('wallpaper_video_fit_selector'));
-    await tester.scrollUntilVisible(
-      fitSelectorFinder,
-      240,
-      scrollable: wallpaperScrollableFinder,
-    );
+    final wallpaperScrollableState =
+        tester.state<ScrollableState>(wallpaperScrollableFinder);
+    final wallpaperTargetPixels =
+        (wallpaperScrollableState.position.maxScrollExtent * 0.6)
+            .clamp(120.0, 320.0)
+            .toDouble();
+    expect(wallpaperScrollableState.position.maxScrollExtent, greaterThan(0));
+    wallpaperScrollableState.position.jumpTo(wallpaperTargetPixels);
     await tester.pumpAndSettle();
-    final initialPixels = tester
-        .state<ScrollableState>(wallpaperScrollableFinder)
-        .position
-        .pixels;
+    final initialPixels = wallpaperScrollableState.position.pixels;
+    expect(initialPixels, greaterThan(0));
 
     await tester.drag(find.byType(ListView).first, const Offset(0, -500));
     await tester.pumpAndSettle();
@@ -375,7 +1015,16 @@ Future<void> _pumpSettingsPanel(
   required AppsService appsService,
   required WallpaperService wallpaperService,
   required SystemBridgeService bridgeService,
+  ProfileSecurityService? securityService,
+  SearchService? searchService,
 }) async {
+  final effectiveSecurityService = securityService ??
+      ProfileSecurityService(await SharedPreferences.getInstance());
+  final effectiveSearchService = searchService ??
+      SearchService(
+        await SharedPreferences.getInstance(),
+        MockFLauncherChannel(),
+      );
   await tester.pumpWidget(
     MultiProvider(
       providers: [
@@ -383,6 +1032,12 @@ Future<void> _pumpSettingsPanel(
         ChangeNotifierProvider<AppsService>.value(value: appsService),
         ChangeNotifierProvider<WallpaperService>.value(value: wallpaperService),
         ChangeNotifierProvider<SystemBridgeService>.value(value: bridgeService),
+        ChangeNotifierProvider<ProfileSecurityService>.value(
+          value: effectiveSecurityService,
+        ),
+        ChangeNotifierProvider<SearchService>.value(
+          value: effectiveSearchService,
+        ),
       ],
       child: MaterialApp(
         locale: const Locale('en'),
@@ -395,6 +1050,28 @@ Future<void> _pumpSettingsPanel(
   await tester.pumpAndSettle();
 }
 
+Future<void> _enterRouteDetailByTap(
+  WidgetTester tester,
+  String routeLabel, {
+  double? railDragOffset,
+}) async {
+  final railFinder = find.byKey(
+    const PageStorageKey<String>('settings_destination_rail'),
+  );
+  final railRouteFinder = find.descendant(
+    of: railFinder,
+    matching: find.text(routeLabel),
+  );
+  if (railDragOffset != null) {
+    await tester.drag(railFinder, Offset(0, railDragOffset));
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(railRouteFinder.first);
+  await tester.pumpAndSettle();
+  await tester.tap(railRouteFinder.first);
+  await tester.pumpAndSettle();
+}
+
 MockWallpaperService _mockWallpaperService() {
   final wallpaperService = MockWallpaperService();
   when(wallpaperService.wallpaperMode).thenReturn('gradient');
@@ -404,6 +1081,7 @@ MockWallpaperService _mockWallpaperService() {
   when(wallpaperService.videoFolderName).thenReturn('');
   when(wallpaperService.isVideoMode).thenReturn(false);
   when(wallpaperService.videoAdvanceMode).thenReturn('on_completion');
+  when(wallpaperService.videoRepeatCountPerItem).thenReturn(3);
   when(wallpaperService.videoOrderMode).thenReturn('sequential');
   when(wallpaperService.videoSwitchIntervalSeconds).thenReturn(30);
   when(wallpaperService.videoPlaylistLoop).thenReturn(true);
@@ -414,6 +1092,16 @@ MockWallpaperService _mockWallpaperService() {
   when(wallpaperService.videoBlur).thenReturn('off');
   when(wallpaperService.videoDimPercent).thenReturn(15);
   when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+  when(wallpaperService.pickImageWallpaper()).thenAnswer((_) async {});
+  when(wallpaperService.pickVideoWallpaper()).thenAnswer((_) async {});
+  when(wallpaperService.pickVideoWallpaperFilesSaf()).thenAnswer((_) async {});
+  when(wallpaperService.pickVideoWallpaperFolderSaf()).thenAnswer((_) async {});
+  when(wallpaperService.setVideoRepeatCountPerItem(any))
+      .thenAnswer((_) async {});
+  when(wallpaperService.setSettingsPlaybackSuppressed(true))
+      .thenAnswer((_) async {});
+  when(wallpaperService.setSettingsPlaybackSuppressed(false))
+      .thenAnswer((_) async {});
   return wallpaperService;
 }
 
@@ -421,6 +1109,53 @@ MockSystemBridgeService _mockBridgeService({
   Map<String, dynamic>? provisioningStatus,
 }) {
   final bridgeService = MockSystemBridgeService();
+  when(bridgeService.diagnosticsReport).thenReturn('bridge ok');
+  when(bridgeService.adbAutomationStatus)
+      .thenReturn(const <String, dynamic>{'policy': 'adb_and_wifi'});
+  when(bridgeService.systemCoreStatus)
+      .thenReturn(const <String, dynamic>{'coreServiceHealth': 'healthy'});
+  when(bridgeService.densityStatus).thenReturn(const <String, dynamic>{
+    'currentDensity': 320,
+    'factoryDensity': 320,
+    'overrideDensity': '-',
+    'executionPath': 'wm density',
+  });
+  when(bridgeService.voiceStatus).thenReturn(const <String, dynamic>{
+    'mode': 0,
+    'keyCode': 231,
+    'health': 'healthy',
+    'interceptEnabled': true,
+    'defaultKeySummary': 'Double press voice key',
+    'learningMode': false,
+  });
+  when(bridgeService.privateDnsStatus).thenReturn(const <String, dynamic>{
+    'selectedHost': 'dns.adguard.com',
+    'effectiveMode': 'hostname',
+    'specifier': 'dns.adguard.com',
+    'hasWriteSecureSettings': true,
+  });
+  when(bridgeService.accessibilitySnapshot).thenReturn(const <String, dynamic>{
+    'writeSecureSettingsGranted': true,
+    'accessibilityMasterEnabled': true,
+    'managedPackageCount': 1,
+    'lastVerifyResult': 'ok',
+    'apps': <Map<String, dynamic>>[],
+  });
+  when(bridgeService.refreshFull()).thenAnswer((_) async {});
+  when(bridgeService.refreshAccessibilitySnapshot()).thenAnswer((_) async {});
+  when(bridgeService.setVoiceInterceptEnabled(any)).thenAnswer(
+    (_) async => const <String, dynamic>{},
+  );
+  when(bridgeService.startKeyLearning()).thenAnswer(
+    (_) async => const <String, dynamic>{'message': 'ok'},
+  );
+  when(bridgeService.testVoiceSearch()).thenAnswer(
+    (_) async => const <String, dynamic>{'message': 'ok'},
+  );
+  when(bridgeService.resetVoiceMapping()).thenAnswer(
+    (_) async => const <String, dynamic>{'message': 'ok'},
+  );
+  when(bridgeService.openAccessibilitySettings()).thenAnswer((_) async {});
   when(bridgeService.fileAccessStatus)
       .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
   when(bridgeService.provisioningStatus).thenReturn(

@@ -3,18 +3,39 @@ import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 class VoiceSearchPanelPage extends StatelessWidget {
   static const String routeName = "voice_search_panel";
+  final FocusNode? primaryFocusNode;
 
-  const VoiceSearchPanelPage({super.key});
+  const VoiceSearchPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
+    Widget actionCard({
+      required String title,
+      String? subtitle,
+      required IconData icon,
+      required Future<void> Function()? onPressed,
+    }) =>
+        SizedBox(
+          height: 88,
+          child: SettingsActionCard(
+            title: title,
+            subtitle: subtitle,
+            icon: icon,
+            onPressed: onPressed,
+            focusEmphasis: 1.32,
+          ),
+        );
 
     return Consumer2<SystemBridgeService, SearchService>(
       builder: (context, bridgeService, searchService, _) {
@@ -53,21 +74,49 @@ class VoiceSearchPanelPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SettingsChoiceCard<int>(
+                    focusNode: primaryFocusNode,
+                    selectorKey: const Key('voice_search_mode_selector'),
+                    optionKeyPrefix: 'voice_search_mode_option',
+                    title: localizations.pressMode,
+                    subtitle: localizations.settingsDestinationVoiceSubtitle,
+                    icon: Icons.tune,
+                    value: mode,
+                    options: <SettingsChoiceOption<int>>[
+                      SettingsChoiceOption<int>(
+                        value: 0,
+                        label: localizations.voiceModeDoublePress,
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 1,
+                        label: localizations.voiceModeSinglePress,
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 2,
+                        label: localizations.voiceModeLongPress,
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 3,
+                        label: localizations.voiceModeDoublePressHold,
+                      ),
+                    ],
+                    valueLabelBuilder: (value) =>
+                        localizedVoiceMode(localizations, value),
+                    onChanged: (value) async {
+                      await bridgeService.setVoiceMode(mode: value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
                   RoundedSwitchListTile(
                     value: interceptEnabled,
                     onChanged: bridgeService.setVoiceInterceptEnabled,
-                    title: Text(localizations.interceptRemoteVoiceKey),
+                    title: Text(
+                      localizations.interceptRemoteVoiceKey,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     secondary: const Icon(Icons.hearing_outlined),
                   ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.tune),
-                    title: Text(localizations.pressMode),
-                    subtitle: Text(localizedVoiceMode(localizations, mode)),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showModePicker(context, bridgeService, mode),
-                  ),
+                  const SizedBox(height: 10),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.key_outlined),
@@ -86,77 +135,71 @@ class VoiceSearchPanelPage extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
             SettingsSurfaceCard(
-              child: Column(
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () async {
-                          final result =
-                              await searchService.startSpeechRecognizer();
-                          if (!context.mounted) {
-                            return;
-                          }
-                          final String message;
-                          final text = result['text']?.toString() ?? '';
-                          if (text.trim().isNotEmpty) {
-                            message = localizations.speechCapturedMessage(text);
-                          } else {
-                            message = result['message']?.toString() ??
-                                localizations.speechCaptureNoTextMessage;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(message)),
-                          );
-                        },
-                        icon: const Icon(Icons.mic_none_outlined),
-                        label: Text(localizations.testSpeechCaptureAction),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            SettingsSurfaceCard(
-              child: Wrap(
+              child: SettingsAdaptiveGrid(
                 spacing: 12,
                 runSpacing: 12,
+                minChildWidth: 240,
+                maxColumns: 2,
                 children: [
-                  FilledButton.icon(
-                    onPressed: () => bridgeService.startKeyLearning(),
-                    icon: const Icon(Icons.sensors_outlined),
-                    label: Text(localizations.learnRemoteKey),
+                  actionCard(
+                    title: localizations.testSpeechCaptureAction,
+                    icon: Icons.mic_none_outlined,
+                    onPressed: () async {
+                      final result =
+                          await searchService.startSpeechRecognizer();
+                      if (!context.mounted) {
+                        return;
+                      }
+                      final String message;
+                      final text = result['text']?.toString() ?? '';
+                      if (text.trim().isNotEmpty) {
+                        message = localizations.speechCapturedMessage(text);
+                      } else {
+                        message = result['message']?.toString() ??
+                            localizations.speechCaptureNoTextMessage;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(message)),
+                      );
+                    },
                   ),
-                  FilledButton.tonalIcon(
+                  actionCard(
+                    title: localizations.learnRemoteKey,
+                    icon: Icons.sensors_outlined,
+                    onPressed: () async {
+                      await bridgeService.startKeyLearning();
+                    },
+                  ),
+                  actionCard(
+                    title: localizations.testVoiceLaunch,
+                    icon: Icons.play_circle_outline,
                     onPressed: () async => _showResult(
                       context,
                       await bridgeService.testVoiceSearch(),
                     ),
-                    icon: const Icon(Icons.play_circle_outline),
-                    label: Text(localizations.testVoiceLaunch),
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => bridgeService.resetVoiceMapping(),
-                    icon: const Icon(Icons.restart_alt),
-                    label: Text(localizations.resetXiaomiDefault),
+                  actionCard(
+                    title: localizations.resetXiaomiDefault,
+                    icon: Icons.restart_alt,
+                    onPressed: () async {
+                      await bridgeService.resetVoiceMapping();
+                    },
                   ),
-                  FilledButton.tonalIcon(
+                  actionCard(
+                    title: localizations.repairAccessibility,
+                    icon: Icons.build_circle_outlined,
                     onPressed: () async => _showResult(
                       context,
                       await bridgeService.repairAccessibility(),
                     ),
-                    icon: const Icon(Icons.build_circle_outlined),
-                    label: Text(localizations.repairAccessibility),
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => bridgeService.openAccessibilitySettings(),
-                    icon: const Icon(Icons.settings_accessibility),
-                    label: Text(localizations.openAccessibilitySettings),
+                  actionCard(
+                    title: localizations.openAccessibilitySettings,
+                    icon: Icons.settings_accessibility,
+                    onPressed: () async {
+                      bridgeService.openAccessibilitySettings();
+                    },
                   ),
                 ],
               ),
@@ -165,41 +208,6 @@ class VoiceSearchPanelPage extends StatelessWidget {
         );
       },
     );
-  }
-
-  Future<void> _showModePicker(
-    BuildContext context,
-    SystemBridgeService bridgeService,
-    int currentMode,
-  ) async {
-    final selectedMode = await showDialog<int>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(AppLocalizations.of(context)!.voiceModeLabel),
-        children: [
-          _VoiceModeOption(
-            value: 0,
-            label: AppLocalizations.of(context)!.voiceModeDoublePress,
-          ),
-          _VoiceModeOption(
-            value: 1,
-            label: AppLocalizations.of(context)!.voiceModeSinglePress,
-          ),
-          _VoiceModeOption(
-            value: 2,
-            label: AppLocalizations.of(context)!.voiceModeLongPress,
-          ),
-          _VoiceModeOption(
-            value: 3,
-            label: AppLocalizations.of(context)!.voiceModeDoublePressHold,
-          ),
-        ],
-      ),
-    );
-
-    if (selectedMode != null && selectedMode != currentMode) {
-      await bridgeService.setVoiceMode(mode: selectedMode);
-    }
   }
 
   void _showResult(BuildContext context, Map<String, dynamic> result) {
@@ -211,17 +219,4 @@ class VoiceSearchPanelPage extends StatelessWidget {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
-}
-
-class _VoiceModeOption extends StatelessWidget {
-  final int value;
-  final String label;
-
-  const _VoiceModeOption({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) => SimpleDialogOption(
-        onPressed: () => Navigator.of(context).pop(value),
-        child: Text(label),
-      );
 }

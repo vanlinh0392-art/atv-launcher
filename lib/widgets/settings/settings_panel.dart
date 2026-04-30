@@ -16,6 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'dart:async';
+
 import 'package:flauncher/widgets/right_panel_dialog.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
 import 'package:flauncher/widgets/settings/applications_panel_page.dart';
@@ -29,18 +31,31 @@ import 'package:flauncher/widgets/settings/launcher_section_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
 import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
+import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/settings_perf_probe.dart';
 import 'package:flauncher/widgets/settings/settings_panel_page.dart';
 import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flauncher/widgets/settings/system_core_panel_page.dart';
 import 'package:flauncher/widgets/settings/voice_search_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class SettingsPanel extends StatefulWidget {
   final String? initialRoute;
+  final String? selectedRouteOnShell;
+  final bool autoFocusDetailOnOpen;
+  final String? benchmarkSessionId;
 
-  const SettingsPanel({Key? key, this.initialRoute}) : super(key: key);
+  const SettingsPanel({
+    Key? key,
+    this.initialRoute,
+    this.selectedRouteOnShell,
+    this.autoFocusDetailOnOpen = false,
+    this.benchmarkSessionId,
+  }) : super(key: key);
 
   @override
   State<SettingsPanel> createState() => _SettingsPanelState();
@@ -48,6 +63,66 @@ class SettingsPanel extends StatefulWidget {
 
 class _SettingsPanelState extends State<SettingsPanel> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  WallpaperService? _wallpaperService;
+  bool _settingsPlaybackSuppressed = false;
+  late final Stopwatch _openStopwatch = Stopwatch()..start();
+  bool _settingsFirstFrameLogged = false;
+  SettingsPerfProbe? _perfProbe;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _wallpaperService ??= context.read<WallpaperService>();
+    _perfProbe ??= kDebugMode && widget.benchmarkSessionId != null
+        ? (SettingsPerfProbe(
+            sessionId: widget.benchmarkSessionId!,
+            route: widget.selectedRouteOnShell ??
+                widget.initialRoute ??
+                SettingsPanelPage.routeName,
+            logger: debugPrint,
+          )..attach())
+        : null;
+    if (_settingsPlaybackSuppressed) {
+      return;
+    }
+    if (!_settingsFirstFrameLogged) {
+      _settingsFirstFrameLogged = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _logPerf('settings_first_frame');
+      });
+    }
+    _settingsPlaybackSuppressed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(() async {
+        await _wallpaperService?.setSettingsPlaybackSuppressed(true);
+        if (!mounted) {
+          return;
+        }
+        _logPerf('settings_video_suppressed');
+      }());
+    });
+  }
+
+  @override
+  void dispose() {
+    _perfProbe?.dispose();
+    if (_settingsPlaybackSuppressed) {
+      _wallpaperService?.setSettingsPlaybackSuppressed(false);
+    }
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _logPerf('settings_open_requested');
+  }
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -90,13 +165,25 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   width: 1360,
                   child: Navigator(
                     key: _navigatorKey,
-                    initialRoute:
-                        widget.initialRoute ?? SettingsPanelPage.routeName,
+                    initialRoute: widget.selectedRouteOnShell != null
+                        ? SettingsPanelPage.routeName
+                        : (widget.initialRoute ?? SettingsPanelPage.routeName),
                     onGenerateRoute: (settings) {
                       switch (settings.name) {
                         case SettingsPanelPage.routeName:
                           return MaterialPageRoute(
-                              builder: (_) => SettingsPanelPage());
+                            builder: (_) => SettingsPanelPage(
+                              initialSelectedRoute: widget.selectedRouteOnShell,
+                              autoFocusDetailOnOpen:
+                                  widget.autoFocusDetailOnOpen,
+                              onBenchmarkReady: _perfProbe == null
+                                  ? null
+                                  : _perfProbe!.markReady,
+                              onBenchmarkDpadSample: _perfProbe == null
+                                  ? null
+                                  : _perfProbe!.recordDpadSample,
+                            ),
+                          );
                         case HomeLayoutPanelPage.routeName:
                           return MaterialPageRoute(
                               builder: (_) => HomeLayoutPanelPage());
@@ -161,4 +248,13 @@ class _SettingsPanelState extends State<SettingsPanel> {
           ),
         ),
       );
+
+  void _logPerf(String marker) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint(
+      'FLauncherPerf $marker elapsedMs=${_openStopwatch.elapsedMilliseconds}',
+    );
+  }
 }

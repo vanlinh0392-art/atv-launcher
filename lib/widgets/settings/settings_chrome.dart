@@ -18,6 +18,38 @@ enum SettingsButtonVariant {
   danger,
 }
 
+enum SettingsFocusFrameVariant {
+  detailPane,
+  rowOnly,
+  optionButton,
+}
+
+class SettingsFocusFrameVisuals {
+  final Color fillColor;
+  final Color borderColor;
+  final Color glowColor;
+  final Color shadowColor;
+  final double borderWidth;
+  final double glowBlurRadius;
+  final double glowSpreadRadius;
+  final Offset glowOffset;
+  final double shadowBlurRadius;
+  final Offset shadowOffset;
+
+  const SettingsFocusFrameVisuals({
+    required this.fillColor,
+    required this.borderColor,
+    required this.glowColor,
+    required this.shadowColor,
+    required this.borderWidth,
+    required this.glowBlurRadius,
+    required this.glowSpreadRadius,
+    required this.glowOffset,
+    required this.shadowBlurRadius,
+    required this.shadowOffset,
+  });
+}
+
 class SettingsChromeSpec {
   final double transparencyFraction;
   final double effectiveTransparencyFraction;
@@ -36,11 +68,13 @@ class SettingsChromeSpec {
   }
 
   factory SettingsChromeSpec.of(BuildContext context) {
-    final transparencyPercent = context.select<SettingsService?, int>(
-      (settingsService) =>
-          settingsService?.settingsUiTransparencyPercent ??
-          SettingsService.settingsUiTransparencyDefault,
+    final settingsService = Provider.of<SettingsService?>(
+      context,
+      listen: true,
     );
+    final transparencyPercent =
+        settingsService?.settingsUiTransparencyPercent ??
+            SettingsService.settingsUiTransparencyDefault;
     return SettingsChromeSpec.fromTransparencyPercent(transparencyPercent);
   }
 
@@ -75,31 +109,179 @@ class SettingsChromeSpec {
       _lerpOpacity(0.44, 0.08, effectiveTransparencyFraction);
 
   double get detailFocusFillOpacity =>
-      _lerpOpacity(0.11, 0.02, effectiveTransparencyFraction);
+      _lerpOpacity(0.085, 0.018, effectiveTransparencyFraction);
 
   double get detailFocusBorderOpacity =>
-      _lerpOpacity(0.88, 0.24, effectiveTransparencyFraction);
+      _lerpOpacity(0.7, 0.2, effectiveTransparencyFraction);
 
   double get detailFocusGlowOpacity =>
-      _lerpOpacity(0.22, 0.055, effectiveTransparencyFraction);
+      _lerpOpacity(0.14, 0.04, effectiveTransparencyFraction);
 
   double get detailFocusShadowOpacity =>
-      _lerpOpacity(0.18, 0.04, effectiveTransparencyFraction);
+      _lerpOpacity(0.14, 0.035, effectiveTransparencyFraction);
+
+  double get rowOnlyFocusFillOpacity =>
+      _lerpOpacity(0.132, 0.03, effectiveTransparencyFraction);
+
+  double get rowOnlyFocusBorderOpacity =>
+      _lerpOpacity(0.78, 0.26, effectiveTransparencyFraction);
+
+  double get rowOnlyFocusGlowOpacity =>
+      _lerpOpacity(0.18, 0.052, effectiveTransparencyFraction);
+
+  double get rowOnlyFocusShadowOpacity =>
+      _lerpOpacity(0.16, 0.045, effectiveTransparencyFraction);
 
   double get actionButtonSurfaceOpacity =>
-      _lerpOpacity(0.14, 0.045, effectiveTransparencyFraction);
+      _lerpOpacity(0.12, 0.038, effectiveTransparencyFraction);
 
   double get actionButtonFocusSurfaceOpacity =>
-      _lerpOpacity(0.22, 0.095, effectiveTransparencyFraction);
+      _lerpOpacity(0.18, 0.078, effectiveTransparencyFraction);
 
   double get actionButtonFocusBorderOpacity =>
-      _lerpOpacity(0.98, 0.66, effectiveTransparencyFraction);
+      _lerpOpacity(0.82, 0.5, effectiveTransparencyFraction);
 
   double get actionButtonFocusGlowOpacity =>
-      _lerpOpacity(0.34, 0.14, effectiveTransparencyFraction);
+      _lerpOpacity(0.22, 0.1, effectiveTransparencyFraction);
 
   double get actionButtonPressedOpacity =>
       _lerpOpacity(0.28, 0.12, effectiveTransparencyFraction);
+
+  SettingsFocusFrameVisuals resolveFocusFrameVisuals({
+    required SettingsFocusFrameVariant variant,
+    required bool focused,
+    double emphasis = 1.0,
+    Color accentColor = const Color(0xFF7EBCE8),
+  }) {
+    final emphasisBoost = (emphasis - 1.0).clamp(0.0, 1.0).toDouble();
+
+    late final Color accent;
+    late final double focusFillOpacity;
+    late final double focusBorderOpacity;
+    late final double focusGlowOpacity;
+    late final double focusShadowOpacity;
+    late final double focusedBorderWidth;
+    late final double glowBlurRadius;
+    late final double glowSpreadRadius;
+    late final Offset glowOffset;
+    late final double shadowBlurRadius;
+    late final Offset shadowOffset;
+    late final double idleFillOpacity;
+    late final double idleBorderOpacity;
+    late final double idleShadowOpacity;
+    late final double idleShadowBlurRadius;
+    late final Offset idleShadowOffset;
+
+    switch (variant) {
+      case SettingsFocusFrameVariant.detailPane:
+        accent = const Color(0xFF88C8EE);
+        focusFillOpacity =
+            (detailFocusFillOpacity * (1 + (emphasisBoost * 1.8)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusBorderOpacity =
+            (detailFocusBorderOpacity * (1 + (emphasisBoost * 0.45)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusGlowOpacity =
+            (detailFocusGlowOpacity * (1 + (emphasisBoost * 0.85)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusShadowOpacity =
+            (detailFocusShadowOpacity * (1 + (emphasisBoost * 0.35)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusedBorderWidth = 1.7 + (emphasisBoost * 0.45);
+        glowBlurRadius = 10 + (emphasisBoost * 2);
+        glowSpreadRadius = 0.4 + (emphasisBoost * 0.4);
+        glowOffset = const Offset(0, 4);
+        shadowBlurRadius = 8 + emphasisBoost;
+        shadowOffset = const Offset(0, 5);
+        idleFillOpacity = focusBaseOpacity;
+        idleBorderOpacity = panelBorderOpacity;
+        idleShadowOpacity = panelShadowOpacity - 0.02;
+        idleShadowBlurRadius = 7;
+        idleShadowOffset = const Offset(0, 4);
+        break;
+      case SettingsFocusFrameVariant.rowOnly:
+        accent = const Color(0xFF7ABFE8);
+        focusFillOpacity =
+            (rowOnlyFocusFillOpacity * (1 + (emphasisBoost * 1.1)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusBorderOpacity =
+            (rowOnlyFocusBorderOpacity * (1 + (emphasisBoost * 0.28)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusGlowOpacity =
+            (rowOnlyFocusGlowOpacity * (1 + (emphasisBoost * 0.5)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusShadowOpacity =
+            (rowOnlyFocusShadowOpacity * (1 + (emphasisBoost * 0.25)))
+                .clamp(0.0, 1.0)
+                .toDouble();
+        focusedBorderWidth = 2.0 + (emphasisBoost * 0.3);
+        glowBlurRadius = 11 + emphasisBoost;
+        glowSpreadRadius = 0.55 + (emphasisBoost * 0.25);
+        glowOffset = const Offset(0, 4);
+        shadowBlurRadius = 8.5 + (emphasisBoost * 0.6);
+        shadowOffset = const Offset(0, 5);
+        idleFillOpacity = focusBaseOpacity + 0.006;
+        idleBorderOpacity = panelBorderOpacity + 0.018;
+        idleShadowOpacity = panelShadowOpacity - 0.015;
+        idleShadowBlurRadius = 7.5;
+        idleShadowOffset = const Offset(0, 4);
+        break;
+      case SettingsFocusFrameVariant.optionButton:
+        accent = accentColor;
+        focusFillOpacity = actionButtonFocusSurfaceOpacity;
+        focusBorderOpacity = actionButtonFocusBorderOpacity;
+        focusGlowOpacity = actionButtonFocusGlowOpacity;
+        focusShadowOpacity =
+            math.min(actionButtonFocusGlowOpacity + 0.025, 0.34);
+        focusedBorderWidth = 2.35 + (emphasisBoost * 0.15);
+        glowBlurRadius = 14 + emphasisBoost;
+        glowSpreadRadius = 0.8 + (emphasisBoost * 0.15);
+        glowOffset = const Offset(0, 6);
+        shadowBlurRadius = 11 + emphasisBoost;
+        shadowOffset = const Offset(0, 6);
+        idleFillOpacity = focusBaseOpacity + 0.018;
+        idleBorderOpacity = panelBorderOpacity + 0.03;
+        idleShadowOpacity = panelShadowOpacity;
+        idleShadowBlurRadius = 8;
+        idleShadowOffset = const Offset(0, 5);
+        break;
+    }
+
+    if (!focused) {
+      return SettingsFocusFrameVisuals(
+        fillColor: Colors.white.withOpacity(idleFillOpacity),
+        borderColor: Colors.white.withOpacity(idleBorderOpacity),
+        glowColor: Colors.transparent,
+        shadowColor: Colors.black.withOpacity(idleShadowOpacity),
+        borderWidth: 1,
+        glowBlurRadius: 0,
+        glowSpreadRadius: 0,
+        glowOffset: idleShadowOffset,
+        shadowBlurRadius: idleShadowBlurRadius,
+        shadowOffset: idleShadowOffset,
+      );
+    }
+
+    return SettingsFocusFrameVisuals(
+      fillColor: _accentWithOpacity(accent, focusFillOpacity),
+      borderColor: _accentWithOpacity(accent, focusBorderOpacity),
+      glowColor: _accentWithOpacity(accent, focusGlowOpacity),
+      shadowColor: Colors.black.withOpacity(focusShadowOpacity),
+      borderWidth: focusedBorderWidth,
+      glowBlurRadius: glowBlurRadius,
+      glowSpreadRadius: glowSpreadRadius,
+      glowOffset: glowOffset,
+      shadowBlurRadius: shadowBlurRadius,
+      shadowOffset: shadowOffset,
+    );
+  }
 }
 
 class SettingsContentView extends StatelessWidget {
@@ -152,34 +334,36 @@ class SettingsSurfaceCard extends StatelessWidget {
     final chromeSpec = SettingsChromeSpec.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF10233A).withOpacity(chromeSpec.panelSurfaceOpacity),
+        color:
+            const Color(0xFF10233A).withOpacity(chromeSpec.panelSurfaceOpacity),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: highlighted
-              ? const Color(0xFF9ED4FF)
+              ? const Color(0xFF86C5EE)
               : Colors.white.withOpacity(chromeSpec.panelBorderOpacity),
           width: highlighted ? 2.2 : 1.0,
         ),
         boxShadow: highlighted
             ? [
                 BoxShadow(
-                  color: const Color(0xFF2A6BD8)
-                      .withOpacity(chromeSpec.panelShadowOpacity + 0.06),
-                  blurRadius: 18,
-                  offset: Offset(0, 10),
+                  color: const Color(0xFF4A95D0)
+                      .withOpacity(chromeSpec.panelShadowOpacity + 0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 7),
                 ),
                 BoxShadow(
                   color: Colors.black
                       .withOpacity(chromeSpec.panelShadowOpacity + 0.02),
-                  blurRadius: 16,
-                  offset: Offset(0, 8),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
                 ),
               ]
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(chromeSpec.panelShadowOpacity),
-                  blurRadius: 14,
-                  offset: Offset(0, 8),
+                  color:
+                      Colors.black.withOpacity(chromeSpec.panelShadowOpacity),
+                  blurRadius: 8,
+                  offset: const Offset(0, 5),
                 ),
               ],
       ),
@@ -253,6 +437,9 @@ class SettingsFocusFrame extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final BorderRadiusGeometry borderRadius;
   final Color baseColor;
+  final double focusEmphasis;
+  final SettingsFocusFrameVariant variant;
+  final bool? focused;
 
   const SettingsFocusFrame({
     super.key,
@@ -260,6 +447,9 @@ class SettingsFocusFrame extends StatefulWidget {
     this.padding = const EdgeInsets.all(16),
     this.borderRadius = const BorderRadius.all(Radius.circular(22)),
     this.baseColor = const Color(0x07FFFFFF),
+    this.focusEmphasis = 1.0,
+    this.variant = SettingsFocusFrameVariant.detailPane,
+    this.focused,
   });
 
   @override
@@ -273,6 +463,12 @@ class _SettingsFocusFrameState extends State<SettingsFocusFrame> {
   Widget build(BuildContext context) {
     final borderRadius = widget.borderRadius;
     final chromeSpec = SettingsChromeSpec.of(context);
+    final resolvedFocused = widget.focused ?? _focused;
+    final visuals = chromeSpec.resolveFocusFrameVisuals(
+      variant: widget.variant,
+      focused: resolvedFocused,
+      emphasis: widget.focusEmphasis,
+    );
     return Focus(
       canRequestFocus: false,
       onFocusChange: (value) {
@@ -284,46 +480,33 @@ class _SettingsFocusFrameState extends State<SettingsFocusFrame> {
         duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color: _focused
-              ? _accentWithOpacity(
-                  const Color(0xFF4B93FF),
-                  chromeSpec.detailFocusFillOpacity,
-                )
-              : Colors.white.withOpacity(chromeSpec.focusBaseOpacity),
+          color: resolvedFocused
+              ? visuals.fillColor
+              : Color.alphaBlend(widget.baseColor, visuals.fillColor),
           borderRadius: borderRadius,
           border: Border.all(
-            color: _focused
-                ? _accentWithOpacity(
-                    const Color(0xFFB9DEFF),
-                    chromeSpec.detailFocusBorderOpacity,
-                  )
-                : Colors.white.withOpacity(chromeSpec.panelBorderOpacity),
-            width: _focused ? 1.7 : 1,
+            color: visuals.borderColor,
+            width: visuals.borderWidth,
           ),
-          boxShadow: _focused
+          boxShadow: resolvedFocused
               ? [
                   BoxShadow(
-                    color: _accentWithOpacity(
-                      const Color(0xFF4E95FF),
-                      chromeSpec.detailFocusGlowOpacity,
-                    ),
-                    blurRadius: 11,
-                    spreadRadius: 0.5,
-                    offset: const Offset(0, 5),
+                    color: visuals.glowColor,
+                    blurRadius: visuals.glowBlurRadius,
+                    spreadRadius: visuals.glowSpreadRadius,
+                    offset: visuals.glowOffset,
                   ),
                   BoxShadow(
-                    color: Colors.black
-                        .withOpacity(chromeSpec.detailFocusShadowOpacity),
-                    blurRadius: 11,
-                    offset: const Offset(0, 6),
+                    color: visuals.shadowColor,
+                    blurRadius: visuals.shadowBlurRadius,
+                    offset: visuals.shadowOffset,
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black
-                        .withOpacity(chromeSpec.panelShadowOpacity - 0.02),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
+                    color: visuals.shadowColor,
+                    blurRadius: visuals.shadowBlurRadius,
+                    offset: visuals.shadowOffset,
                   ),
                 ],
         ),
@@ -427,11 +610,11 @@ class SettingsButtonStyles {
   static Color accentForVariant(SettingsButtonVariant variant) {
     switch (variant) {
       case SettingsButtonVariant.neutral:
-        return const Color(0xFFEAF6FF);
+        return const Color(0xFF8DB9D6);
       case SettingsButtonVariant.primary:
-        return const Color(0xFF7BC2FF);
+        return const Color(0xFF72BEF2);
       case SettingsButtonVariant.success:
-        return const Color(0xFF61E59B);
+        return const Color(0xFF62D89A);
       case SettingsButtonVariant.danger:
         return const Color(0xFFFF8F8F);
     }
@@ -491,7 +674,7 @@ class SettingsButtonStyles {
 
   static ButtonStyle text(BuildContext context) {
     final spec = SettingsChromeSpec.of(context);
-    const accent = Color(0xFF8FC9FF);
+    const accent = Color(0xFF7EBCE8);
     return ButtonStyle(
       animationDuration: _duration,
       minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
@@ -530,7 +713,7 @@ class SettingsButtonStyles {
 
   static ButtonStyle icon(BuildContext context) {
     final spec = SettingsChromeSpec.of(context);
-    const accent = Color(0xFF8FC9FF);
+    const accent = Color(0xFF7EBCE8);
     return ButtonStyle(
       animationDuration: _duration,
       minimumSize: const WidgetStatePropertyAll(Size(44, 44)),
@@ -602,28 +785,39 @@ class SettingsButtonStyles {
     required bool selected,
   }) {
     final accent = accentForVariant(variant);
+    final optionFocusVisuals = spec.resolveFocusFrameVisuals(
+      variant: SettingsFocusFrameVariant.optionButton,
+      focused: true,
+      accentColor: accent,
+    );
+    final optionIdleVisuals = spec.resolveFocusFrameVisuals(
+      variant: SettingsFocusFrameVariant.optionButton,
+      focused: false,
+      accentColor: accent,
+    );
     final fillColor = !enabled
         ? Colors.white.withOpacity(0.02)
         : focused
-            ? _accentWithOpacity(accent, spec.actionButtonFocusSurfaceOpacity)
+            ? optionFocusVisuals.fillColor
             : selected
                 ? _accentWithOpacity(accent, spec.actionButtonSurfaceOpacity)
-                : Colors.white.withOpacity(spec.focusBaseOpacity + 0.018);
+                : optionIdleVisuals.fillColor;
     final borderColor = !enabled
         ? Colors.white.withOpacity(0.04)
         : focused
-            ? _accentWithOpacity(accent, spec.actionButtonFocusBorderOpacity)
+            ? optionFocusVisuals.borderColor
             : selected
                 ? _accentWithOpacity(accent, 0.7)
-                : Colors.white.withOpacity(spec.panelBorderOpacity + 0.03);
+                : optionIdleVisuals.borderColor;
     final shadowColor = focused
-        ? _accentWithOpacity(accent, spec.actionButtonFocusGlowOpacity)
+        ? optionFocusVisuals.glowColor
         : Colors.black.withOpacity(spec.panelShadowOpacity);
     return SettingsControlVisuals(
       fillColor: fillColor,
       borderColor: borderColor,
       shadowColor: shadowColor,
-      borderWidth: focused ? 2.35 : (selected ? 1.5 : 1),
+      borderWidth:
+          focused ? optionFocusVisuals.borderWidth : (selected ? 1.5 : 1),
       contentOpacity: enabled ? 1 : 0.42,
       scale: focused ? 1.024 : 1,
     );

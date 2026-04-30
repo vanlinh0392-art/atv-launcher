@@ -9,6 +9,7 @@ import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -582,20 +583,26 @@ public final class SystemBridgeCoordinator {
                 .setPackage(context.getPackageName())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 .addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
         ResolveInfo resolveInfo = context.getPackageManager().resolveActivity(homeIntent, 0);
-        if (resolveInfo != null && resolveInfo.activityInfo != null) {
+        if (resolveInfo != null
+                && resolveInfo.activityInfo != null
+                && !TextUtils.isEmpty(resolveInfo.activityInfo.name)) {
+            homeIntent.setClassName(resolveInfo.activityInfo.packageName, resolveInfo.activityInfo.name);
             return homeIntent;
         }
 
-        Intent fallback = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-        if (fallback == null) {
-            return null;
+        Intent queryIntent = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .setPackage(context.getPackageName());
+        List<ResolveInfo> matches = context.getPackageManager().queryIntentActivities(queryIntent, 0);
+        if (matches != null && !matches.isEmpty() && matches.get(0).activityInfo != null) {
+            ActivityInfo activityInfo = matches.get(0).activityInfo;
+            homeIntent.setClassName(activityInfo.packageName, activityInfo.name);
+            return homeIntent;
         }
-        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        fallback.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        fallback.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-        return fallback;
+        return null;
     }
 
     private static String resolveCurrentHomePackage(Context context) {

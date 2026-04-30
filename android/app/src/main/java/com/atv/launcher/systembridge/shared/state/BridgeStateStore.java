@@ -65,6 +65,7 @@ public final class BridgeStateStore {
     private static final String KEY_WALLPAPER_VIDEO_ORDER = "wallpaper_video_order";
     private static final String KEY_WALLPAPER_VIDEO_ADVANCE_MODE = "wallpaper_video_advance_mode";
     private static final String KEY_WALLPAPER_VIDEO_INTERVAL_SECONDS = "wallpaper_video_interval_seconds";
+    private static final String KEY_WALLPAPER_VIDEO_REPEAT_COUNT_PER_ITEM = "wallpaper_video_repeat_count_per_item";
     private static final String KEY_WALLPAPER_VIDEO_PLAYLIST_LOOP = "wallpaper_video_playlist_loop";
     private static final String KEY_WALLPAPER_VIDEO_LOOP = "wallpaper_video_loop";
     private static final String KEY_WALLPAPER_VIDEO_MUTE = "wallpaper_video_mute";
@@ -414,6 +415,15 @@ public final class BridgeStateStore {
     public static void setWallpaperVideoSwitchIntervalSeconds(Context context, int seconds) {
         int normalized = Math.max(5, Math.min(24 * 60 * 60, seconds));
         prefs(context).edit().putInt(KEY_WALLPAPER_VIDEO_INTERVAL_SECONDS, normalized).apply();
+    }
+
+    public static int getWallpaperVideoRepeatCountPerItem(Context context) {
+        return prefs(context).getInt(KEY_WALLPAPER_VIDEO_REPEAT_COUNT_PER_ITEM, 1);
+    }
+
+    public static void setWallpaperVideoRepeatCountPerItem(Context context, int count) {
+        int normalized = Math.max(1, Math.min(20, count));
+        prefs(context).edit().putInt(KEY_WALLPAPER_VIDEO_REPEAT_COUNT_PER_ITEM, normalized).apply();
     }
 
     public static boolean isWallpaperVideoPlaylistLoopEnabled(Context context) {

@@ -1,3 +1,4 @@
+import 'package:flauncher/custom_traversal_policy.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,19 +21,23 @@ class SettingsChoiceOption<T> {
 }
 
 class SettingsActionCard extends StatefulWidget {
+  final FocusNode? focusNode;
   final String title;
   final String? subtitle;
   final IconData icon;
   final Future<void> Function()? onPressed;
   final bool autofocus;
+  final double focusEmphasis;
 
   const SettingsActionCard({
     super.key,
+    this.focusNode,
     required this.title,
     this.subtitle,
     required this.icon,
     this.onPressed,
     this.autofocus = false,
+    this.focusEmphasis = 1.3,
   });
 
   @override
@@ -40,68 +45,146 @@ class SettingsActionCard extends StatefulWidget {
 }
 
 class _SettingsActionCardState extends State<SettingsActionCard> {
+  late FocusNode _focusNode;
+  late bool _ownsFocusNode;
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) => EnsureVisible(
-        alignment: 0.12,
-        child: FocusableActionDetector(
-          autofocus: widget.autofocus,
-          onShowFocusHighlight: (value) {
-            if (_focused != value) {
-              setState(() => _focused = value);
-            }
-          },
-          child: SettingsFocusFrame(
+  void initState() {
+    super.initState();
+    _configureFocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsActionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode == widget.focusNode) {
+      return;
+    }
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    _configureFocusNode();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final iconColor =
+        enabled ? (_focused ? Colors.white : Colors.white70) : Colors.white38;
+    final titleColor = enabled
+        ? (_focused ? Colors.white : Colors.white.withOpacity(0.96))
+        : Colors.white38;
+    final subtitleColor = enabled
+        ? (_focused ? Colors.white.withOpacity(0.86) : Colors.white70)
+        : Colors.white38;
+    return EnsureVisible(
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: widget.autofocus,
+        canRequestFocus: enabled,
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (isSettingsActivateKey(event.logicalKey) && enabled) {
+            widget.onPressed?.call();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SettingsFocusFrame(
+          padding: EdgeInsets.zero,
+          variant: SettingsFocusFrameVariant.rowOnly,
+          focusEmphasis: widget.focusEmphasis,
+          focused: _focused,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: enabled ? () => widget.onPressed!.call() : null,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 120),
-              opacity: _focused ? 1 : 0.96,
-              child: TextButton(
-                onPressed: widget.onPressed == null
-                    ? null
-                    : () => widget.onPressed!.call(),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  backgroundColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                  ),
+              opacity: enabled ? (_focused ? 1 : 0.97) : 0.46,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: widget.subtitle == null
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.start,
                   children: [
-                    Icon(widget.icon, color: Colors.white70),
+                    Icon(widget.icon, color: iconColor),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
+                        mainAxisAlignment: widget.subtitle == null
+                            ? MainAxisAlignment.center
+                            : MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             widget.title,
-                            style: Theme.of(context).textTheme.bodyLarge,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: titleColor,
+                                      fontWeight: _focused
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
                           ),
                           if (widget.subtitle != null) ...[
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 3),
                             Text(
                               widget.subtitle!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
-                                  ?.copyWith(color: Colors.white70),
+                                  ?.copyWith(color: subtitleColor),
                             ),
                           ],
                         ],
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Icon(Icons.chevron_right, color: Colors.white70),
+                    Icon(Icons.chevron_right, color: iconColor),
                   ],
                 ),
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  void _configureFocusNode() {
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ??
+        FocusNode(
+          debugLabel: 'settings_action_${widget.title}'.replaceAll(' ', '_'),
+        );
+  }
 }
 
 class SettingsChoiceCard<T> extends StatefulWidget {
@@ -135,20 +218,28 @@ class SettingsChoiceCard<T> extends StatefulWidget {
 }
 
 class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
+  late final FocusNode _rowFocusNode;
+  late final bool _ownsRowFocusNode;
   late List<FocusNode> _optionFocusNodes;
   bool _hasFocus = false;
-  int _lastFocusedIndex = 0;
+  bool _skipAutoEnterOnNextRowFocus = false;
 
   @override
   void initState() {
     super.initState();
+    _ownsRowFocusNode = widget.focusNode == null;
+    final debugBase = _rowDebugBase();
+    _rowFocusNode =
+        widget.focusNode ?? FocusNode(debugLabel: '${debugBase}_row');
     _optionFocusNodes = _buildOptionFocusNodes();
   }
 
   @override
   void didUpdateWidget(covariant SettingsChoiceCard<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.options.length != widget.options.length) {
+    if (oldWidget.options.length != widget.options.length ||
+        oldWidget.optionKeyPrefix != widget.optionKeyPrefix ||
+        oldWidget.focusNode != widget.focusNode) {
       for (final node in _optionFocusNodes) {
         node.dispose();
       }
@@ -161,12 +252,17 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
     for (final node in _optionFocusNodes) {
       node.dispose();
     }
+    if (_ownsRowFocusNode) {
+      _rowFocusNode.dispose();
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => EnsureVisible(
-        alignment: 0.12,
+        alignment: EnsureVisible.settingsAlignment,
+        settleFrameCount: 1,
+        preferImmediate: true,
         child: Focus(
           canRequestFocus: false,
           onFocusChange: (value) {
@@ -176,9 +272,12 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
           },
           onKeyEvent: (_, event) => _handleContainerKeyEvent(event),
           child: Focus(
-            focusNode: widget.focusNode,
+            focusNode: _rowFocusNode,
+            onFocusChange: _handleRowFocusChange,
             child: SettingsFocusFrame(
               key: widget.selectorKey,
+              variant: SettingsFocusFrameVariant.rowOnly,
+              focused: _hasFocus,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 120),
                 opacity: _hasFocus ? 1 : 0.96,
@@ -188,7 +287,10 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(widget.icon, color: Colors.white70),
+                        Icon(
+                          widget.icon,
+                          color: _hasFocus ? Colors.white : Colors.white70,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -196,7 +298,14 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                             children: [
                               Text(
                                 widget.title,
-                                style: Theme.of(context).textTheme.bodyLarge,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      fontWeight: _hasFocus
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                    ),
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -214,39 +323,62 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                           widget.valueLabelBuilder(widget.value),
                           style:
                               Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: _hasFocus
+                                        ? Colors.white
+                                        : Colors.white.withOpacity(0.92),
                                     fontWeight: FontWeight.w700,
                                   ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children:
-                          List<Widget>.generate(widget.options.length, (index) {
-                        final option = widget.options[index];
-                        final buttonKeyPrefix = widget.optionKeyPrefix;
-                        final button = SettingsControlButton(
-                          focusNode: _optionFocusNodes[index],
-                          selected: option.value == widget.value,
-                          onPressed: () => widget.onChanged(option.value),
-                          onMoveBackOnLeft: index == 0
-                              ? () => widget.focusNode?.requestFocus()
-                              : null,
-                          onFocused: () => _lastFocusedIndex = index,
-                          child: Text(option.label),
-                        );
-                        if (buttonKeyPrefix == null) {
-                          return button;
-                        }
-                        return KeyedSubtree(
-                          key: ValueKey<String>(
-                            '${buttonKeyPrefix}_${option.value}',
+                    ExcludeFocus(
+                      excluding: !_hasFocus,
+                      child: Offstage(
+                        offstage: !_hasFocus,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: List<Widget>.generate(
+                              widget.options.length,
+                              (index) {
+                                final option = widget.options[index];
+                                final buttonKeyPrefix = widget.optionKeyPrefix;
+                                final button = SettingsControlButton(
+                                  focusNode: _optionFocusNodes[index],
+                                  selected: option.value == widget.value,
+                                  onPressed: () =>
+                                      widget.onChanged(option.value),
+                                  onFocused: _ensureRowVisible,
+                                  onMovePreviousOnLeft: index > 0
+                                      ? () => _optionFocusNodes[index - 1]
+                                          .requestFocus()
+                                      : null,
+                                  onMoveBackOnLeft: index == 0
+                                      ? _focusRowWithoutAutoEnter
+                                      : null,
+                                  onMoveNextOnRight:
+                                      index < widget.options.length - 1
+                                          ? () => _optionFocusNodes[index + 1]
+                                              .requestFocus()
+                                          : null,
+                                  child: Text(option.label),
+                                );
+                                if (buttonKeyPrefix == null) {
+                                  return button;
+                                }
+                                return KeyedSubtree(
+                                  key: ValueKey<String>(
+                                    '${buttonKeyPrefix}_${option.value}',
+                                  ),
+                                  child: button,
+                                );
+                              },
+                            ),
                           ),
-                          child: button,
-                        );
-                      }),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -259,14 +391,23 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
   List<FocusNode> _buildOptionFocusNodes() => List<FocusNode>.generate(
         widget.options.length,
         (index) => FocusNode(
-          debugLabel:
-              '${widget.focusNode?.debugLabel ?? widget.title}_option_$index',
+          debugLabel: '${_rowDebugBase()}_option_$index',
         ),
         growable: false,
       );
 
   KeyEventResult _handleContainerKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent || widget.focusNode?.hasFocus != true) {
+    if (event is! KeyDownEvent || !_hasFocus) {
+      return KeyEventResult.ignored;
+    }
+    final direction = _verticalDirectionForKey(event.logicalKey);
+    if (direction != null) {
+      if (!_moveVerticalFocusDirectly(direction)) {
+        _moveFocusBetweenRows(direction);
+      }
+      return KeyEventResult.handled;
+    }
+    if (!_rowFocusNode.hasFocus) {
       return KeyEventResult.ignored;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
@@ -277,16 +418,81 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
     return KeyEventResult.ignored;
   }
 
+  void _handleRowFocusChange(bool hasFocus) {
+    if (!hasFocus) {
+      return;
+    }
+    if (_skipAutoEnterOnNextRowFocus) {
+      _skipAutoEnterOnNextRowFocus = false;
+      _ensureRowVisible();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_rowFocusNode.hasFocus) {
+        return;
+      }
+      _focusSelectedOption();
+      _ensureRowVisible();
+    });
+  }
+
+  void _focusRowWithoutAutoEnter() {
+    _skipAutoEnterOnNextRowFocus = true;
+    _rowFocusNode.requestFocus();
+  }
+
   void _focusSelectedOption() {
     if (_optionFocusNodes.isEmpty) {
       return;
     }
-    final selectedIndex =
-        widget.options.indexWhere((option) => option.value == widget.value);
-    final targetIndex = selectedIndex >= 0
-        ? selectedIndex
-        : _lastFocusedIndex.clamp(0, _optionFocusNodes.length - 1);
-    _optionFocusNodes[targetIndex].requestFocus();
+    final selectedIndex = widget.options.indexWhere(
+      (option) => option.value == widget.value,
+    );
+    _optionFocusNodes[(selectedIndex < 0 ? 0 : selectedIndex)].requestFocus();
+  }
+
+  void _ensureRowVisible() {
+    final targetContext = widget.selectorKey is GlobalKey
+        ? (widget.selectorKey! as GlobalKey).currentContext
+        : null;
+    EnsureVisible.scheduleEnsureVisible(
+      targetContext ?? context,
+      alignment: EnsureVisible.settingsAlignment,
+      remainingPasses: 1,
+      preferImmediate: true,
+    );
+  }
+
+  void _moveFocusBetweenRows(TraversalDirection direction) {
+    _focusRowWithoutAutoEnter();
+    Future<void>.microtask(() {
+      if (!mounted || !_rowFocusNode.hasFocus) {
+        return;
+      }
+      _rowFocusNode.focusInDirection(direction);
+    });
+  }
+
+  bool _moveVerticalFocusDirectly(TraversalDirection direction) {
+    return _moveVerticalFocusOutsideCluster(
+      direction: direction,
+      localNodes: <FocusNode>{
+        _rowFocusNode,
+        ..._optionFocusNodes,
+      },
+    );
+  }
+
+  String _rowDebugBase() {
+    final focusLabel = widget.focusNode?.debugLabel?.trim() ?? '';
+    if (focusLabel.isNotEmpty) {
+      return focusLabel.replaceAll(' ', '_');
+    }
+    final optionKeyPrefix = widget.optionKeyPrefix?.trim() ?? '';
+    if (optionKeyPrefix.isNotEmpty) {
+      return optionKeyPrefix.replaceFirst(RegExp(r'_option$'), '');
+    }
+    return widget.title.replaceAll(' ', '_');
   }
 }
 
@@ -325,15 +531,20 @@ class SettingsStepperCard extends StatefulWidget {
 }
 
 class _SettingsStepperCardState extends State<SettingsStepperCard> {
+  late final FocusNode _rowFocusNode;
+  late final bool _ownsRowFocusNode;
   late final FocusNode _decreaseFocusNode;
   late final FocusNode _increaseFocusNode;
   bool _hasFocus = false;
-  int _lastFocusedActionIndex = 0;
+  bool _skipAutoEnterOnNextRowFocus = false;
 
   @override
   void initState() {
     super.initState();
-    final debugBase = widget.focusNode?.debugLabel ?? widget.title;
+    _ownsRowFocusNode = widget.focusNode == null;
+    final debugBase = _rowDebugBase();
+    _rowFocusNode =
+        widget.focusNode ?? FocusNode(debugLabel: '${debugBase}_row');
     _decreaseFocusNode = FocusNode(debugLabel: '${debugBase}_decrease');
     _increaseFocusNode = FocusNode(debugLabel: '${debugBase}_increase');
   }
@@ -342,6 +553,9 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
   void dispose() {
     _decreaseFocusNode.dispose();
     _increaseFocusNode.dispose();
+    if (_ownsRowFocusNode) {
+      _rowFocusNode.dispose();
+    }
     super.dispose();
   }
 
@@ -352,7 +566,9 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
     final canIncrease =
         widget.onChanged != null && widget.value < widget.maximum;
     return EnsureVisible(
-      alignment: 0.12,
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
       child: Focus(
         canRequestFocus: false,
         onFocusChange: (value) {
@@ -362,9 +578,12 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
         },
         onKeyEvent: (_, event) => _handleContainerKeyEvent(event),
         child: Focus(
-          focusNode: widget.focusNode,
+          focusNode: _rowFocusNode,
+          onFocusChange: _handleRowFocusChange,
           child: SettingsFocusFrame(
             key: widget.selectorKey,
+            variant: SettingsFocusFrameVariant.rowOnly,
+            focused: _hasFocus,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 120),
               opacity: _hasFocus ? 1 : 0.96,
@@ -374,7 +593,10 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(widget.icon, color: Colors.white70),
+                      Icon(
+                        widget.icon,
+                        color: _hasFocus ? Colors.white : Colors.white70,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -382,7 +604,14 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                           children: [
                             Text(
                               widget.title,
-                              style: Theme.of(context).textTheme.bodyLarge,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    fontWeight: _hasFocus
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                  ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -395,67 +624,91 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Text(
+                        widget.valueLabelBuilder(widget.value),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: _hasFocus
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(0.92),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      _wrapStepperButton(
-                        suffix: 'decrease',
-                        child: SettingsControlButton(
-                          focusNode: _decreaseFocusNode,
-                          selected: false,
-                          enabled: canDecrease,
-                          onPressed: canDecrease
-                              ? () => _shiftValue(-widget.step)
-                              : null,
-                          onMoveBackOnLeft: () =>
-                              widget.focusNode?.requestFocus(),
-                          onMoveNextOnRight: () =>
-                              _increaseFocusNode.requestFocus(),
-                          onFocused: () => _lastFocusedActionIndex = 0,
-                          child: const Icon(Icons.remove),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.04),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.06),
+                  ExcludeFocus(
+                    excluding: !_hasFocus,
+                    child: Offstage(
+                      offstage: !_hasFocus,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Row(
+                          children: [
+                            _wrapStepperButton(
+                              suffix: 'decrease',
+                              child: SettingsControlButton(
+                                focusNode: _decreaseFocusNode,
+                                selected: false,
+                                enabled: canDecrease,
+                                onFocused: _ensureRowVisible,
+                                onPressed: canDecrease
+                                    ? () => _shiftValue(-widget.step)
+                                    : null,
+                                onMoveBackOnLeft: _focusRowWithoutAutoEnter,
+                                onMoveNextOnRight: () =>
+                                    _increaseFocusNode.requestFocus(),
+                                child: const Icon(Icons.remove),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            widget.valueLabelBuilder(widget.value),
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.04),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.06),
+                                  ),
+                                ),
+                                child: Text(
+                                  widget.valueLabelBuilder(widget.value),
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _wrapStepperButton(
+                              suffix: 'increase',
+                              child: SettingsControlButton(
+                                focusNode: _increaseFocusNode,
+                                selected: false,
+                                enabled: canIncrease,
+                                onFocused: _ensureRowVisible,
+                                onPressed: canIncrease
+                                    ? () => _shiftValue(widget.step)
+                                    : null,
+                                onMovePreviousOnLeft: canDecrease
+                                    ? () => _decreaseFocusNode.requestFocus()
+                                    : null,
+                                onMoveBackOnLeft: !canDecrease
+                                    ? _focusRowWithoutAutoEnter
+                                    : null,
+                                child: const Icon(Icons.add),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      _wrapStepperButton(
-                        suffix: 'increase',
-                        child: SettingsControlButton(
-                          focusNode: _increaseFocusNode,
-                          selected: false,
-                          enabled: canIncrease,
-                          onPressed: canIncrease
-                              ? () => _shiftValue(widget.step)
-                              : null,
-                          onFocused: () => _lastFocusedActionIndex = 1,
-                          child: const Icon(Icons.add),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -467,7 +720,17 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
   }
 
   KeyEventResult _handleContainerKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent || widget.focusNode?.hasFocus != true) {
+    if (event is! KeyDownEvent || !_hasFocus) {
+      return KeyEventResult.ignored;
+    }
+    final direction = _verticalDirectionForKey(event.logicalKey);
+    if (direction != null) {
+      if (!_moveVerticalFocusDirectly(direction)) {
+        _moveFocusBetweenRows(direction);
+      }
+      return KeyEventResult.handled;
+    }
+    if (!_rowFocusNode.hasFocus) {
       return KeyEventResult.ignored;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
@@ -478,16 +741,30 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
     return KeyEventResult.ignored;
   }
 
+  void _handleRowFocusChange(bool hasFocus) {
+    if (!hasFocus) {
+      return;
+    }
+    if (_skipAutoEnterOnNextRowFocus) {
+      _skipAutoEnterOnNextRowFocus = false;
+      _ensureRowVisible();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_rowFocusNode.hasFocus) {
+        return;
+      }
+      _focusActiveAction();
+      _ensureRowVisible();
+    });
+  }
+
+  void _focusRowWithoutAutoEnter() {
+    _skipAutoEnterOnNextRowFocus = true;
+    _rowFocusNode.requestFocus();
+  }
+
   void _focusActiveAction() {
-    final preferredIndex = _lastFocusedActionIndex;
-    if (preferredIndex == 0 && widget.value > widget.minimum) {
-      _decreaseFocusNode.requestFocus();
-      return;
-    }
-    if (preferredIndex == 1 && widget.value < widget.maximum) {
-      _increaseFocusNode.requestFocus();
-      return;
-    }
     if (widget.value > widget.minimum) {
       _decreaseFocusNode.requestFocus();
       return;
@@ -495,6 +772,39 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
     if (widget.value < widget.maximum) {
       _increaseFocusNode.requestFocus();
     }
+  }
+
+  void _ensureRowVisible() {
+    final targetContext = widget.selectorKey is GlobalKey
+        ? (widget.selectorKey! as GlobalKey).currentContext
+        : null;
+    EnsureVisible.scheduleEnsureVisible(
+      targetContext ?? context,
+      alignment: EnsureVisible.settingsAlignment,
+      remainingPasses: 1,
+      preferImmediate: true,
+    );
+  }
+
+  void _moveFocusBetweenRows(TraversalDirection direction) {
+    _focusRowWithoutAutoEnter();
+    Future<void>.microtask(() {
+      if (!mounted || !_rowFocusNode.hasFocus) {
+        return;
+      }
+      _rowFocusNode.focusInDirection(direction);
+    });
+  }
+
+  bool _moveVerticalFocusDirectly(TraversalDirection direction) {
+    return _moveVerticalFocusOutsideCluster(
+      direction: direction,
+      localNodes: <FocusNode>{
+        _rowFocusNode,
+        _decreaseFocusNode,
+        _increaseFocusNode,
+      },
+    );
   }
 
   Widget _wrapStepperButton({
@@ -523,6 +833,66 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
     }
     return false;
   }
+
+  String _rowDebugBase() {
+    final focusLabel = widget.focusNode?.debugLabel?.trim() ?? '';
+    if (focusLabel.isNotEmpty) {
+      return focusLabel.replaceAll(' ', '_');
+    }
+    final buttonKeyPrefix = widget.buttonKeyPrefix?.trim() ?? '';
+    if (buttonKeyPrefix.isNotEmpty) {
+      return buttonKeyPrefix;
+    }
+    return widget.title.replaceAll(' ', '_');
+  }
+}
+
+TraversalDirection? _verticalDirectionForKey(LogicalKeyboardKey key) {
+  if (key == LogicalKeyboardKey.arrowUp) {
+    return TraversalDirection.up;
+  }
+  if (key == LogicalKeyboardKey.arrowDown) {
+    return TraversalDirection.down;
+  }
+  return null;
+}
+
+bool _moveVerticalFocusOutsideCluster({
+  required TraversalDirection direction,
+  required Set<FocusNode> localNodes,
+}) {
+  final current = FocusManager.instance.primaryFocus;
+  if (current == null || !localNodes.contains(current)) {
+    return false;
+  }
+
+  final scope = current.nearestScope;
+  final descendants = scope?.traversalDescendants.toList();
+  if (descendants == null || descendants.isEmpty) {
+    return false;
+  }
+
+  final searcher = NodeSearcher(direction);
+  final candidates = descendants.where((node) {
+    if (localNodes.contains(node)) {
+      return false;
+    }
+    if (!node.canRequestFocus) {
+      return false;
+    }
+    return node.context != null;
+  }).toList(growable: false);
+  if (candidates.isEmpty) {
+    return false;
+  }
+
+  final matchingCandidates = searcher.findCandidates(candidates, current);
+  if (matchingCandidates.isEmpty) {
+    return false;
+  }
+
+  searcher.findBestFocusNode(matchingCandidates, current).requestFocus();
+  return true;
 }
 
 class SettingsControlButton extends StatefulWidget {
@@ -531,6 +901,7 @@ class SettingsControlButton extends StatefulWidget {
   final bool selected;
   final bool enabled;
   final VoidCallback? onPressed;
+  final VoidCallback? onMovePreviousOnLeft;
   final VoidCallback? onMoveBackOnLeft;
   final VoidCallback? onMoveNextOnRight;
   final VoidCallback? onFocused;
@@ -542,6 +913,7 @@ class SettingsControlButton extends StatefulWidget {
     required this.selected,
     this.enabled = true,
     this.onPressed,
+    this.onMovePreviousOnLeft,
     this.onMoveBackOnLeft,
     this.onMoveNextOnRight,
     this.onFocused,
@@ -585,13 +957,24 @@ class _SettingsControlButtonState extends State<SettingsControlButton> {
           return KeyEventResult.ignored;
         }
         if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+            widget.onMovePreviousOnLeft != null) {
+          widget.onMovePreviousOnLeft!.call();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
             widget.onMoveBackOnLeft != null) {
           widget.onMoveBackOnLeft!.call();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
           return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
             widget.onMoveNextOnRight != null) {
           widget.onMoveNextOnRight!.call();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
           return KeyEventResult.handled;
         }
         if (isSettingsActivateKey(event.logicalKey) && enabled) {

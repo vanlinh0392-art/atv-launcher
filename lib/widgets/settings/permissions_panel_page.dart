@@ -1,6 +1,8 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -8,29 +10,39 @@ import 'package:provider/provider.dart';
 
 class PermissionsPanelPage extends StatefulWidget {
   static const String routeName = "permissions_panel";
+  final FocusNode? primaryFocusNode;
 
-  const PermissionsPanelPage({super.key});
+  const PermissionsPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   State<PermissionsPanelPage> createState() => _PermissionsPanelPageState();
 }
 
 class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
+  bool _showAdvanced = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SystemBridgeService>().refreshFull();
+      final bridgeService = context.read<SystemBridgeService>();
+      if (bridgeService.provisioningStatus.isEmpty) {
+        bridgeService.refreshLite();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
+    final bridgeService = context.read<SystemBridgeService>();
 
-    return Consumer<SystemBridgeService>(
-      builder: (context, bridgeService, _) {
-        final status = bridgeService.provisioningStatus;
+    return Selector<SystemBridgeService, Map<String, dynamic>>(
+      selector: (_, service) => service.provisioningStatus,
+      builder: (context, status, _) {
         final health = status['health']?.toString() ?? 'missing_required';
         final missingRequired =
             ((status['missingRequiredCount'] as num?) ?? 0).toInt();
@@ -45,10 +57,17 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
         final commands = ((status['commands'] as List?) ?? const [])
             .map((item) => item.toString())
             .toList(growable: false);
-        final steps = _wizardSteps(localizations);
+        final wizardSteps = _compactWizardSteps(localizations);
+        final missingRequirements = requirements
+            .where((item) => item['granted'] != true)
+            .toList(growable: false);
+        final grantedRequirements = requirements
+            .where((item) => item['granted'] == true)
+            .toList(growable: false);
 
         return ListView(
           key: const PageStorageKey<String>(PermissionsPanelPage.routeName),
+          padding: const EdgeInsets.only(bottom: 16),
           children: [
             SettingsSurfaceCard(
               child: Column(
@@ -79,7 +98,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     adbEnabled
                         ? localizations.provisioningWizardDescription
@@ -122,13 +141,44 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 18),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  const SizedBox(height: 14),
+                  SettingsAdaptiveGrid(
+                    minChildWidth: 180,
+                    maxColumns: 3,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      FilledButton.icon(
+                      SettingsMetricTile(
+                        label: localizations.permissionHealthLabel,
+                        value:
+                            localizedProvisioningHealth(localizations, health),
+                        icon: health == 'healthy'
+                            ? Icons.verified_user_outlined
+                            : Icons.warning_amber_outlined,
+                      ),
+                      SettingsMetricTile(
+                        label: localizations.requiredMissingLabel,
+                        value: missingRequired.toString(),
+                        icon: Icons.warning_amber_outlined,
+                      ),
+                      SettingsMetricTile(
+                        label: localizations.recommendedMissingLabel,
+                        value: missingRecommended.toString(),
+                        icon: Icons.info_outline,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Column(
+                    children: [
+                      SettingsActionCard(
                         key: const Key('permissions_quick_grant_button'),
+                        focusNode: widget.primaryFocusNode,
+                        title: localizations.grantViaLocalAdb,
+                        subtitle: adbEnabled
+                            ? localizations.provisioningWizardDescription
+                            : localizations.wizardStepOpenDeveloperOptions,
+                        icon: Icons.auto_fix_high_outlined,
                         onPressed: () async {
                           if (!adbEnabled) {
                             await _showAdbSetupGuidance(context, bridgeService);
@@ -142,64 +192,37 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                             ),
                           );
                         },
-                        icon: const Icon(Icons.auto_fix_high_outlined),
-                        label: Text(localizations.grantViaLocalAdb),
                       ),
-                      if (!adbEnabled)
-                        FilledButton.tonalIcon(
+                      if (!adbEnabled) ...[
+                        const SizedBox(height: 10),
+                        SettingsActionCard(
+                          title: localizations.openDeveloperOptions,
+                          subtitle: localizations.wizardStepGrantWss,
+                          icon: Icons.developer_mode_outlined,
                           onPressed: () async => _showActionResult(
                             context,
                             await bridgeService.runProvisioningAction(
                               action: 'open_development',
                             ),
                           ),
-                          icon: const Icon(Icons.developer_mode_outlined),
-                          label: Text(localizations.openDeveloperOptions),
                         ),
+                      ],
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 18),
-            SettingsAdaptiveGrid(
-              children: [
-                SettingsMetricTile(
-                  label: localizations.permissionHealthLabel,
-                  value: localizedProvisioningHealth(localizations, health),
-                  icon: health == 'healthy'
-                      ? Icons.verified_user_outlined
-                      : Icons.warning_amber_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.requiredMissingLabel,
-                  value: missingRequired.toString(),
-                  icon: Icons.warning_amber_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.recommendedMissingLabel,
-                  value: missingRecommended.toString(),
-                  icon: Icons.info_outline,
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
             SettingsSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(localizations.provisioningWizardTitle,
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 10),
                   Text(
-                    localizations.provisioningWizardDescription,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: Colors.white70),
+                    localizations.provisioningWizardTitle,
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  const SizedBox(height: 18),
-                  for (var index = 0; index < steps.length; index += 1)
+                  const SizedBox(height: 12),
+                  for (var index = 0; index < wizardSteps.length; index += 1)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
@@ -210,50 +233,55 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                             color: const Color(0xFF8CCBFF),
                           ),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(steps[index])),
+                          Expanded(child: Text(wizardSteps[index])),
                         ],
                       ),
                     ),
-                  const SizedBox(height: 18),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  const SizedBox(height: 14),
+                  Column(
                     children: [
-                      FilledButton.tonalIcon(
+                      SettingsActionCard(
+                        title: localizations.grantMediaAccess,
+                        subtitle: localizations.requirementMediaReadLabel,
+                        icon: Icons.perm_media_outlined,
                         onPressed: () async => _showActionResult(
                           context,
                           await bridgeService.requestMediaReadPermission(),
                         ),
-                        icon: const Icon(Icons.perm_media_outlined),
-                        label: Text(localizations.grantMediaAccess),
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () async => _showActionResult(
-                          context,
-                          await bridgeService.runProvisioningAction(
-                            action: 'open_development',
-                          ),
-                        ),
-                        icon: const Icon(Icons.developer_mode_outlined),
-                        label: Text(localizations.openDeveloperOptions),
+                      const SizedBox(height: 10),
+                      SettingsActionCard(
+                        title: localizations.batteryAccess,
+                        subtitle: localizations.wizardStepWhitelistBattery,
+                        icon: Icons.battery_charging_full_outlined,
+                        onPressed: () async {
+                          await bridgeService.openSpecificSettingsPage(
+                            'battery',
+                          );
+                        },
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () =>
-                            bridgeService.openSpecificSettingsPage('battery'),
-                        icon: const Icon(Icons.battery_charging_full_outlined),
-                        label: Text(localizations.batteryAccess),
+                      const SizedBox(height: 10),
+                      SettingsActionCard(
+                        title: localizations.overlayAccess,
+                        subtitle:
+                            localizations.requirementSystemAlertWindowLabel,
+                        icon: Icons.layers_outlined,
+                        onPressed: () async {
+                          await bridgeService.openSpecificSettingsPage(
+                            'overlay',
+                          );
+                        },
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () =>
-                            bridgeService.openSpecificSettingsPage('overlay'),
-                        icon: const Icon(Icons.layers_outlined),
-                        label: Text(localizations.overlayAccess),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => bridgeService
-                            .openSpecificSettingsPage('write_settings'),
-                        icon: const Icon(Icons.edit_note_outlined),
-                        label: Text(localizations.writeSettingsAccess),
+                      const SizedBox(height: 10),
+                      SettingsActionCard(
+                        title: localizations.writeSettingsAccess,
+                        subtitle: localizations.requirementWriteSettingsLabel,
+                        icon: Icons.edit_note_outlined,
+                        onPressed: () async {
+                          await bridgeService.openSpecificSettingsPage(
+                            'write_settings',
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -265,51 +293,84 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(localizations.requirementChecklistTitle,
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 14),
-                  for (final item in requirements)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        item['granted'] == true
-                            ? Icons.check_circle
-                            : Icons.error_outline,
-                        color: item['granted'] == true
-                            ? const Color(0xFF7BE0A5)
-                            : const Color(0xFFFFC970),
+                  _PermissionsAdvancedToggleTile(
+                    key: const Key('permissions_advanced_toggle'),
+                    title: localizations.requirementChecklistTitle,
+                    subtitle:
+                        '${localizations.requiredMissingLabel}: $missingRequired  /  ${localizations.recommendedMissingLabel}: $missingRecommended',
+                    expanded: _showAdvanced,
+                    onPressed: () {
+                      setState(() {
+                        _showAdvanced = !_showAdvanced;
+                      });
+                    },
+                  ),
+                  if (_showAdvanced) ...[
+                    const SizedBox(height: 14),
+                    if (missingRequirements.isNotEmpty) ...[
+                      Text(
+                        localizations.requirementChecklistTitle,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      title: Text(_requirementLabel(
-                        localizations,
-                        item['name']?.toString() ?? '',
-                      )),
-                      subtitle: Text(_requirementGuidance(
-                        localizations,
-                        item['name']?.toString() ?? '',
-                        item['guidance']?.toString() ?? '',
-                      )),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            SettingsSurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(localizations.pcProvisioningCommandsTitle,
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 14),
-                  for (final command in commands)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: SelectableText(command),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.copy_outlined),
-                        onPressed: () =>
-                            Clipboard.setData(ClipboardData(text: command)),
+                      const SizedBox(height: 8),
+                      for (final item in missingRequirements)
+                        _PermissionRequirementTile(
+                          title: _requirementLabel(
+                            localizations,
+                            item['name']?.toString() ?? '',
+                          ),
+                          subtitle: _requirementGuidance(
+                            localizations,
+                            item['name']?.toString() ?? '',
+                            item['guidance']?.toString() ?? '',
+                          ),
+                          granted: false,
+                        ),
+                    ],
+                    if (grantedRequirements.isNotEmpty) ...[
+                      if (missingRequirements.isNotEmpty)
+                        const SizedBox(height: 8),
+                      Text(
+                        localizations.grantedLabel,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      for (final item in grantedRequirements)
+                        _PermissionRequirementTile(
+                          title: _requirementLabel(
+                            localizations,
+                            item['name']?.toString() ?? '',
+                          ),
+                          subtitle: _requirementGuidance(
+                            localizations,
+                            item['name']?.toString() ?? '',
+                            item['guidance']?.toString() ?? '',
+                          ),
+                          granted: true,
+                        ),
+                    ],
+                    if (commands.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        localizations.pcProvisioningCommandsTitle,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 10),
+                      for (final command in commands)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: SettingsActionCard(
+                            title: command,
+                            icon: Icons.copy_outlined,
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                ClipboardData(text: command),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ],
                 ],
               ),
             ),
@@ -377,13 +438,11 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
     );
   }
 
-  static List<String> _wizardSteps(AppLocalizations localizations) => [
+  static List<String> _compactWizardSteps(AppLocalizations localizations) => [
         localizations.wizardStepOpenDeveloperOptions,
         localizations.wizardStepGrantWss,
         localizations.wizardStepGrantMediaAccess,
-        localizations.wizardStepAllowOverlayAndWriteSettings,
-        localizations.wizardStepWhitelistBattery,
-        localizations.wizardStepSelectAdbPolicy,
+        '${localizations.wizardStepAllowOverlayAndWriteSettings}  /  ${localizations.wizardStepWhitelistBattery}',
       ];
 
   static String _requirementLabel(
@@ -455,5 +514,137 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
       }
     }
     return false;
+  }
+}
+
+class _PermissionsAdvancedToggleTile extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final bool expanded;
+  final VoidCallback onPressed;
+
+  const _PermissionsAdvancedToggleTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.expanded,
+    required this.onPressed,
+  });
+
+  @override
+  State<_PermissionsAdvancedToggleTile> createState() =>
+      _PermissionsAdvancedToggleTileState();
+}
+
+class _PermissionsAdvancedToggleTileState
+    extends State<_PermissionsAdvancedToggleTile> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = _focused ? Colors.white : Colors.white70;
+    final subtitleColor =
+        _focused ? Colors.white.withOpacity(0.86) : Colors.white70;
+    return EnsureVisible(
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
+      child: Focus(
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() {
+              _focused = value;
+            });
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (isSettingsActivateKey(event.logicalKey)) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SettingsFocusFrame(
+          padding: EdgeInsets.zero,
+          variant: SettingsFocusFrameVariant.rowOnly,
+          focusEmphasis: 1.26,
+          focused: _focused,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onPressed,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.tune_outlined, color: iconColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: _focused
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          widget.subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: subtitleColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    widget.expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: iconColor,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PermissionRequirementTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool granted;
+
+  const _PermissionRequirementTile({
+    required this.title,
+    required this.subtitle,
+    required this.granted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        granted ? Icons.check_circle : Icons.error_outline,
+        color: granted ? const Color(0xFF7BE0A5) : const Color(0xFFFFC970),
+      ),
+      title: Text(title),
+      subtitle: Text(subtitle),
+    );
   }
 }

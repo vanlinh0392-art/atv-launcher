@@ -73,6 +73,11 @@ typedef _HomeSectionsSnapshot = ({
   String signature,
 });
 
+typedef _NavigationSnapshot = ({
+  int homeSequence,
+  String reason,
+});
+
 class FLauncher extends StatelessWidget {
   const FLauncher({super.key});
 
@@ -160,6 +165,17 @@ class _HomeContent extends StatelessWidget {
     final videoWallpaperActive = context.select<WallpaperService, bool>(
       (service) => service.isVideoMode && service.videoTextureId != null,
     );
+    final navigation =
+        context.select<SystemBridgeService, _NavigationSnapshot>((service) {
+      final rawNavigation = service.status['navigation'];
+      final map = rawNavigation is Map
+          ? rawNavigation.cast<String, dynamic>()
+          : const <String, dynamic>{};
+      return (
+        homeSequence: ((map['homeSequence'] as num?) ?? 0).toInt(),
+        reason: map['reason']?.toString() ?? '',
+      );
+    });
 
     return Selector2<AppsService, ProfileSecurityService?,
         _HomeSectionsSnapshot>(
@@ -202,6 +218,8 @@ class _HomeContent extends StatelessWidget {
             performanceMode: dockSettings.performanceMode,
             videoWallpaperActive: videoWallpaperActive,
             rowSpacing: dockSettings.rowSpacing,
+            homeSequence: navigation.homeSequence,
+            homeNavigationReason: navigation.reason,
           ),
         );
       },
@@ -367,6 +385,8 @@ class _HomeDockViewport extends StatefulWidget {
   final String performanceMode;
   final bool videoWallpaperActive;
   final double rowSpacing;
+  final int homeSequence;
+  final String homeNavigationReason;
 
   const _HomeDockViewport({
     required this.sections,
@@ -381,6 +401,8 @@ class _HomeDockViewport extends StatefulWidget {
     required this.performanceMode,
     required this.videoWallpaperActive,
     required this.rowSpacing,
+    required this.homeSequence,
+    required this.homeNavigationReason,
   });
 
   @override
@@ -394,6 +416,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   Timer? _collapseTimer;
   bool _collapsed = false;
   bool _hasInteractedSinceEntry = false;
+  bool _pendingCenterAfterExpand = false;
   String? _activeSectionName;
   String? _lastFocusedRowSignature;
   BuildContext? _lastFocusedItemContext;
@@ -408,6 +431,11 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   @override
   void didUpdateWidget(covariant _HomeDockViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.homeSequence != oldWidget.homeSequence &&
+        widget.homeSequence > 0 &&
+        widget.homeNavigationReason == 'home_reentry') {
+      _handleHomeReentry();
+    }
     final nextTitle = _activeSectionName;
     if (nextTitle == null || !_hasCategoryNamed(widget.sections, nextTitle)) {
       _activeSectionName = _firstCategoryName(widget.sections);
@@ -427,6 +455,37 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         _resetDockToStart();
       });
     }
+  }
+
+  void _handleHomeReentry() {
+    if (_isAlreadyAtHomeTop()) {
+      return;
+    }
+    _collapseTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _activeSectionName = _firstCategoryName(widget.sections);
+        _lastFocusedRowSignature = null;
+        _hasInteractedSinceEntry = !widget.autoCollapseEnabled;
+        _collapsed = widget.autoCollapseEnabled;
+      });
+    }
+    _resetDockToStart();
+  }
+
+  bool _isAlreadyAtHomeTop() {
+    final nodes = _dockTraversalNodes();
+    if (nodes.isEmpty) {
+      return false;
+    }
+    final firstNode = nodes.first;
+    final currentFocus = FocusManager.instance.primaryFocus;
+    final atTop = !_dockScrollController.hasClients ||
+        (_dockScrollController.offset -
+                    _dockScrollController.position.minScrollExtent)
+                .abs() <
+            1;
+    return atTop && identical(currentFocus, firstNode);
   }
 
   @override
@@ -708,6 +767,9 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       setState(() {
         _hasInteractedSinceEntry = true;
         _collapsed = false;
+        if (shouldExpand) {
+          _pendingCenterAfterExpand = true;
+        }
       });
     } else {
       _hasInteractedSinceEntry = true;
@@ -749,7 +811,13 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       _jumpDockToTop();
       return;
     }
-    _centerLatestFocusedRow(animate: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _collapsed) {
+        return;
+      }
+      _centerLatestFocusedRow(animate: false);
+      _pendingCenterAfterExpand = false;
+    });
   }
 
   void _scheduleCenterFocusedRow(BuildContext itemContext) {
@@ -784,6 +852,17 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     if (lastFocusedItemContext != null &&
         _isDockDescendant(lastFocusedItemContext, dockContext)) {
       _centerFocusedItemInDock(lastFocusedItemContext, animate: animate);
+      return;
+    }
+    if (_pendingCenterAfterExpand) {
+      final nodes = _dockTraversalNodes();
+      if (nodes.isNotEmpty) {
+        final fallbackContext = nodes.first.context;
+        if (fallbackContext != null &&
+            _isDockDescendant(fallbackContext, dockContext)) {
+          _centerFocusedItemInDock(fallbackContext, animate: animate);
+        }
+      }
     }
   }
 

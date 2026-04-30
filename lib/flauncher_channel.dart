@@ -215,6 +215,7 @@ class FLauncherChannel {
     String? orderMode,
     String? advanceMode,
     int? switchIntervalSeconds,
+    int? repeatCountPerItem,
     bool? playlistLoop,
     bool? loop,
     bool? mute,
@@ -232,6 +233,7 @@ class FLauncherChannel {
         'orderMode': orderMode,
         'advanceMode': advanceMode,
         'switchIntervalSeconds': switchIntervalSeconds,
+        'repeatCountPerItem': repeatCountPerItem,
         'playlistLoop': playlistLoop,
         'loop': loop,
         'mute': mute,
@@ -239,6 +241,15 @@ class FLauncherChannel {
         'dimPercent': dimPercent,
         'blur': blur,
         'autoResume': autoResume,
+      });
+
+  Future<Map<String, dynamic>> setVideoWallpaperPlaybackSuppressed({
+    required bool suppressed,
+    String? reason,
+  }) =>
+      _invokeMapMethod('setVideoWallpaperPlaybackSuppressed', {
+        'suppressed': suppressed,
+        'reason': reason,
       });
 
   Future<Map<String, dynamic>> exportSettingsBackup({

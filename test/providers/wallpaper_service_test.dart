@@ -26,6 +26,7 @@ void main() {
         orderMode: anyNamed('orderMode'),
         advanceMode: anyNamed('advanceMode'),
         switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
         playlistLoop: anyNamed('playlistLoop'),
         loop: anyNamed('loop'),
         mute: anyNamed('mute'),
@@ -84,6 +85,7 @@ void main() {
         orderMode: anyNamed('orderMode'),
         advanceMode: anyNamed('advanceMode'),
         switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
         playlistLoop: anyNamed('playlistLoop'),
         loop: anyNamed('loop'),
         mute: anyNamed('mute'),
@@ -124,6 +126,7 @@ void main() {
         orderMode: anyNamed('orderMode'),
         advanceMode: anyNamed('advanceMode'),
         switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
         playlistLoop: anyNamed('playlistLoop'),
         loop: anyNamed('loop'),
         mute: anyNamed('mute'),
@@ -148,6 +151,106 @@ void main() {
     expect(settings.videoWallpaperUris,
         ['content://video/10', 'content://video/11']);
     expect(service.videoTextureId, 5);
+  });
+
+  test('setVideoRepeatCountPerItem persists and syncs repeat count', () async {
+    final settings = await _createSettingsService();
+    final channel = MockFLauncherChannel();
+    when(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
+
+    await service.setVideoRepeatCountPerItem(5);
+
+    expect(settings.videoWallpaperRepeatCountPerItem, 5);
+    verify(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: 5,
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).called(1);
+  });
+
+  test('settings playback suppression is ref-counted and only forwards edges',
+      () async {
+    final settings = await _createSettingsService();
+    final channel = MockFLauncherChannel();
+    when(
+      channel.setVideoWallpaperPlaybackSuppressed(
+        suppressed: true,
+        reason: anyNamed('reason'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    when(
+      channel.setVideoWallpaperPlaybackSuppressed(
+        suppressed: false,
+        reason: anyNamed('reason'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
+
+    await service.setSettingsPlaybackSuppressed(true);
+    await service.setSettingsPlaybackSuppressed(true);
+
+    expect(service.settingsPlaybackSuppressed, isTrue);
+    verify(
+      channel.setVideoWallpaperPlaybackSuppressed(
+        suppressed: true,
+        reason: 'settings_panel',
+      ),
+    ).called(1);
+
+    await service.setSettingsPlaybackSuppressed(false);
+
+    expect(service.settingsPlaybackSuppressed, isTrue);
+    verifyNever(
+      channel.setVideoWallpaperPlaybackSuppressed(
+        suppressed: false,
+        reason: 'settings_panel_release',
+      ),
+    );
+
+    await service.setSettingsPlaybackSuppressed(false);
+
+    expect(service.settingsPlaybackSuppressed, isFalse);
+    verify(
+      channel.setVideoWallpaperPlaybackSuppressed(
+        suppressed: false,
+        reason: 'settings_panel_release',
+      ),
+    ).called(1);
   });
 }
 

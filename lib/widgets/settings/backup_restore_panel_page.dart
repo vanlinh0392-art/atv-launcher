@@ -8,14 +8,19 @@ import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 class BackupRestorePanelPage extends StatefulWidget {
   static const String routeName = "backup_restore_panel";
+  final FocusNode? primaryFocusNode;
 
-  const BackupRestorePanelPage({super.key});
+  const BackupRestorePanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   State<BackupRestorePanelPage> createState() => _BackupRestorePanelPageState();
@@ -65,33 +70,38 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
         ),
         const SizedBox(height: 18),
         SettingsSurfaceCard(
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          child: SettingsAdaptiveGrid(
+            minChildWidth: 230,
+            maxColumns: 2,
             children: [
-              FilledButton.icon(
+              SettingsActionCard(
+                focusNode: widget.primaryFocusNode,
+                title: localizations.exportBackup,
+                subtitle: localizations.lastExport,
+                icon: Icons.save_alt,
                 onPressed: _busy ? null : () => _exportBackup(context),
-                icon: const Icon(Icons.save_alt),
-                label: Text(localizations.exportBackup),
               ),
-              FilledButton.tonalIcon(
+              SettingsActionCard(
+                title: localizations.previewBackup,
+                subtitle: localizations.selectedBackup,
+                icon: Icons.preview_outlined,
                 onPressed: _busy ? null : () => _previewBackup(context),
-                icon: const Icon(Icons.preview_outlined),
-                label: Text(localizations.previewBackup),
               ),
-              FilledButton.tonalIcon(
+              SettingsActionCard(
+                title: localizations.restoreLauncherOnly,
+                subtitle: localizations.lastRestore,
+                icon: Icons.restore_page_outlined,
                 onPressed: _busy || _preview == null
                     ? null
                     : () => _applyBackup(context, applySystemSettings: false),
-                icon: const Icon(Icons.restore_page_outlined),
-                label: Text(localizations.restoreLauncherOnly),
               ),
-              FilledButton.tonalIcon(
+              SettingsActionCard(
+                title: localizations.restoreWithSystemSettings,
+                subtitle: localizations.lastImport,
+                icon: Icons.settings_backup_restore_outlined,
                 onPressed: _busy || _preview == null
                     ? null
                     : () => _applyBackup(context, applySystemSettings: true),
-                icon: const Icon(Icons.settings_backup_restore_outlined),
-                label: Text(localizations.restoreWithSystemSettings),
               ),
             ],
           ),
@@ -131,13 +141,15 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
             );
       }
       final localizations = AppLocalizations.of(context)!;
+      final exportPath = result['path']?.toString() ?? '';
       setState(() {
         _lastMessage = result['cancelled'] == true
             ? localizations.backupExportCancelled
             : localizations.backupExportedTo(
                 result['displayName']?.toString() ??
                     localizations.selectedBackup,
-              );
+              ) +
+                (exportPath.trim().isEmpty ? '' : '\n$exportPath');
       });
     } catch (error) {
       if (!mounted) return;

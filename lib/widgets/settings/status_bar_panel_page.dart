@@ -27,8 +27,12 @@ import '../../providers/settings_service.dart';
 
 class StatusBarPanelPage extends StatelessWidget {
   static const String routeName = "status_bar_panel";
+  final FocusNode? primaryFocusNode;
 
-  const StatusBarPanelPage({super.key});
+  const StatusBarPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +70,7 @@ class StatusBarPanelPage extends StatelessWidget {
           child: Column(
             children: [
               RoundedSwitchListTile(
-                autofocus: true,
+                focusNode: primaryFocusNode,
                 value: settings.autoHideAppBarEnabled,
                 onChanged: settings.setAutoHideAppBarEnabled,
                 title: Text(

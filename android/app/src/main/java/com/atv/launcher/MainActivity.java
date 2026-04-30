@@ -23,6 +23,7 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ClipData;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -44,8 +45,10 @@ import android.media.MediaMetadataRetriever;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.speech.RecognizerIntent;
@@ -94,10 +97,12 @@ import java.util.concurrent.Future;
 
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.embedding.engine.dart.DartExecutor;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugins.GeneratedPluginRegistrant;
 
 public class MainActivity extends FlutterActivity {
     private static final String TAG = "FLauncherPerf";
@@ -106,8 +111,10 @@ public class MainActivity extends FlutterActivity {
     private static final String APPS_EVENT_CHANNEL = "com.atv.launcher/event_apps";
     private static final String NETWORK_EVENT_CHANNEL = "com.atv.launcher/event_network";
     private static final String SYSTEM_EVENT_CHANNEL = "com.atv.launcher/event_system";
+    private static final String DEBUG_BENCHMARK_ACTION = "com.atv.launcher.DEBUG_BENCHMARK";
     private static final long SYSTEM_EVENT_INTERVAL_MS = 3000L;
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
+    private static final long APPLICATIONS_CACHE_TTL_MS = 20_000L;
     private static final int MAX_IMAGE_CACHE_ENTRIES = 128;
     private static final int MAX_IMAGE_CACHE_BYTES = 16 * 1024 * 1024;
     private static final int MAX_BANNER_WIDTH = 640;
@@ -124,12 +131,47 @@ public class MainActivity extends FlutterActivity {
     private static final int REQUEST_MEDIA_PERMISSION = 4106;
     private static final int REQUEST_SPEECH_RECOGNIZER = 4107;
 
-    private final Handler systemEventHandler = new Handler(Looper.getMainLooper());
+    private static final Object FLUTTER_ENGINE_LOCK = new Object();
+    private static final Object APPLICATIONS_CACHE_LOCK = new Object();
+    private static final Handler SHARED_SYSTEM_EVENT_HANDLER = new Handler(Looper.getMainLooper());
+    private static final LinkedHashMap<String, byte[]> APP_IMAGE_CACHE = new LinkedHashMap<>(16, 0.75f, true);
+    private static FlutterEngine sharedFlutterEngine;
+    private static EventChannel.EventSink sharedSystemEventSink;
+    private static VideoWallpaperController sharedVideoWallpaperController;
+    private static MainActivity activeActivity;
+    private static boolean sharedChannelsBound;
+    private static boolean sharedDartStarted;
+    private static List<Map<String, Serializable>> cachedApplications;
+    private static long cachedApplicationsAtElapsedMs;
+    private static int appImageCacheBytes = 0;
+    private static long homeNavigationSequence;
+    private static String lastNavigationReason = "";
+    private static long benchmarkCommandSequence;
+    private static String lastBenchmarkAction = "";
+    private static String lastBenchmarkRoute = "";
+    private static String lastBenchmarkSessionId = "";
+    private static boolean lastBenchmarkAutoFocusDetail;
+    private static boolean lastBenchmarkBypassSettingsSecurity;
+    private static boolean firstBridgeSnapshotLogged;
+    private static boolean firstLiteBridgeStatusLogged;
+    private static boolean firstFullBridgeStatusLogged;
+    private static final Runnable sharedInitialSystemSnapshotRunnable =
+            MainActivity::emitInitialSystemSnapshotForActiveActivity;
+    private static final Runnable sharedSystemEventRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (sharedSystemEventSink == null) {
+                return;
+            }
+            MainActivity activity = activeActivity;
+            if (activity != null) {
+                sharedSystemEventSink.success(activity.buildSystemBridgeStatusLite());
+            }
+            SHARED_SYSTEM_EVENT_HANDLER.postDelayed(this, SYSTEM_EVENT_INTERVAL_MS);
+        }
+    };
+
     private final long activityBootstrapStartedAtNanos = System.nanoTime();
-    private final LinkedHashMap<String, byte[]> appImageCache = new LinkedHashMap<>(16, 0.75f, true);
-    private int appImageCacheBytes = 0;
-    private EventChannel.EventSink systemEventSink;
-    private VideoWallpaperController videoWallpaperController;
     private MethodChannel.Result pendingWallpaperAssetResult;
     private MethodChannel.Result pendingWallpaperFilesResult;
     private MethodChannel.Result pendingWallpaperFolderResult;
@@ -141,88 +183,160 @@ public class MainActivity extends FlutterActivity {
     private String pendingBackupExportContent = "";
     private String pendingBackupExportFileName = "atv-launcher-backup.json";
     private String pendingBackupImportMode = "import";
-    private boolean firstBridgeSnapshotLogged;
-    private final Runnable initialSystemSnapshotRunnable = this::emitInitialSystemSnapshot;
 
-    private final Runnable systemEventRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (systemEventSink != null) {
-                systemEventSink.success(buildSystemBridgeStatusLite());
-                systemEventHandler.postDelayed(this, SYSTEM_EVENT_INTERVAL_MS);
-            }
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        if (recordBenchmarkCommand(getIntent())) {
+            // Keep benchmark state so Flutter can consume it from the first lite snapshot.
         }
-    };
+        if (shouldRedirectNonHomeEntry(getIntent())
+                && moveExistingLauncherTaskToFront("onCreate")) {
+            finish();
+            return;
+        }
+        super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    public FlutterEngine provideFlutterEngine(@NonNull Context context) {
+        synchronized (FLUTTER_ENGINE_LOCK) {
+            if (sharedFlutterEngine == null) {
+                sharedFlutterEngine = new FlutterEngine(context.getApplicationContext());
+            }
+            return sharedFlutterEngine;
+        }
+    }
+
+    @Override
+    public boolean shouldDestroyEngineWithHost() {
+        return false;
+    }
 
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
-        super.configureFlutterEngine(flutterEngine);
-        videoWallpaperController = new VideoWallpaperController(this, flutterEngine.getRenderer());
+        activeActivity = this;
+        synchronized (FLUTTER_ENGINE_LOCK) {
+            if (sharedVideoWallpaperController == null) {
+                sharedVideoWallpaperController = new VideoWallpaperController(
+                        getApplicationContext(),
+                        flutterEngine.getRenderer()
+                );
+            }
+            bindSharedFlutterChannels(flutterEngine);
+            if (!sharedDartStarted && !flutterEngine.getDartExecutor().isExecutingDart()) {
+                GeneratedPluginRegistrant.registerWith(flutterEngine);
+                flutterEngine.getDartExecutor().executeDartEntrypoint(
+                        DartExecutor.DartEntrypoint.createDefault()
+                );
+            }
+            sharedDartStarted = true;
+        }
+    }
+
+    private void bindSharedFlutterChannels(@NonNull FlutterEngine flutterEngine) {
+        if (sharedChannelsBound) {
+            return;
+        }
 
         BinaryMessenger messenger = flutterEngine.getDartExecutor().getBinaryMessenger();
 
         new MethodChannel(messenger, METHOD_CHANNEL).setMethodCallHandler((call, result) -> {
+            MainActivity activity = activeActivity;
+            if (activity == null) {
+                result.error("activity_unavailable", "Launcher activity is not attached", null);
+                return;
+            }
             try {
-                handleMethodCall(call, result);
+                activity.handleMethodCall(call, result);
             } catch (Exception exception) {
                 result.error("native_error", exception.toString(), null);
             }
         });
 
         new EventChannel(messenger, APPS_EVENT_CHANNEL).setStreamHandler(
-                new LauncherAppsEventStreamHandler(this));
+                new LauncherAppsEventStreamHandler(getApplicationContext()));
 
         new EventChannel(messenger, NETWORK_EVENT_CHANNEL).setStreamHandler(
-                new NetworkEventStreamHandler(this));
+                new NetworkEventStreamHandler(getApplicationContext()));
 
         new EventChannel(messenger, SYSTEM_EVENT_CHANNEL).setStreamHandler(new EventChannel.StreamHandler() {
             @Override
             public void onListen(Object arguments, EventChannel.EventSink events) {
-                systemEventSink = events;
-                systemEventHandler.removeCallbacks(initialSystemSnapshotRunnable);
-                systemEventHandler.removeCallbacks(systemEventRunnable);
-                systemEventHandler.postDelayed(
-                        initialSystemSnapshotRunnable,
+                sharedSystemEventSink = events;
+                SHARED_SYSTEM_EVENT_HANDLER.removeCallbacks(sharedInitialSystemSnapshotRunnable);
+                SHARED_SYSTEM_EVENT_HANDLER.removeCallbacks(sharedSystemEventRunnable);
+                SHARED_SYSTEM_EVENT_HANDLER.postDelayed(
+                        sharedInitialSystemSnapshotRunnable,
                         INITIAL_SYSTEM_SNAPSHOT_DELAY_MS
                 );
-                systemEventHandler.postDelayed(systemEventRunnable, SYSTEM_EVENT_INTERVAL_MS);
+                SHARED_SYSTEM_EVENT_HANDLER.postDelayed(
+                        sharedSystemEventRunnable,
+                        SYSTEM_EVENT_INTERVAL_MS
+                );
             }
 
             @Override
             public void onCancel(Object arguments) {
-                systemEventSink = null;
-                systemEventHandler.removeCallbacks(initialSystemSnapshotRunnable);
-                systemEventHandler.removeCallbacks(systemEventRunnable);
+                sharedSystemEventSink = null;
+                SHARED_SYSTEM_EVENT_HANDLER.removeCallbacks(sharedInitialSystemSnapshotRunnable);
+                SHARED_SYSTEM_EVENT_HANDLER.removeCallbacks(sharedSystemEventRunnable);
             }
         });
+
+        sharedChannelsBound = true;
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        if (videoWallpaperController != null) {
-            videoWallpaperController.onStart();
+        activeActivity = this;
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onStart();
         }
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_start");
-        scheduleStartupSystemSnapshot();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (videoWallpaperController != null) {
-            videoWallpaperController.onStart();
+        activeActivity = this;
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onStart();
         }
+        pruneBackgroundLauncherTasks("onResume");
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_resume");
-        scheduleStartupSystemSnapshot();
     }
 
     @Override
     protected void onStop() {
-        if (videoWallpaperController != null) {
-            videoWallpaperController.onStop();
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onStop();
         }
         super.onStop();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (recordBenchmarkCommand(intent)) {
+            return;
+        }
+        if (shouldRedirectNonHomeEntry(intent)) {
+            recordHomeNavigation("launcher_reentry");
+            return;
+        }
+        if (isHomeIntent(intent)) {
+            recordHomeNavigation("home_reentry");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (activeActivity == this) {
+            activeActivity = null;
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -315,12 +429,15 @@ public class MainActivity extends FlutterActivity {
             case "pickWallpaperFolder" -> pickWallpaperFolder(result);
             case "setWallpaperMode" -> result.success(setWallpaperMode((String) call.arguments));
             case "setVideoWallpaperOptions" -> result.success(setVideoWallpaperOptions(call));
+            case "setVideoWallpaperPlaybackSuppressed" -> result.success(setVideoWallpaperPlaybackSuppressed(call));
             case "exportSettingsBackup" -> exportSettingsBackup(call, result);
             case "importSettingsBackup" -> importSettingsBackup(result, "import");
             case "previewBackup" -> importSettingsBackup(result, "preview");
             case "recordBackupRestoreResult" -> result.success(recordBackupRestoreResult(call));
             case "getVideoWallpaperTextureId" -> result.success(
-                    videoWallpaperController == null ? -1L : videoWallpaperController.ensureTextureId());
+                    sharedVideoWallpaperController == null
+                            ? -1L
+                            : sharedVideoWallpaperController.ensureTextureId());
             case "getDiagnosticsReport" -> result.success(SystemBridgeCoordinator.buildStatusReport(this));
             default -> throw new IllegalArgumentException("Unsupported method: " + call.method);
         }
@@ -328,6 +445,12 @@ public class MainActivity extends FlutterActivity {
 
     private List<Map<String, Serializable>> getApplications() {
         long startedAt = System.nanoTime();
+        List<Map<String, Serializable>> cached = getCachedApplications();
+        if (cached != null) {
+            logPerf("getApplications cacheHit count=" + cached.size(), startedAt);
+            return cached;
+        }
+
         ExecutorService executor = Executors.newFixedThreadPool(4);
         CompletionService<Pair<Boolean, List<ResolveInfo>>> queryIntentActivitiesCompletionService =
                 new ExecutorCompletionService<>(executor);
@@ -405,8 +528,9 @@ public class MainActivity extends FlutterActivity {
             }
         }
 
+        putCachedApplications(applications);
         logPerf("getApplications count=" + applications.size(), startedAt);
-        return applications;
+        return cloneApplications(applications);
     }
 
     private byte[] getApplicationBanner(String packageName) {
@@ -457,21 +581,26 @@ public class MainActivity extends FlutterActivity {
         return imageBytes;
     }
 
-    void clearAppImageCache(String packageName) {
-        synchronized (appImageCache) {
+    static void clearAppImageCacheForPackage(String packageName) {
+        invalidateApplicationsCacheStatic();
+        synchronized (APP_IMAGE_CACHE) {
             List<String> keysToRemove = new ArrayList<>();
-            for (String key : appImageCache.keySet()) {
+            for (String key : APP_IMAGE_CACHE.keySet()) {
                 if (key.startsWith("banner:" + packageName + ":") || key.startsWith("icon:" + packageName + ":")) {
                     keysToRemove.add(key);
                 }
             }
             for (String key : keysToRemove) {
-                byte[] bytes = appImageCache.remove(key);
+                byte[] bytes = APP_IMAGE_CACHE.remove(key);
                 if (bytes != null) {
                     appImageCacheBytes -= bytes.length;
                 }
             }
         }
+    }
+
+    void clearAppImageCache(String packageName) {
+        clearAppImageCacheForPackage(packageName);
     }
 
     private String buildAppImageCacheKey(String type, String packageName) {
@@ -488,8 +617,8 @@ public class MainActivity extends FlutterActivity {
     }
 
     private byte[] getCachedAppImage(String cacheKey) {
-        synchronized (appImageCache) {
-            return appImageCache.get(cacheKey);
+        synchronized (APP_IMAGE_CACHE) {
+            return APP_IMAGE_CACHE.get(cacheKey);
         }
     }
 
@@ -497,8 +626,8 @@ public class MainActivity extends FlutterActivity {
         if (imageBytes.length > MAX_IMAGE_CACHE_BYTES / 2) {
             return;
         }
-        synchronized (appImageCache) {
-            byte[] previous = appImageCache.put(cacheKey, imageBytes);
+        synchronized (APP_IMAGE_CACHE) {
+            byte[] previous = APP_IMAGE_CACHE.put(cacheKey, imageBytes);
             if (previous != null) {
                 appImageCacheBytes -= previous.length;
             }
@@ -508,13 +637,53 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void trimAppImageCache() {
-        while (appImageCache.size() > MAX_IMAGE_CACHE_ENTRIES || appImageCacheBytes > MAX_IMAGE_CACHE_BYTES) {
-            String eldestKey = appImageCache.keySet().iterator().next();
-            byte[] eldest = appImageCache.remove(eldestKey);
+        while (APP_IMAGE_CACHE.size() > MAX_IMAGE_CACHE_ENTRIES || appImageCacheBytes > MAX_IMAGE_CACHE_BYTES) {
+            String eldestKey = APP_IMAGE_CACHE.keySet().iterator().next();
+            byte[] eldest = APP_IMAGE_CACHE.remove(eldestKey);
             if (eldest != null) {
                 appImageCacheBytes -= eldest.length;
             }
         }
+    }
+
+    private static void invalidateApplicationsCacheStatic() {
+        synchronized (APPLICATIONS_CACHE_LOCK) {
+            cachedApplications = null;
+            cachedApplicationsAtElapsedMs = 0L;
+        }
+    }
+
+    private void invalidateApplicationsCache() {
+        invalidateApplicationsCacheStatic();
+    }
+
+    private List<Map<String, Serializable>> getCachedApplications() {
+        synchronized (APPLICATIONS_CACHE_LOCK) {
+            if (cachedApplications == null) {
+                return null;
+            }
+            if (SystemClock.elapsedRealtime() - cachedApplicationsAtElapsedMs > APPLICATIONS_CACHE_TTL_MS) {
+                cachedApplications = null;
+                cachedApplicationsAtElapsedMs = 0L;
+                return null;
+            }
+            return cloneApplications(cachedApplications);
+        }
+    }
+
+    private void putCachedApplications(List<Map<String, Serializable>> applications) {
+        synchronized (APPLICATIONS_CACHE_LOCK) {
+            cachedApplications = cloneApplications(applications);
+            cachedApplicationsAtElapsedMs = SystemClock.elapsedRealtime();
+        }
+    }
+
+    private List<Map<String, Serializable>> cloneApplications(List<Map<String, Serializable>> applications) {
+        List<Map<String, Serializable>> copy = new ArrayList<>(applications.size());
+        for (Map<String, Serializable> application : applications) {
+            copy.add(new LinkedHashMap<>(application));
+        }
+        return copy;
     }
 
     private void logPerf(String label, long startedAtNanos) {
@@ -537,14 +706,23 @@ public class MainActivity extends FlutterActivity {
         }
     }
 
-    private List<ResolveInfo> queryIntentActivities(boolean sideloaded) {
+    private static List<ResolveInfo> queryIntentActivities(Context context, boolean sideloaded) {
         String category = sideloaded ? Intent.CATEGORY_LAUNCHER : Intent.CATEGORY_LEANBACK_LAUNCHER;
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(category);
-        return getPackageManager().queryIntentActivities(intent, 0);
+        return context.getPackageManager().queryIntentActivities(intent, 0);
     }
 
-    private Map<String, Serializable> buildAppMap(ActivityInfo activityInfo, boolean sideloaded, String action) {
-        PackageManager packageManager = getPackageManager();
+    private List<ResolveInfo> queryIntentActivities(boolean sideloaded) {
+        return queryIntentActivities(this, sideloaded);
+    }
+
+    private static Map<String, Serializable> buildAppMap(
+            Context context,
+            ActivityInfo activityInfo,
+            boolean sideloaded,
+            String action
+    ) {
+        PackageManager packageManager = context.getPackageManager();
         String applicationName = activityInfo.loadLabel(packageManager).toString();
         String applicationVersionName = "";
         try {
@@ -563,18 +741,26 @@ public class MainActivity extends FlutterActivity {
         return appMap;
     }
 
-    Map<String, Serializable> getApplication(String packageName) {
-        for (ResolveInfo resolveInfo : queryIntentActivities(false)) {
+    private Map<String, Serializable> buildAppMap(ActivityInfo activityInfo, boolean sideloaded, String action) {
+        return buildAppMap(this, activityInfo, sideloaded, action);
+    }
+
+    static Map<String, Serializable> getApplicationForPackage(Context context, String packageName) {
+        for (ResolveInfo resolveInfo : queryIntentActivities(context, false)) {
             if (TextUtils.equals(resolveInfo.activityInfo.packageName, packageName)) {
-                return buildAppMap(resolveInfo.activityInfo, false, null);
+                return buildAppMap(context, resolveInfo.activityInfo, false, null);
             }
         }
-        for (ResolveInfo resolveInfo : queryIntentActivities(true)) {
+        for (ResolveInfo resolveInfo : queryIntentActivities(context, true)) {
             if (TextUtils.equals(resolveInfo.activityInfo.packageName, packageName)) {
-                return buildAppMap(resolveInfo.activityInfo, true, null);
+                return buildAppMap(context, resolveInfo.activityInfo, true, null);
             }
         }
         return new HashMap<>();
+    }
+
+    Map<String, Serializable> getApplication(String packageName) {
+        return getApplicationForPackage(this, packageName);
     }
 
     private boolean launchActivityFromAction(String action) {
@@ -639,18 +825,30 @@ public class MainActivity extends FlutterActivity {
         long startedAt = System.nanoTime();
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("snapshotKind", "lite");
+        map.put("navigation", buildNavigationStatus());
+        if (isDebuggableBuild()) {
+            map.put("benchmarkCommand", buildBenchmarkCommandStatus());
+        }
         map.put("voice", buildVoiceStatus());
         map.put("systemCore", buildSystemCoreStatus());
         map.put("adbAutomation", SystemBridgeCoordinator.buildAdbAutomationStatus(this));
         map.put("homeGuard", SystemBridgeCoordinator.buildHomeGuardStatus(this));
         map.put("density", DensityBridge.getStatus(this));
         map.put("privateDns", PrivateDnsController.getStatus(this));
-        map.put("wallpaper", videoWallpaperController != null ? videoWallpaperController.getStatus() : new LinkedHashMap<>());
+        map.put(
+                "wallpaper",
+                sharedVideoWallpaperController != null
+                        ? sharedVideoWallpaperController.getStatus()
+                        : new LinkedHashMap<>()
+        );
         map.put("provisioning", buildProvisioningSummary());
         map.put("memory", buildMemoryStatus());
         map.put("fileAccess", VideoLibraryController.getFileAccessStatus(this));
         map.put("backup", buildBackupStatus());
-        logPerf("time_to_lite_bridge_status", startedAt);
+        if (!firstLiteBridgeStatusLogged) {
+            firstLiteBridgeStatusLogged = true;
+            logPerf("time_to_lite_bridge_status", startedAt);
+        }
         return map;
     }
 
@@ -660,7 +858,10 @@ public class MainActivity extends FlutterActivity {
         map.put("snapshotKind", "full");
         map.put("provisioning", buildProvisioningChecklist());
         map.put("diagnosticsReport", SystemBridgeCoordinator.buildStatusReport(this));
-        logPerf("time_to_full_bridge_status", startedAt);
+        if (!firstFullBridgeStatusLogged) {
+            firstFullBridgeStatusLogged = true;
+            logPerf("time_to_full_bridge_status", startedAt);
+        }
         return map;
     }
 
@@ -1260,11 +1461,13 @@ public class MainActivity extends FlutterActivity {
 
     private Map<String, Object> setWallpaperMode(String mode) {
         BridgeStateStore.setWallpaperMode(this, TextUtils.isEmpty(mode) ? "gradient" : mode);
-        if (videoWallpaperController != null) {
-            videoWallpaperController.onWallpaperModeChanged();
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onWallpaperModeChanged();
         }
         emitSystemSnapshot();
-        return videoWallpaperController != null ? videoWallpaperController.getStatus() : new LinkedHashMap<>();
+        return sharedVideoWallpaperController != null
+                ? sharedVideoWallpaperController.getStatus()
+                : new LinkedHashMap<>();
     }
 
     private Map<String, Object> setVideoWallpaperOptions(MethodCall call) {
@@ -1276,6 +1479,7 @@ public class MainActivity extends FlutterActivity {
         String orderMode = call.argument("orderMode");
         String advanceMode = call.argument("advanceMode");
         Integer switchIntervalSeconds = call.argument("switchIntervalSeconds");
+        Integer repeatCountPerItem = call.argument("repeatCountPerItem");
         Boolean playlistLoop = call.argument("playlistLoop");
         Boolean loop = call.argument("loop");
         Boolean mute = call.argument("mute");
@@ -1317,6 +1521,9 @@ public class MainActivity extends FlutterActivity {
         if (switchIntervalSeconds != null) {
             BridgeStateStore.setWallpaperVideoSwitchIntervalSeconds(this, switchIntervalSeconds);
         }
+        if (repeatCountPerItem != null) {
+            BridgeStateStore.setWallpaperVideoRepeatCountPerItem(this, repeatCountPerItem);
+        }
         if (playlistLoop != null) {
             BridgeStateStore.setWallpaperVideoPlaylistLoopEnabled(this, playlistLoop);
         }
@@ -1338,11 +1545,24 @@ public class MainActivity extends FlutterActivity {
         if (autoResume != null) {
             BridgeStateStore.setWallpaperVideoAutoResumeEnabled(this, autoResume);
         }
-        if (videoWallpaperController != null) {
-            videoWallpaperController.onVideoConfigChanged();
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onVideoConfigChanged();
         }
         emitSystemSnapshot();
-        return videoWallpaperController != null ? videoWallpaperController.getStatus() : new LinkedHashMap<>();
+        return sharedVideoWallpaperController != null
+                ? sharedVideoWallpaperController.getStatus()
+                : new LinkedHashMap<>();
+    }
+
+    private Map<String, Object> setVideoWallpaperPlaybackSuppressed(MethodCall call) {
+        boolean suppressed = Boolean.TRUE.equals(call.argument("suppressed"));
+        String reason = call.argument("reason");
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.setPlaybackSuppressed(suppressed, reason);
+        }
+        return sharedVideoWallpaperController != null
+                ? sharedVideoWallpaperController.getStatus()
+                : new LinkedHashMap<>();
     }
 
     private void handleWallpaperPickerResult(Uri uri) {
@@ -1365,8 +1585,8 @@ public class MainActivity extends FlutterActivity {
             String previewPath = createWallpaperPreview(uri, resolvedKind);
             BridgeStateStore.setWallpaperAssetUri(this, uri.toString());
             BridgeStateStore.setWallpaperPreviewPath(this, previewPath);
-            if (TextUtils.equals("video", resolvedKind) && videoWallpaperController != null) {
-                videoWallpaperController.onWallpaperModeChanged();
+            if (TextUtils.equals("video", resolvedKind) && sharedVideoWallpaperController != null) {
+                sharedVideoWallpaperController.onWallpaperModeChanged();
             }
 
             Map<String, Object> map = new LinkedHashMap<>();
@@ -1479,24 +1699,12 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void exportSettingsBackup(MethodCall call, MethodChannel.Result result) {
-        if (pendingBackupExportResult != null) {
-            result.error("backup_busy", "A backup export is already active.", null);
-            return;
-        }
         String fileName = call.argument("fileName");
         String content = call.argument("content");
-        pendingBackupExportResult = result;
-        pendingBackupExportContent = content == null ? "" : content;
-        pendingBackupExportFileName = TextUtils.isEmpty(fileName) ? "atv-launcher-backup.json" : fileName;
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, pendingBackupExportFileName);
         try {
-            startActivityForResult(intent, REQUEST_EXPORT_BACKUP);
+            result.success(writeBackupToLocalFile(fileName, content));
         } catch (Exception exception) {
-            pendingBackupExportResult = null;
-            result.error("backup_export_unavailable", exception.toString(), null);
+            result.error("backup_export_failed", exception.toString(), null);
         }
     }
 
@@ -1547,6 +1755,34 @@ public class MainActivity extends FlutterActivity {
         } catch (Exception exception) {
             result.error("backup_export_failed", exception.toString(), null);
         }
+    }
+
+    private Map<String, Object> writeBackupToLocalFile(String fileName, String content) throws Exception {
+        String resolvedFileName = sanitizeBackupFileName(fileName);
+        File directory = getExternalFilesDir("backups");
+        if (directory == null) {
+            directory = new File(getFilesDir(), "backups");
+        }
+        if (!directory.isDirectory() && !directory.mkdirs()) {
+            throw new IllegalStateException("Could not create backup directory.");
+        }
+
+        File backupFile = new File(directory, resolvedFileName);
+        try (OutputStream outputStream = new FileOutputStream(backupFile, false)) {
+            outputStream.write((content == null ? "" : content).getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+        }
+
+        String displayName = backupFile.getName();
+        BridgeStateStore.setLastBackupExportName(this, displayName);
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("cancelled", false);
+        map.put("uri", Uri.fromFile(backupFile).toString());
+        map.put("displayName", displayName);
+        map.put("path", backupFile.getAbsolutePath());
+        map.put("storage", "local_app_backup");
+        emitSystemSnapshot();
+        return map;
     }
 
     private void handleBackupImportResult(Uri uri) {
@@ -1689,6 +1925,16 @@ public class MainActivity extends FlutterActivity {
         return map;
     }
 
+    private String sanitizeBackupFileName(String fileName) {
+        String resolvedName = TextUtils.isEmpty(fileName)
+                ? "atv-launcher-backup.json"
+                : new File(fileName).getName();
+        if (!resolvedName.endsWith(".json")) {
+            resolvedName = resolvedName + ".json";
+        }
+        return resolvedName;
+    }
+
     private Map<String, Object> buildMediaPermissionResult(boolean granted) {
         Map<String, Object> map = new LinkedHashMap<>(VideoLibraryController.getFileAccessStatus(this));
         map.put("permission", mediaReadPermissionName());
@@ -1800,6 +2046,113 @@ public class MainActivity extends FlutterActivity {
         return success;
     }
 
+    private boolean shouldRedirectNonHomeEntry(Intent intent) {
+        if (intent == null) {
+            return false;
+        }
+        if (isDebugBenchmarkIntent(intent)) {
+            return false;
+        }
+        return !isHomeIntent(intent);
+    }
+
+    private boolean moveExistingLauncherTaskToFront(String source) {
+        ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) {
+            return false;
+        }
+        List<ActivityManager.AppTask> appTasks = activityManager.getAppTasks();
+        if (appTasks == null || appTasks.isEmpty()) {
+            return false;
+        }
+        ActivityManager.AppTask preferredTask = null;
+        ActivityManager.RecentTaskInfo preferredTaskInfo = null;
+        ActivityManager.AppTask fallbackTask = null;
+        ActivityManager.RecentTaskInfo fallbackTaskInfo = null;
+        for (ActivityManager.AppTask appTask : appTasks) {
+            ActivityManager.RecentTaskInfo taskInfo = appTask.getTaskInfo();
+            if (taskInfo == null || taskInfo.id == getTaskId()) {
+                continue;
+            }
+            if (!isOwnLauncherTask(taskInfo)) {
+                continue;
+            }
+            if (isHomeLauncherTask(taskInfo)) {
+                preferredTask = appTask;
+                preferredTaskInfo = taskInfo;
+                break;
+            }
+            if (fallbackTask == null) {
+                fallbackTask = appTask;
+                fallbackTaskInfo = taskInfo;
+            }
+        }
+        ActivityManager.AppTask targetTask = preferredTask != null ? preferredTask : fallbackTask;
+        ActivityManager.RecentTaskInfo targetInfo = preferredTaskInfo != null ? preferredTaskInfo : fallbackTaskInfo;
+        if (targetTask == null || targetInfo == null) {
+            return false;
+        }
+        try {
+            targetTask.moveToFront();
+            Log.i(
+                    TAG,
+                    "Reused existing launcher task via " + source + " taskId=" + targetInfo.id
+            );
+            return true;
+        } catch (Exception exception) {
+            Log.w(TAG, "Failed to move existing launcher task via " + source, exception);
+            return false;
+        }
+    }
+
+    private void pruneBackgroundLauncherTasks(String source) {
+        if (!isHomeIntent(getIntent())) {
+            return;
+        }
+        ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) {
+            return;
+        }
+        List<ActivityManager.AppTask> appTasks = activityManager.getAppTasks();
+        if (appTasks == null || appTasks.isEmpty()) {
+            return;
+        }
+        for (ActivityManager.AppTask appTask : appTasks) {
+            ActivityManager.RecentTaskInfo taskInfo = appTask.getTaskInfo();
+            if (taskInfo == null || taskInfo.id == getTaskId()) {
+                continue;
+            }
+            if (!isOwnLauncherTask(taskInfo)) {
+                continue;
+            }
+            try {
+                appTask.finishAndRemoveTask();
+                Log.i(TAG, "Pruned stale launcher task via " + source + " taskId=" + taskInfo.id);
+            } catch (Exception exception) {
+                Log.w(TAG, "Failed to prune stale launcher task via " + source, exception);
+            }
+        }
+    }
+
+    private boolean isOwnLauncherTask(ActivityManager.RecentTaskInfo taskInfo) {
+        ComponentName baseActivity = taskInfo.baseActivity;
+        ComponentName topActivity = taskInfo.topActivity;
+        boolean ownsBase = baseActivity != null
+                && TextUtils.equals(baseActivity.getPackageName(), getPackageName());
+        boolean ownsTop = topActivity != null
+                && TextUtils.equals(topActivity.getPackageName(), getPackageName());
+        return ownsBase || ownsTop;
+    }
+
+    private boolean isHomeLauncherTask(ActivityManager.RecentTaskInfo taskInfo) {
+        Intent baseIntent = taskInfo.baseIntent;
+        if (baseIntent == null) {
+            return false;
+        }
+        Set<String> categories = baseIntent.getCategories();
+        return categories != null && categories.contains(Intent.CATEGORY_HOME);
+    }
+
     private byte[] drawableToByteArray(Drawable drawable, int maxWidth, int maxHeight, boolean opaqueBackground) {
         if (drawable.getIntrinsicWidth() <= 0 || drawable.getIntrinsicHeight() <= 0) {
             return new byte[0];
@@ -1836,8 +2189,32 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void emitSystemSnapshot() {
-        if (systemEventSink != null) {
-            systemEventSink.success(buildSystemBridgeStatusLite());
+        if (sharedSystemEventSink != null) {
+            sharedSystemEventSink.success(buildSystemBridgeStatusLite());
+        }
+    }
+
+    private void emitSystemSnapshotDelta(Map<String, Object> delta) {
+        if (sharedSystemEventSink != null) {
+            sharedSystemEventSink.success(delta);
+        }
+    }
+
+    private void emitWallpaperStatusDelta() {
+        Map<String, Object> delta = new LinkedHashMap<>();
+        delta.put(
+                "wallpaper",
+                sharedVideoWallpaperController != null
+                        ? sharedVideoWallpaperController.getStatus()
+                        : new LinkedHashMap<>()
+        );
+        emitSystemSnapshotDelta(delta);
+    }
+
+    private static void emitInitialSystemSnapshotForActiveActivity() {
+        MainActivity activity = activeActivity;
+        if (activity != null) {
+            activity.emitInitialSystemSnapshot();
         }
     }
 
@@ -1857,11 +2234,89 @@ public class MainActivity extends FlutterActivity {
             emitSystemSnapshot();
             return;
         }
-        systemEventHandler.removeCallbacks(initialSystemSnapshotRunnable);
-        systemEventHandler.postDelayed(
-                initialSystemSnapshotRunnable,
+        SHARED_SYSTEM_EVENT_HANDLER.removeCallbacks(sharedInitialSystemSnapshotRunnable);
+        SHARED_SYSTEM_EVENT_HANDLER.postDelayed(
+                sharedInitialSystemSnapshotRunnable,
                 INITIAL_SYSTEM_SNAPSHOT_DELAY_MS
         );
+    }
+
+    private Map<String, Object> buildNavigationStatus() {
+        Map<String, Object> navigation = new LinkedHashMap<>();
+        navigation.put("homeSequence", homeNavigationSequence);
+        navigation.put("reason", lastNavigationReason);
+        return navigation;
+    }
+
+    private Map<String, Object> buildBenchmarkCommandStatus() {
+        Map<String, Object> benchmark = new LinkedHashMap<>();
+        benchmark.put("sequence", benchmarkCommandSequence);
+        benchmark.put("action", lastBenchmarkAction);
+        benchmark.put("route", lastBenchmarkRoute);
+        benchmark.put("sessionId", lastBenchmarkSessionId);
+        benchmark.put("autoFocusDetail", lastBenchmarkAutoFocusDetail);
+        benchmark.put("bypassSettingsSecurity", lastBenchmarkBypassSettingsSecurity);
+        return benchmark;
+    }
+
+    private void recordHomeNavigation(String reason) {
+        homeNavigationSequence += 1L;
+        lastNavigationReason = TextUtils.isEmpty(reason) ? "" : reason;
+        Map<String, Object> delta = new LinkedHashMap<>();
+        delta.put("navigation", buildNavigationStatus());
+        emitSystemSnapshotDelta(delta);
+    }
+
+    private boolean isDebugBenchmarkIntent(Intent intent) {
+        return isDebuggableBuild()
+                && intent != null
+                && TextUtils.equals(DEBUG_BENCHMARK_ACTION, intent.getAction());
+    }
+
+    private boolean recordBenchmarkCommand(Intent intent) {
+        if (!isDebugBenchmarkIntent(intent)) {
+            return false;
+        }
+        String action = intent.getStringExtra("action");
+        if (!TextUtils.equals("open_launcher_settings", action)
+                && !TextUtils.equals("close_launcher_settings", action)) {
+            return false;
+        }
+        benchmarkCommandSequence += 1L;
+        lastBenchmarkAction = action;
+        lastBenchmarkRoute = intent.getStringExtra("route") != null
+                ? intent.getStringExtra("route")
+                : "";
+        lastBenchmarkSessionId = intent.getStringExtra("sessionId") != null
+                ? intent.getStringExtra("sessionId")
+                : "";
+        lastBenchmarkAutoFocusDetail = intent.getBooleanExtra("autoFocusDetail", false);
+        lastBenchmarkBypassSettingsSecurity = intent.getBooleanExtra(
+                "bypassSettingsSecurity",
+                false
+        );
+        Map<String, Object> delta = new LinkedHashMap<>();
+        delta.put("benchmarkCommand", buildBenchmarkCommandStatus());
+        emitSystemSnapshotDelta(delta);
+        return true;
+    }
+
+    private boolean isHomeIntent(Intent intent) {
+        if (intent == null) {
+            return false;
+        }
+        if (!TextUtils.equals(Intent.ACTION_MAIN, intent.getAction())) {
+            return false;
+        }
+        Set<String> categories = intent.getCategories();
+        if (categories == null) {
+            return false;
+        }
+        return categories.contains(Intent.CATEGORY_HOME);
+    }
+
+    private boolean isDebuggableBuild() {
+        return (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
     private Set<String> readEnabledAccessibilityServices() {

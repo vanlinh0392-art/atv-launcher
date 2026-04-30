@@ -1,5 +1,6 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
@@ -7,19 +8,61 @@ import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
-class WallpaperPanelPage extends StatelessWidget {
+class WallpaperPanelPage extends StatefulWidget {
   static const String routeName = "wallpaper_panel";
+  final FocusNode? primaryFocusNode;
 
-  const WallpaperPanelPage({super.key});
+  const WallpaperPanelPage({
+    super.key,
+    this.primaryFocusNode,
+  });
+
+  @override
+  State<WallpaperPanelPage> createState() => _WallpaperPanelPageState();
+}
+
+class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
+  static const String _scrollStorageId = 'wallpaper_panel_scroll_offset';
+
+  late final ScrollController _scrollController;
+  bool _showDeferredSections = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController(keepScrollOffset: false);
+    _scrollController.addListener(_persistScrollOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreScrollOffsetIfPossible();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _showDeferredSections) {
+          return;
+        }
+        setState(() {
+          _showDeferredSections = true;
+        });
+        _restoreScrollOffsetIfPossible();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_persistScrollOffset);
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     return Consumer2<WallpaperService, SystemBridgeService>(
       builder: (context, wallpaperService, bridgeService, _) => ListView(
+        controller: _scrollController,
         key: const PageStorageKey<String>(WallpaperPanelPage.routeName),
         padding: const EdgeInsets.only(bottom: 16),
         children: [
@@ -93,6 +136,7 @@ class WallpaperPanelPage extends StatelessWidget {
                   maxColumns: 3,
                   children: [
                     SettingsActionCard(
+                      focusNode: widget.primaryFocusNode,
                       title: localizations.gradient,
                       icon: Icons.gradient,
                       onPressed: () async {
@@ -126,7 +170,10 @@ class WallpaperPanelPage extends StatelessWidget {
                       title: localizations.pickFolder,
                       icon: Icons.folder_open_outlined,
                       onPressed: () async {
-                        await wallpaperService.pickVideoWallpaperFolderSaf();
+                        await _pickFolderWithFallback(
+                          context,
+                          wallpaperService,
+                        );
                       },
                     ),
                     SettingsActionCard(
@@ -164,220 +211,288 @@ class WallpaperPanelPage extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 18),
-          SettingsSurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(localizations.playlistBehaviourTitle,
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 14),
-                SettingsChoiceCard<String>(
-                  selectorKey: const Key('wallpaper_order_mode_selector'),
-                  optionKeyPrefix: 'wallpaper_order_mode_option',
-                  title: localizations.sourceLabel,
-                  subtitle: localizations.playlistBehaviourTitle,
-                  icon: Icons.playlist_play_outlined,
-                  value: wallpaperService.videoOrderMode,
-                  options: <SettingsChoiceOption<String>>[
-                    SettingsChoiceOption<String>(
-                      value: 'sequential',
-                      label: localizations.sequentialOrder,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'shuffle',
-                      label: localizations.shuffleOrder,
-                    ),
-                  ],
-                  valueLabelBuilder: (value) => localizedVideoOrderMode(
-                    localizations,
-                    value,
-                  ),
-                  onChanged: wallpaperService.setVideoOrderMode,
-                ),
-                const SizedBox(height: 10),
-                SettingsChoiceCard<String>(
-                  selectorKey: const Key('wallpaper_advance_mode_selector'),
-                  optionKeyPrefix: 'wallpaper_advance_mode_option',
-                  title: localizations.playlistBehaviourTitle,
-                  subtitle: localizations.fixedInterval,
-                  icon: Icons.schedule_outlined,
-                  value: wallpaperService.videoAdvanceMode,
-                  options: <SettingsChoiceOption<String>>[
-                    SettingsChoiceOption<String>(
-                      value: 'on_completion',
-                      label: localizations.onCompletion,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'fixed_interval',
-                      label: localizations.fixedInterval,
-                    ),
-                  ],
-                  valueLabelBuilder: (value) => localizedVideoAdvanceMode(
-                    localizations,
-                    value,
-                  ),
-                  onChanged: wallpaperService.setVideoAdvanceMode,
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: wallpaperService.videoPlaylistLoop,
-                  onChanged: wallpaperService.isVideoMode
-                      ? wallpaperService.setVideoPlaylistLoop
-                      : null,
-                  title: Text(
-                    localizations.loopPlaylist,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  secondary: const Icon(Icons.repeat_outlined),
-                ),
-                if (wallpaperService.videoAdvanceMode == 'fixed_interval')
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: SettingsStepperCard(
-                      selectorKey:
-                          const Key('video_switch_interval_seconds_stepper'),
-                      buttonKeyPrefix: 'video_switch_interval_seconds',
-                      title: localizations.switchIntervalSeconds(
-                        wallpaperService.videoSwitchIntervalSeconds,
+          if (_showDeferredSections) ...[
+            const SizedBox(height: 18),
+            SettingsSurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(localizations.playlistBehaviourTitle,
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 14),
+                  SettingsChoiceCard<String>(
+                    selectorKey: const Key('wallpaper_order_mode_selector'),
+                    optionKeyPrefix: 'wallpaper_order_mode_option',
+                    title: localizations.sourceLabel,
+                    subtitle: localizations.playlistBehaviourTitle,
+                    icon: Icons.playlist_play_outlined,
+                    value: wallpaperService.videoOrderMode,
+                    options: <SettingsChoiceOption<String>>[
+                      SettingsChoiceOption<String>(
+                        value: 'sequential',
+                        label: localizations.sequentialOrder,
                       ),
-                      subtitle: localizations.fixedInterval,
-                      icon: Icons.timer_outlined,
-                      value: wallpaperService.videoSwitchIntervalSeconds,
-                      valueLabelBuilder: (value) => '${value}s',
-                      minimum: 5,
-                      maximum: 300,
-                      step: 5,
-                      onChanged: wallpaperService.isVideoMode
-                          ? wallpaperService.setVideoSwitchIntervalSeconds
-                          : null,
+                      SettingsChoiceOption<String>(
+                        value: 'shuffle',
+                        label: localizations.shuffleOrder,
+                      ),
+                    ],
+                    valueLabelBuilder: (value) => localizedVideoOrderMode(
+                      localizations,
+                      value,
                     ),
+                    onChanged: wallpaperService.setVideoOrderMode,
                   ),
-              ],
+                  const SizedBox(height: 10),
+                  SettingsChoiceCard<String>(
+                    selectorKey: const Key('wallpaper_advance_mode_selector'),
+                    optionKeyPrefix: 'wallpaper_advance_mode_option',
+                    title: localizations.playlistBehaviourTitle,
+                    subtitle: localizations.fixedInterval,
+                    icon: Icons.schedule_outlined,
+                    value: wallpaperService.videoAdvanceMode,
+                    options: <SettingsChoiceOption<String>>[
+                      SettingsChoiceOption<String>(
+                        value: 'on_completion',
+                        label: localizations.onCompletion,
+                      ),
+                      SettingsChoiceOption<String>(
+                        value: 'fixed_interval',
+                        label: localizations.fixedInterval,
+                      ),
+                    ],
+                    valueLabelBuilder: (value) => localizedVideoAdvanceMode(
+                      localizations,
+                      value,
+                    ),
+                    onChanged: wallpaperService.setVideoAdvanceMode,
+                  ),
+                  const SizedBox(height: 10),
+                  if (wallpaperService.videoAdvanceMode != 'fixed_interval')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SettingsStepperCard(
+                        selectorKey:
+                            const Key('video_repeat_count_per_item_stepper'),
+                        buttonKeyPrefix: 'video_repeat_count_per_item',
+                        title: localizations.repeatEachVideoCount(
+                          wallpaperService.videoRepeatCountPerItem,
+                        ),
+                        subtitle: localizations.repeatEachVideoDescription,
+                        icon: Icons.repeat_one_on_outlined,
+                        value: wallpaperService.videoRepeatCountPerItem,
+                        valueLabelBuilder: (value) => '${value}x',
+                        minimum:
+                            SettingsService.videoWallpaperRepeatCountPerItemMin,
+                        maximum:
+                            SettingsService.videoWallpaperRepeatCountPerItemMax,
+                        step:
+                            SettingsService.videoWallpaperRepeatCountPerItemStep,
+                        onChanged: wallpaperService.isVideoMode
+                            ? wallpaperService.setVideoRepeatCountPerItem
+                            : null,
+                      ),
+                    ),
+                  if (wallpaperService.videoAdvanceMode == 'fixed_interval')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SettingsStepperCard(
+                        selectorKey:
+                            const Key('video_switch_interval_seconds_stepper'),
+                        buttonKeyPrefix: 'video_switch_interval_seconds',
+                        title: localizations.switchIntervalSeconds(
+                          wallpaperService.videoSwitchIntervalSeconds,
+                        ),
+                        subtitle: localizations.fixedInterval,
+                        icon: Icons.timer_outlined,
+                        value: wallpaperService.videoSwitchIntervalSeconds,
+                        valueLabelBuilder: (value) => '${value}s',
+                        minimum: 5,
+                        maximum: 300,
+                        step: 5,
+                        onChanged: wallpaperService.isVideoMode
+                            ? wallpaperService.setVideoSwitchIntervalSeconds
+                            : null,
+                      ),
+                    ),
+                  RoundedSwitchListTile(
+                    debugLabel: 'wallpaper_loop_playlist',
+                    value: wallpaperService.videoPlaylistLoop,
+                    onChanged: wallpaperService.isVideoMode
+                        ? wallpaperService.setVideoPlaylistLoop
+                        : null,
+                    title: Text(
+                      localizations.loopPlaylist,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    secondary: const Icon(Icons.repeat_outlined),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          SettingsSurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(localizations.playbackAppearanceTitle,
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 12),
-                RoundedSwitchListTile(
-                  value: wallpaperService.videoLoop,
-                  onChanged: wallpaperService.isVideoMode
-                      ? wallpaperService.setVideoLoop
-                      : null,
-                  title: Text(
-                    localizations.loopSingleVideo,
-                    style: Theme.of(context).textTheme.bodyMedium,
+            const SizedBox(height: 18),
+            SettingsSurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(localizations.playbackAppearanceTitle,
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  RoundedSwitchListTile(
+                    debugLabel: 'wallpaper_video_loop',
+                    value: wallpaperService.videoLoop,
+                    onChanged: wallpaperService.isVideoMode
+                        ? wallpaperService.setVideoLoop
+                        : null,
+                    title: Text(
+                      localizations.loopSingleVideo,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    secondary: const Icon(Icons.loop_outlined),
                   ),
-                  secondary: const Icon(Icons.loop_outlined),
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: wallpaperService.videoMute,
-                  onChanged: wallpaperService.isVideoMode
-                      ? wallpaperService.setVideoMute
-                      : null,
-                  title: Text(
-                    localizations.muteVideo,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
+                    debugLabel: 'wallpaper_video_mute',
+                    value: wallpaperService.videoMute,
+                    onChanged: wallpaperService.isVideoMode
+                        ? wallpaperService.setVideoMute
+                        : null,
+                    title: Text(
+                      localizations.muteVideo,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    secondary: const Icon(Icons.volume_off_outlined),
                   ),
-                  secondary: const Icon(Icons.volume_off_outlined),
-                ),
-                const SizedBox(height: 10),
-                RoundedSwitchListTile(
-                  value: wallpaperService.videoAutoResume,
-                  onChanged: wallpaperService.isVideoMode
-                      ? wallpaperService.setVideoAutoResume
-                      : null,
-                  title: Text(
-                    localizations.autoResumeOnHome,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  const SizedBox(height: 10),
+                  RoundedSwitchListTile(
+                    debugLabel: 'wallpaper_video_auto_resume',
+                    value: wallpaperService.videoAutoResume,
+                    onChanged: wallpaperService.isVideoMode
+                        ? wallpaperService.setVideoAutoResume
+                        : null,
+                    title: Text(
+                      localizations.autoResumeOnHome,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    secondary: const Icon(Icons.home_max_outlined),
                   ),
-                  secondary: const Icon(Icons.home_max_outlined),
-                ),
-                const SizedBox(height: 10),
-                SettingsChoiceCard<String>(
-                  selectorKey: const Key('wallpaper_video_fit_selector'),
-                  optionKeyPrefix: 'wallpaper_video_fit_option',
-                  title: localizations.videoFitLabel,
-                  subtitle: localizations.playbackAppearanceTitle,
-                  icon: Icons.crop,
-                  value: wallpaperService.videoFit,
-                  options: <SettingsChoiceOption<String>>[
-                    SettingsChoiceOption<String>(
-                      value: 'center-crop',
-                      label: localizations.videoFitCenterCrop,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'fit',
-                      label: localizations.videoFitFit,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'fill',
-                      label: localizations.videoFitFill,
-                    ),
-                  ],
-                  valueLabelBuilder: (value) =>
-                      localizedVideoFit(localizations, value),
-                  onChanged: wallpaperService.setVideoFit,
-                ),
-                const SizedBox(height: 10),
-                SettingsChoiceCard<String>(
-                  selectorKey: const Key('wallpaper_video_blur_selector'),
-                  optionKeyPrefix: 'wallpaper_video_blur_option',
-                  title: localizations.videoBlurLabel,
-                  subtitle: localizations.playbackAppearanceTitle,
-                  icon: Icons.blur_on_outlined,
-                  value: wallpaperService.videoBlur,
-                  options: <SettingsChoiceOption<String>>[
-                    SettingsChoiceOption<String>(
-                      value: 'off',
-                      label: localizations.videoBlurOff,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'low',
-                      label: localizations.videoBlurLow,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'medium',
-                      label: localizations.videoBlurMedium,
-                    ),
-                    SettingsChoiceOption<String>(
-                      value: 'high',
-                      label: localizations.videoBlurHigh,
-                    ),
-                  ],
-                  valueLabelBuilder: (value) =>
-                      localizedVideoBlur(localizations, value),
-                  onChanged: wallpaperService.setVideoBlur,
-                ),
-                const SizedBox(height: 10),
-                SettingsStepperCard(
-                  selectorKey: const Key('video_dim_percent_stepper'),
-                  buttonKeyPrefix: 'video_dim_percent',
-                  title: localizations
-                      .dimOverlayPercent(wallpaperService.videoDimPercent),
-                  subtitle: localizations.playbackAppearanceTitle,
-                  icon: Icons.dark_mode_outlined,
-                  value: wallpaperService.videoDimPercent,
-                  valueLabelBuilder: (value) => '${value}%',
-                  minimum: 0,
-                  maximum: 100,
-                  step: 5,
-                  onChanged: wallpaperService.isVideoMode
-                      ? wallpaperService.setVideoDimPercent
-                      : null,
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  SettingsChoiceCard<String>(
+                    selectorKey: const Key('wallpaper_video_fit_selector'),
+                    optionKeyPrefix: 'wallpaper_video_fit_option',
+                    title: localizations.videoFitLabel,
+                    subtitle: localizations.playbackAppearanceTitle,
+                    icon: Icons.crop,
+                    value: wallpaperService.videoFit,
+                    options: <SettingsChoiceOption<String>>[
+                      SettingsChoiceOption<String>(
+                        value: 'center-crop',
+                        label: localizations.videoFitCenterCrop,
+                      ),
+                      SettingsChoiceOption<String>(
+                        value: 'fit',
+                        label: localizations.videoFitFit,
+                      ),
+                      SettingsChoiceOption<String>(
+                        value: 'fill',
+                        label: localizations.videoFitFill,
+                      ),
+                    ],
+                    valueLabelBuilder: (value) =>
+                        localizedVideoFit(localizations, value),
+                    onChanged: wallpaperService.setVideoFit,
+                  ),
+                  const SizedBox(height: 10),
+                  SettingsChoiceCard<String>(
+                    selectorKey: const Key('wallpaper_video_blur_selector'),
+                    optionKeyPrefix: 'wallpaper_video_blur_option',
+                    title: localizations.videoBlurLabel,
+                    subtitle: localizations.playbackAppearanceTitle,
+                    icon: Icons.blur_on_outlined,
+                    value: wallpaperService.videoBlur,
+                    options: <SettingsChoiceOption<String>>[
+                      SettingsChoiceOption<String>(
+                        value: 'off',
+                        label: localizations.videoBlurOff,
+                      ),
+                      SettingsChoiceOption<String>(
+                        value: 'low',
+                        label: localizations.videoBlurLow,
+                      ),
+                      SettingsChoiceOption<String>(
+                        value: 'medium',
+                        label: localizations.videoBlurMedium,
+                      ),
+                      SettingsChoiceOption<String>(
+                        value: 'high',
+                        label: localizations.videoBlurHigh,
+                      ),
+                    ],
+                    valueLabelBuilder: (value) =>
+                        localizedVideoBlur(localizations, value),
+                    onChanged: wallpaperService.setVideoBlur,
+                  ),
+                  const SizedBox(height: 10),
+                  SettingsStepperCard(
+                    selectorKey: const Key('video_dim_percent_stepper'),
+                    buttonKeyPrefix: 'video_dim_percent',
+                    title: localizations
+                        .dimOverlayPercent(wallpaperService.videoDimPercent),
+                    subtitle: localizations.playbackAppearanceTitle,
+                    icon: Icons.dark_mode_outlined,
+                    value: wallpaperService.videoDimPercent,
+                    valueLabelBuilder: (value) => '${value}%',
+                    minimum: 0,
+                    maximum: 100,
+                    step: 5,
+                    onChanged: wallpaperService.isVideoMode
+                        ? wallpaperService.setVideoDimPercent
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
+  }
+
+  void _persistScrollOffset() {
+    if (!mounted || !_scrollController.hasClients) {
+      return;
+    }
+    PageStorage.maybeOf(context)?.writeState(
+      context,
+      _scrollController.offset,
+      identifier: _scrollStorageId,
+    );
+  }
+
+  void _restoreScrollOffsetIfPossible() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      final storedOffset =
+          (PageStorage.maybeOf(context)?.readState(
+                    context,
+                    identifier: _scrollStorageId,
+                  ) as num?)
+                  ?.toDouble() ??
+              0.0;
+      if (storedOffset <= 0) {
+        return;
+      }
+      final targetOffset = storedOffset
+          .clamp(0.0, _scrollController.position.maxScrollExtent)
+          .toDouble();
+      if (targetOffset <= 0 ||
+          (_scrollController.offset - targetOffset).abs() < 0.5) {
+        return;
+      }
+      _scrollController.jumpTo(targetOffset);
+    });
   }
 
   Future<void> _browseLocalLibrary(
@@ -406,6 +521,45 @@ class WallpaperPanelPage extends StatelessWidget {
       folderBucketId: selection.bucketId,
       folderName: selection.folderName,
     );
+  }
+
+  Future<void> _pickFolderWithFallback(
+    BuildContext context,
+    WallpaperService wallpaperService,
+  ) async {
+    final localizations = AppLocalizations.of(context)!;
+    try {
+      await wallpaperService.pickVideoWallpaperFolderSaf();
+    } on PlatformException catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      final shouldFallback = error.code != 'picker_busy';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            shouldFallback
+                ? localizations.folderPickerFallbackToTvStorage
+                : (error.message?.trim().isNotEmpty == true
+                    ? error.message!.trim()
+                    : localizations.folderPickerFallbackToTvStorage),
+          ),
+        ),
+      );
+      if (shouldFallback) {
+        await _browseLocalLibrary(context, wallpaperService);
+      }
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizations.folderPickerFallbackToTvStorage),
+        ),
+      );
+      await _browseLocalLibrary(context, wallpaperService);
+    }
   }
 
   Future<void> _requestMediaPermission(
@@ -479,7 +633,8 @@ class _VideoLibraryDialog extends StatelessWidget {
                               itemBuilder: (context, index) {
                                 final folder = folders[index];
                                 return EnsureVisible(
-                                  alignment: 0.12,
+                                  alignment: EnsureVisible.settingsAlignment,
+                                  preferImmediate: true,
                                   child: ListTile(
                                     title: Text(folder['name']?.toString() ??
                                         localizations.genericFolder),
@@ -540,7 +695,8 @@ class _VideoLibraryDialog extends StatelessWidget {
                               itemBuilder: (context, index) {
                                 final video = videos[index];
                                 return EnsureVisible(
-                                  alignment: 0.12,
+                                  alignment: EnsureVisible.settingsAlignment,
+                                  preferImmediate: true,
                                   child: ListTile(
                                     title: Text(
                                         video['displayName']?.toString() ??

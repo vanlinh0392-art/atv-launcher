@@ -1,6 +1,7 @@
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -25,8 +26,14 @@ void main() {
   testWidgets('clock scale can be changed from stepper buttons',
       (tester) async {
     final settings = await _createSettingsService();
+    final primaryFocusNode = FocusNode(debugLabel: 'status_bar_primary_toggle');
+    addTearDown(primaryFocusNode.dispose);
 
-    await _pumpWidget(tester, settings);
+    await _pumpWidget(
+      tester,
+      settings,
+      primaryFocusNode: primaryFocusNode,
+    );
     await tester.scrollUntilVisible(
       find.byKey(const Key('status_bar_clock_scale_stepper')),
       240,
@@ -34,11 +41,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    primaryFocusNode.requestFocus();
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 4; index += 1) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel ?? '',
+      contains('status_bar_clock_scale_increase'),
+    );
+
     final initial = settings.statusBarClockScalePercent;
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('status_bar_clock_scale_increase')),
-    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
     expect(
@@ -50,8 +68,9 @@ void main() {
 
 Future<void> _pumpWidget(
   WidgetTester tester,
-  SettingsService settings,
-) async {
+  SettingsService settings, {
+  FocusNode? primaryFocusNode,
+}) async {
   await tester.pumpWidget(
     ChangeNotifierProvider<SettingsService>.value(
       value: settings,
@@ -59,7 +78,9 @@ Future<void> _pumpWidget(
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const Scaffold(body: StatusBarPanelPage()),
+        home: Scaffold(
+          body: StatusBarPanelPage(primaryFocusNode: primaryFocusNode),
+        ),
       ),
     ),
   );

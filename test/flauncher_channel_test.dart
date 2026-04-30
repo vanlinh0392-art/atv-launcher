@@ -26,7 +26,8 @@ void main() {
 
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
-    messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   });
 
   test("getApplications", () async {
@@ -154,6 +155,47 @@ void main() {
     await fLauncherChannel.startAmbientMode();
 
     expect(called, isTrue);
+  });
+
+  test("setVideoWallpaperPlaybackSuppressed", () async {
+    Map<dynamic, dynamic>? arguments;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == "setVideoWallpaperPlaybackSuppressed") {
+        arguments = call.arguments as Map<dynamic, dynamic>;
+        return <String, dynamic>{'playbackSuppressed': true};
+      }
+      fail("Unhandled method name");
+    });
+    final fLauncherChannel = FLauncherChannel();
+
+    final result = await fLauncherChannel.setVideoWallpaperPlaybackSuppressed(
+      suppressed: true,
+      reason: "settings_panel",
+    );
+
+    expect(arguments?['suppressed'], isTrue);
+    expect(arguments?['reason'], "settings_panel");
+    expect(result['playbackSuppressed'], isTrue);
+  });
+
+  test("setVideoWallpaperOptions includes repeat count per item", () async {
+    Map<dynamic, dynamic>? arguments;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == "setVideoWallpaperOptions") {
+        arguments = call.arguments as Map<dynamic, dynamic>;
+        return <String, dynamic>{'ok': true};
+      }
+      fail("Unhandled method name");
+    });
+    final fLauncherChannel = FLauncherChannel();
+
+    await fLauncherChannel.setVideoWallpaperOptions(
+      advanceMode: 'on_completion',
+      repeatCountPerItem: 5,
+    );
+
+    expect(arguments?['advanceMode'], 'on_completion');
+    expect(arguments?['repeatCountPerItem'], 5);
   });
 
   tearDown(() {

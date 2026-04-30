@@ -216,6 +216,8 @@
     "statusBar": "Thanh trạng thái",
     "settings": "Cài đặt",
     "show": "Hiện",
+    "showManagedAccessibilityAppsAction": "Hiện app quản lý trợ năng",
+    "hideManagedAccessibilityAppsAction": "Ẩn app quản lý trợ năng",
     "showCategoryTitles": "Hiện tiêu đề danh mục",
     "showRamInStatusBar": "Hiện RAM trên thanh trạng thái",
     "sort": "Sắp xếp",
@@ -551,6 +553,7 @@
     "pickMultipleVideos": "Chọn nhiều video",
     "pickFolder": "Chọn thư mục",
     "browseTvStorage": "Duyệt bộ nhớ TV",
+    "folderPickerFallbackToTvStorage": "TV này không mở được bộ chọn thư mục. Đang chuyển sang duyệt bộ nhớ TV.",
     "folderNameLabel": "Thư mục: {name}",
     "@folderNameLabel": {
         "placeholders": {
@@ -565,6 +568,15 @@
     "onCompletion": "Khi phát xong",
     "fixedInterval": "Khoảng thời gian cố định",
     "loopPlaylist": "Lặp playlist",
+    "repeatEachVideoCount": "Lặp mỗi video {count} lần",
+    "@repeatEachVideoCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "repeatEachVideoDescription": "Phát lặp video hiện tại chừng này lần trước khi chuyển sang video tiếp theo trong playlist.",
     "switchIntervalSeconds": "Đổi video sau {seconds} giây",
     "@switchIntervalSeconds": {
         "placeholders": {
