@@ -1,4 +1,4 @@
-name: Continuous Releases
+name: Continuous Official Release
 
 on:
   push:
@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build-releases:
-    name: Build and Publish APK Releases
+  build-release:
+    name: Build and Publish Official APK Release
     runs-on: ubuntu-latest
 
     steps:
@@ -39,53 +39,6 @@ jobs:
 
       - name: Test
         run: flutter test --no-pub
-
-      - name: Build debug APK
-        run: flutter build apk --debug --target-platform android-arm --no-pub
-
-      - name: Prepare release asset
-        id: prepare_asset
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*debug*.apk' | head -n 1)"
-          if [[ -z "${apk_path}" ]]; then
-            echo "Debug APK was not produced."
-            exit 1
-          fi
-          asset_path="build/app/outputs/flutter-apk/atv-launcher-armeabi-v7a-debug.apk"
-          cp "${apk_path}" "${asset_path}"
-          echo "asset_path=${asset_path}" >> "${GITHUB_OUTPUT}"
-
-      - name: Compute release metadata
-        id: release_meta
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag_name="v$(date +'%Y.%m').${GITHUB_RUN_NUMBER}-debug"
-          echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
-          echo "release_name=ATV Launcher Debug ${tag_name}" >> "${GITHUB_OUTPUT}"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: atv-launcher-armeabi-v7a-debug
-          path: ${{ steps.prepare_asset.outputs.asset_path }}
-          retention-days: 30
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release_meta.outputs.tag_name }}
-          name: ${{ steps.release_meta.outputs.release_name }}
-          body: |
-            Debug APK build generated automatically from `main`.
-
-            File: `atv-launcher-armeabi-v7a-debug.apk`
-
-            This is a debug build intended for device testing and provisioning workflows.
-            See `README.md` in the repository for TV installation, ADB grant and update steps.
-          files: ${{ steps.prepare_asset.outputs.asset_path }}
 
       - name: Build release APK
         id: build_release
