@@ -96,13 +96,25 @@ void main() {
     expect(find.text('Grant via local ADB'), findsOneWidget);
   });
 
-  testWidgets('quick grant shows guidance when ADB is disabled',
+  testWidgets(
+      'quick grant attempts provisioning first, then shows ADB guidance',
       (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
     final appsService = MockAppsService();
     final wallpaperService = _mockWallpaperService();
     final bridgeService = _mockBridgeService();
+    when(
+      bridgeService.runProvisioningAction(
+        action: anyNamed('action'),
+        suggestedPolicy: anyNamed('suggestedPolicy'),
+      ),
+    ).thenAnswer((_) async => const <String, dynamic>{
+          'success': false,
+          'requiresAdbSetup': true,
+          'message':
+              'ADB is disabled. Enable Developer options and retry the local ADB grant.',
+        });
 
     await _pumpSettingsPanel(
       tester,
@@ -120,6 +132,12 @@ void main() {
     await tester.tap(find.byKey(const Key('permissions_quick_grant_button')));
     await tester.pumpAndSettle();
 
+    verify(
+      bridgeService.runProvisioningAction(
+        action: 'grant_all_local_adb',
+        suggestedPolicy: 'adb_and_wifi',
+      ),
+    ).called(1);
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Open developer options'), findsWidgets);
   });
@@ -246,6 +264,88 @@ void main() {
         'adb shell pm grant com.atv.launcher android.permission.TEST_PERMISSION',
       ),
       findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'permissions route surfaces missing requirement names with importance colors',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService(
+      provisioningStatus: const <String, dynamic>{
+        'health': 'missing_required',
+        'missingRequiredCount': 1,
+        'missingRecommendedCount': 1,
+        'missingOptionalCount': 1,
+        'requirements': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'name': 'android.permission.WRITE_SECURE_SETTINGS',
+            'granted': false,
+            'importance': 'required',
+          },
+          <String, dynamic>{
+            'name': 'request_install_packages',
+            'granted': false,
+            'importance': 'recommended',
+          },
+          <String, dynamic>{
+            'name': 'device_owner',
+            'granted': false,
+            'importance': 'optional',
+          },
+        ],
+        'commands': <String>[],
+      },
+    );
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(
+      tester,
+      'Permissions & Provisioning',
+      railDragOffset: -720,
+    );
+
+    expect(find.text('Missing permissions and setup items'), findsOneWidget);
+
+    final requiredChipFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is SettingsStatusChip &&
+          widget.label == 'WRITE_SECURE_SETTINGS',
+    );
+    final recommendedChipFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is SettingsStatusChip &&
+          widget.label == 'Install unknown apps',
+    );
+    final optionalChipFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is SettingsStatusChip && widget.label == 'Device owner',
+    );
+
+    expect(requiredChipFinder, findsOneWidget);
+    expect(recommendedChipFinder, findsOneWidget);
+    expect(optionalChipFinder, findsOneWidget);
+    expect(
+      tester.widget<SettingsStatusChip>(requiredChipFinder).color,
+      const Color(0xFFFF8A80),
+    );
+    expect(
+      tester.widget<SettingsStatusChip>(recommendedChipFinder).color,
+      const Color(0xFFFFC970),
+    );
+    expect(
+      tester.widget<SettingsStatusChip>(optionalChipFinder).color,
+      const Color(0xFF8CCBFF),
     );
   });
 
@@ -1473,6 +1573,12 @@ MockSystemBridgeService _mockBridgeService({
   when(bridgeService.resetVoiceMapping()).thenAnswer(
     (_) async => const <String, dynamic>{'message': 'ok'},
   );
+  when(
+    bridgeService.runProvisioningAction(
+      action: anyNamed('action'),
+      suggestedPolicy: anyNamed('suggestedPolicy'),
+    ),
+  ).thenAnswer((_) async => const <String, dynamic>{'success': true});
   when(bridgeService.openAccessibilitySettings()).thenAnswer((_) async {});
   when(bridgeService.fileAccessStatus)
       .thenReturn(const <String, dynamic>{'hasMediaPermission': true});

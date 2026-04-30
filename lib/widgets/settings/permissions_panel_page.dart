@@ -71,6 +71,15 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
         final missingRequirements = requirements
             .where((item) => item['granted'] != true)
             .toList(growable: false);
+        final missingRequiredRequirements = missingRequirements
+            .where((item) => _requirementImportance(item) == 'required')
+            .toList(growable: false);
+        final missingRecommendedRequirements = missingRequirements
+            .where((item) => _requirementImportance(item) == 'recommended')
+            .toList(growable: false);
+        final missingOptionalRequirements = missingRequirements
+            .where((item) => _requirementImportance(item) == 'optional')
+            .toList(growable: false);
         final grantedRequirements = requirements
             .where((item) => item['granted'] == true)
             .toList(growable: false);
@@ -199,6 +208,84 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                         ],
                       ),
                     ),
+                    if (missingRequirements.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        key: const Key('permissions_missing_summary'),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.045),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.09),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              localizations.missingSetupItemsTitle,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              localizations.missingSetupItemsDescription,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.white70),
+                            ),
+                            if (missingRequiredRequirements.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              _MissingRequirementsGroup(
+                                title: localizations.requiredMissingLabel,
+                                color: _requirementImportanceColor('required'),
+                                labels: missingRequiredRequirements
+                                    .map(
+                                      (item) => _requirementLabel(
+                                        localizations,
+                                        item['name']?.toString() ?? '',
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                            ],
+                            if (missingRecommendedRequirements.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              _MissingRequirementsGroup(
+                                title: localizations.recommendedMissingLabel,
+                                color:
+                                    _requirementImportanceColor('recommended'),
+                                labels: missingRecommendedRequirements
+                                    .map(
+                                      (item) => _requirementLabel(
+                                        localizations,
+                                        item['name']?.toString() ?? '',
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                            ],
+                            if (missingOptionalRequirements.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              _MissingRequirementsGroup(
+                                title: localizations.optionalMissingLabel,
+                                color: _requirementImportanceColor('optional'),
+                                labels: missingOptionalRequirements
+                                    .map(
+                                      (item) => _requirementLabel(
+                                        localizations,
+                                        item['name']?.toString() ?? '',
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     Column(
                       children: [
@@ -214,22 +301,10 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                               ? localizations.provisioningWizardDescription
                               : localizations.wizardStepOpenDeveloperOptions,
                           icon: Icons.auto_fix_high_outlined,
-                          onPressed: () async {
-                            if (!adbEnabled) {
-                              await _showAdbSetupGuidance(
-                                context,
-                                bridgeService,
-                              );
-                              return;
-                            }
-                            _showActionResult(
-                              context,
-                              await bridgeService.runProvisioningAction(
-                                action: 'grant_all_local_adb',
-                                suggestedPolicy: 'adb_and_wifi',
-                              ),
-                            );
-                          },
+                          onPressed: () async => _runQuickGrant(
+                            context,
+                            bridgeService,
+                          ),
                         ),
                         if (!adbEnabled) ...[
                           const SizedBox(height: 10),
@@ -363,6 +438,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                               item['guidance']?.toString() ?? '',
                             ),
                             granted: false,
+                            importance: _requirementImportance(item),
                           ),
                       ],
                       if (grantedRequirements.isNotEmpty) ...[
@@ -385,6 +461,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                               item['guidance']?.toString() ?? '',
                             ),
                             granted: true,
+                            importance: _requirementImportance(item),
                           ),
                       ],
                       if (commands.isNotEmpty) ...[
@@ -437,11 +514,33 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
     messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _showAdbSetupGuidance(
+  Future<void> _runQuickGrant(
     BuildContext context,
     SystemBridgeService bridgeService,
   ) async {
+    final result = await bridgeService.runProvisioningAction(
+      action: 'grant_all_local_adb',
+      suggestedPolicy: 'adb_and_wifi',
+    );
+    if (!context.mounted) {
+      return;
+    }
+    if (result['requiresAdbSetup'] == true) {
+      await _showAdbSetupGuidance(
+        context,
+        bridgeService,
+        detailMessage: result['message']?.toString(),
+      );
+      return;
+    }
+    _showActionResult(context, result);
+  }
+
+  Future<void> _showAdbSetupGuidance(
+      BuildContext context, SystemBridgeService bridgeService,
+      {String? detailMessage}) async {
     final localizations = AppLocalizations.of(context)!;
+    final trimmedDetail = detailMessage?.trim() ?? '';
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -450,6 +549,10 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (trimmedDetail.isNotEmpty) ...[
+              Text(trimmedDetail),
+              const SizedBox(height: 10),
+            ],
             Text(localizations.wizardStepOpenDeveloperOptions),
             const SizedBox(height: 10),
             Text(localizations.wizardStepGrantWss),
@@ -558,6 +661,9 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
     }
     return false;
   }
+
+  static String _requirementImportance(Map<String, dynamic> item) =>
+      item['importance']?.toString() ?? 'required';
 }
 
 class _PermissionsAdvancedToggleTile extends StatefulWidget {
@@ -685,23 +791,91 @@ class _PermissionRequirementTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool granted;
+  final String importance;
 
   const _PermissionRequirementTile({
     required this.title,
     required this.subtitle,
     required this.granted,
+    required this.importance,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = granted
+        ? const Color(0xFF7BE0A5)
+        : _requirementImportanceColor(importance);
+    final icon = granted
+        ? Icons.check_circle
+        : switch (importance) {
+            'recommended' => Icons.warning_amber_rounded,
+            'optional' => Icons.info_outline,
+            _ => Icons.gpp_bad_outlined,
+          };
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(
-        granted ? Icons.check_circle : Icons.error_outline,
-        color: granted ? const Color(0xFF7BE0A5) : const Color(0xFFFFC970),
+        icon,
+        color: color,
       ),
       title: Text(title),
-      subtitle: Text(subtitle),
+      subtitle: Text(
+        subtitle,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: granted ? Colors.white70 : color.withOpacity(0.92),
+            ),
+      ),
     );
+  }
+}
+
+class _MissingRequirementsGroup extends StatelessWidget {
+  final String title;
+  final Color color;
+  final List<String> labels;
+
+  const _MissingRequirementsGroup({
+    required this.title,
+    required this.color,
+    required this.labels,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final label in labels)
+              SettingsStatusChip(
+                label: label,
+                color: color,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+Color _requirementImportanceColor(String importance) {
+  switch (importance) {
+    case 'recommended':
+      return const Color(0xFFFFC970);
+    case 'optional':
+      return const Color(0xFF8CCBFF);
+    default:
+      return const Color(0xFFFF8A80);
   }
 }

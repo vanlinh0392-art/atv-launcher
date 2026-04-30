@@ -1,4 +1,5 @@
 import 'package:flauncher/app_image_cache_invalidator.dart';
+import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
@@ -17,6 +18,21 @@ import '../mocks.mocks.dart';
 
 void main() {
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
+
+  test('resolves configured app card highlight preset colors', () {
+    expect(
+      resolveAppCardHighlightPresetColor(
+        SettingsService.appCardHighlightColorDefault,
+      ),
+      const Color(0xFF8ACBFF),
+    );
+    expect(
+      resolveAppCardHighlightPresetColor(
+        SettingsService.appCardHighlightColorMint,
+      ),
+      const Color(0xFF7BE0A5),
+    );
+  });
 
   testWidgets('reloads the image on the first cache invalidation event',
       (tester) async {

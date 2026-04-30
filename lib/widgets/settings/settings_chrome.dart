@@ -553,6 +553,7 @@ class SettingsMetricTile extends StatefulWidget {
   final String value;
   final IconData icon;
   final double? width;
+  final Color? accentColor;
 
   const SettingsMetricTile({
     super.key,
@@ -562,6 +563,7 @@ class SettingsMetricTile extends StatefulWidget {
     required this.value,
     required this.icon,
     this.width,
+    this.accentColor,
   });
 
   @override
@@ -603,10 +605,16 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
   @override
   Widget build(BuildContext context) {
     final chromeSpec = SettingsChromeSpec.of(context);
-    final titleColor = _focused ? Colors.white : Colors.white.withOpacity(0.96);
+    final accentColor = widget.accentColor;
+    final titleColor = _focused
+        ? Colors.white
+        : (accentColor?.withOpacity(0.96) ?? Colors.white.withOpacity(0.96));
     final subtitleColor =
         _focused ? Colors.white.withOpacity(0.84) : Colors.white70;
-    final iconColor = _focused ? Colors.white : Colors.white70;
+    final iconColor = _focused ? Colors.white : (accentColor ?? Colors.white70);
+    final baseColor = accentColor == null
+        ? Colors.white.withOpacity(chromeSpec.metricTileOpacity)
+        : accentColor.withOpacity(chromeSpec.metricTileOpacity * 0.72);
 
     return EnsureVisible(
       alignment: EnsureVisible.settingsAlignment,
@@ -637,7 +645,7 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
           child: SettingsFocusFrame(
             padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
             borderRadius: BorderRadius.circular(20),
-            baseColor: Colors.white.withOpacity(chromeSpec.metricTileOpacity),
+            baseColor: baseColor,
             focusEmphasis: 1.08,
             variant: SettingsFocusFrameVariant.rowOnly,
             focused: _focused,

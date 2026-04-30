@@ -19,6 +19,7 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_image_type.dart';
 import 'package:flauncher/providers/apps_service.dart';
@@ -303,6 +304,15 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           final mediaScale = context.select<SettingsService, double>(
             (service) => service.appCardMediaScalePercent / 100,
           );
+          final highlightAnimationEnabled =
+              context.select<SettingsService, bool>(
+            (service) => service.appHighlightAnimationEnabled,
+          );
+          final highlightColor = context.select<SettingsService, Color>(
+            (service) => resolveAppCardHighlightPresetColor(
+              service.appHighlightAnimationColorPreset,
+            ),
+          );
           final homeReorderModeEnabled = context.select<AppsService, bool>(
             (service) => service.homeReorderModeEnabled,
           );
@@ -377,38 +387,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                   child: Container(color: Colors.black),
                                 ),
                               ),
-                              Selector<SettingsService, bool>(
-                                selector: (_, settingsService) =>
-                                    settingsService
-                                        .appHighlightAnimationEnabled &&
+                              _highlightFrame(
+                                enabled: highlightAnimationEnabled &&
                                     shouldHighlight,
-                                builder: (context, highlight, _) {
-                                  if (highlight) {
-                                    _animation.repeat(reverse: true);
-                                    return AnimatedBuilder(
-                                      animation: _animation,
-                                      builder: (context, child) =>
-                                          IgnorePointer(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              cornerRadius,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.white.withAlpha(
-                                                _animation.value.round(),
-                                              ),
-                                              width: 3,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-
-                                  _animation.stop();
-                                  return const SizedBox();
-                                },
+                                cornerRadius: cornerRadius,
+                                highlightColor: highlightColor,
                               ),
                               if (locked) _lockBadge(),
                             ],
@@ -423,6 +406,43 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           );
         },
       );
+
+  Widget _highlightFrame({
+    required bool enabled,
+    required double cornerRadius,
+    required Color highlightColor,
+  }) {
+    if (!enabled) {
+      _animation.stop();
+      return const SizedBox();
+    }
+
+    _animation.repeat(reverse: true);
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final pulse = (_animation.value / 255).clamp(0.0, 1.0);
+        return IgnorePointer(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(cornerRadius),
+              border: Border.all(
+                color: highlightColor.withOpacity(0.34 + (pulse * 0.66)),
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: highlightColor.withOpacity(0.10 + (pulse * 0.16)),
+                  blurRadius: 18 + (pulse * 8),
+                  spreadRadius: 0.5 + (pulse * 0.8),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<Tuple2<AppImageType, ImageProvider>> _loadAppBannerOrIcon(
       AppsService service) async {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
@@ -70,6 +71,14 @@ class HomeLayoutPanelPage extends StatefulWidget {
     105,
     110,
     115,
+  ];
+  static const List<String> _appHighlightColorOptions = <String>[
+    SettingsService.appCardHighlightColorLightBlue,
+    SettingsService.appCardHighlightColorMint,
+    SettingsService.appCardHighlightColorAmber,
+    SettingsService.appCardHighlightColorCoral,
+    SettingsService.appCardHighlightColorViolet,
+    SettingsService.appCardHighlightColorWhite,
   ];
 
   final FocusNode? primaryFocusNode;
@@ -442,6 +451,34 @@ class _HomeLayoutPanelPageState extends State<HomeLayoutPanelPage> {
                         secondary: const Icon(Icons.filter_center_focus),
                       ),
                       const SizedBox(height: 10),
+                      SettingsChoiceCard<String>(
+                        selectorKey:
+                            const Key('app_card_highlight_color_selector'),
+                        optionKeyPrefix: 'app_card_highlight_color_option',
+                        title: localizations.appCardHighlightColorTitle,
+                        subtitle:
+                            localizations.appCardHighlightColorDescription,
+                        icon: Icons.palette_outlined,
+                        value: settingsService.appHighlightAnimationColorPreset,
+                        options: HomeLayoutPanelPage._appHighlightColorOptions
+                            .map(
+                              (value) => SettingsChoiceOption<String>(
+                                value: value,
+                                label: _highlightColorLabel(
+                                  localizations,
+                                  value,
+                                ),
+                                swatchColor:
+                                    appCardHighlightPresetColors[value],
+                              ),
+                            )
+                            .toList(growable: false),
+                        valueLabelBuilder: (value) =>
+                            _highlightColorLabel(localizations, value),
+                        onChanged:
+                            settingsService.setAppHighlightAnimationColorPreset,
+                      ),
+                      const SizedBox(height: 10),
                       RoundedSwitchListTile(
                         debugLabel: 'home_layout_app_key_click',
                         value: settingsService.appKeyClickEnabled,
@@ -728,6 +765,23 @@ class _HomeLayoutPanelPageState extends State<HomeLayoutPanelPage> {
         return localizations.homeDockPerformanceModeOff;
       default:
         return localizations.homeDockPerformanceModeBalanced;
+    }
+  }
+
+  String _highlightColorLabel(AppLocalizations localizations, String value) {
+    switch (value) {
+      case SettingsService.appCardHighlightColorMint:
+        return localizations.colorPresetMint;
+      case SettingsService.appCardHighlightColorAmber:
+        return localizations.colorPresetAmber;
+      case SettingsService.appCardHighlightColorCoral:
+        return localizations.colorPresetCoral;
+      case SettingsService.appCardHighlightColorViolet:
+        return localizations.colorPresetViolet;
+      case SettingsService.appCardHighlightColorWhite:
+        return localizations.colorPresetWhite;
+      default:
+        return localizations.colorPresetLightBlue;
     }
   }
 

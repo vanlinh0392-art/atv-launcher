@@ -15,10 +15,12 @@ typedef SettingsBoundaryMoveHandler = bool Function();
 class SettingsChoiceOption<T> {
   final T value;
   final String label;
+  final Color? swatchColor;
 
   const SettingsChoiceOption({
     required this.value,
     required this.label,
+    this.swatchColor,
   });
 }
 
@@ -384,7 +386,7 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                                         ? () => _optionFocusNodes[index + 1]
                                             .requestFocus()
                                         : null,
-                                child: Text(option.label),
+                                child: _ChoiceOptionContent(option: option),
                               );
                               if (buttonKeyPrefix == null) {
                                 return button;
@@ -997,6 +999,40 @@ bool _moveVerticalFocusOutsideCluster({
       direction: direction,
       localNodes: localNodes,
     );
+
+class _ChoiceOptionContent<T> extends StatelessWidget {
+  final SettingsChoiceOption<T> option;
+
+  const _ChoiceOptionContent({
+    required this.option,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (option.swatchColor == null) {
+      return Text(option.label);
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: option.swatchColor,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.75),
+              width: 1.2,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(child: Text(option.label)),
+      ],
+    );
+  }
+}
 
 class SettingsControlButton extends StatefulWidget {
   final FocusNode focusNode;

@@ -4,6 +4,8 @@
     "addSection": "Add section",
     "alphabetical": "Alphabetical",
     "appCardHighlightAnimation": "App card highlight animation",
+    "appCardHighlightColorTitle": "Highlight color",
+    "appCardHighlightColorDescription": "Choose the accent color for the app card highlight animation on HOME.",
     "appInfo": "Application info",
     "appKeyClick": "Click sound on key press",
     "appTitle": "ATV Launcher",
@@ -166,6 +168,12 @@
     "appCardLayoutSizeDescription": "Scale the full home app card inside each fixed slot without changing row count or dock layout.",
     "iconSizeTitle": "Icon size",
     "iconSizeDescription": "Adjust only the banner or icon artwork inside each home card without changing the card layout.",
+    "colorPresetLightBlue": "Light blue",
+    "colorPresetMint": "Mint",
+    "colorPresetAmber": "Amber",
+    "colorPresetCoral": "Coral",
+    "colorPresetViolet": "Violet",
+    "colorPresetWhite": "White",
     "dateAndTimeScaleTitle": "Date & time size",
     "dateAndTimeScaleDescription": "Scale the HOME status bar clock and date without changing the rest of the layout.",
     "ramChipLabel": "RAM {freeValue} free / {totalValue} total",
@@ -190,6 +198,9 @@
     "permissionHealthLabel": "Permission health",
     "requiredMissingLabel": "Required missing",
     "recommendedMissingLabel": "Recommended missing",
+    "optionalMissingLabel": "Optional missing",
+    "missingSetupItemsTitle": "Missing permissions and setup items",
+    "missingSetupItemsDescription": "Red means required, yellow means recommended, blue means optional.",
     "provisioningWizardTitle": "Provisioning Wizard",
     "provisioningWizardDescription": "Guide the user to Developer Options when needed, then run local ADB grants and verify the launcher state.",
     "grantViaLocalAdb": "Grant via local ADB",
@@ -227,33 +238,34 @@
     "requirementMediaReadLabel": "Video library access",
     "requirementMediaReadGuidance": "Use the in-app prompt, local ADB wizard or PC ADB grant",
     "launcherUpdateInstalledVersion": "Installed build",
-    "launcherUpdateLatestRelease": "Latest release",
+    "launcherUpdateLatestRelease": "Latest official release",
     "launcherUpdateInstallerPermission": "Install permission",
     "launcherUpdateDownloadedBuild": "Downloaded APK",
     "launcherUpdateNotChecked": "Not checked",
     "launcherUpdatePermissionReady": "Ready",
     "launcherUpdatePermissionMissing": "Needs approval",
     "launcherUpdateNoDownloadedApk": "Nothing downloaded",
-    "checkLatestRelease": "Check latest release",
-    "launcherUpdateCheckSubtitle": "Query the newest GitHub release for this launcher.",
-    "downloadLatestApk": "Download latest APK",
-    "launcherUpdateCheckBeforeDownload": "Check GitHub first to pick the newest APK asset.",
+    "checkLatestRelease": "Check latest official release",
+    "launcherUpdateCheckSubtitle": "Query the newest official GitHub release for this launcher.",
+    "downloadLatestApk": "Download latest official APK",
+    "launcherUpdateCheckBeforeDownload": "Check GitHub first to pick the newest official APK asset.",
     "installDownloadedApk": "Install downloaded APK",
     "launcherUpdatePermissionActionSubtitle": "Allow installs from this source if Android still blocks updates.",
     "grantInstallPermissionViaLocalAdb": "Grant install via local ADB",
     "launcherUpdateLocalAdbSubtitle": "Try the local ADB fallback before opening Android permission screens.",
     "allowAppInstalls": "Allow app installs",
     "launcherUpdateStatusTitle": "Update status",
-    "launcherUpdateEmptyState": "Check GitHub releases to see the latest ATV Launcher build and download it directly on this TV.",
-    "launcherUpdateChecking": "Checking the latest GitHub release...",
-    "launcherUpdateNoApkAsset": "The latest GitHub release does not contain an APK asset.",
-    "launcherUpdateLatestReleaseReady": "Latest release ready: {release}",
+    "launcherUpdateEmptyState": "Check GitHub releases to see the latest official ATV Launcher build and download it directly on this TV.",
+    "launcherUpdateChecking": "Checking the latest official GitHub release...",
+    "launcherUpdateNoOfficialRelease": "No suitable official release is available right now.",
+    "launcherUpdateNoApkAsset": "The latest GitHub release does not contain a suitable official APK asset.",
+    "launcherUpdateLatestReleaseReady": "Official release ready: {release}",
     "@launcherUpdateLatestReleaseReady": {
         "placeholders": {
             "release": {}
         }
     },
-    "launcherUpdateCheckFailed": "GitHub release check failed: {error}",
+    "launcherUpdateCheckFailed": "GitHub official release check failed: {error}",
     "@launcherUpdateCheckFailed": {
         "placeholders": {
             "error": {}
@@ -271,6 +283,20 @@
             "percent": {
                 "type": "int"
             }
+        }
+    },
+    "launcherUpdateDownloadIndeterminate": "Downloading official APK...",
+    "launcherUpdateDownloadBytesProgress": "{downloaded} / {total}",
+    "@launcherUpdateDownloadBytesProgress": {
+        "placeholders": {
+            "downloaded": {},
+            "total": {}
+        }
+    },
+    "launcherUpdateDownloadBytesReceived": "{downloaded} downloaded",
+    "@launcherUpdateDownloadBytesReceived": {
+        "placeholders": {
+            "downloaded": {}
         }
     },
     "launcherUpdateDownloadComplete": "Downloaded {fileName}. You can install it now from this panel.",
@@ -306,7 +332,9 @@
     "launcherUpdateRepoLabel": "GitHub repo",
     "launcherUpdateTagLabel": "Release tag",
     "launcherUpdatePublishedAt": "Published",
+    "launcherUpdateUploadedAt": "Uploaded",
     "launcherUpdateAssetLabel": "APK asset",
+    "launcherUpdateSizeLabel": "Update size",
     "launcherUpdateDownloadsLabel": "Downloads",
     "launcherUpdateReleaseNotes": "Release notes",
     "actionCompleted": "Action completed.",

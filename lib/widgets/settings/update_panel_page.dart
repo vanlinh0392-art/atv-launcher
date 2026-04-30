@@ -7,6 +7,7 @@ import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -14,10 +15,12 @@ import 'package:provider/provider.dart';
 class UpdatePanelPage extends StatefulWidget {
   static const String routeName = "update_panel";
   final FocusNode? primaryFocusNode;
+  final LauncherUpdateClient? updateClient;
 
   const UpdatePanelPage({
     super.key,
     this.primaryFocusNode,
+    this.updateClient,
   });
 
   @override
@@ -27,14 +30,20 @@ class UpdatePanelPage extends StatefulWidget {
 class _UpdatePanelPageState extends State<UpdatePanelPage>
     with WidgetsBindingObserver {
   static const String _summaryDebugLabel = 'update_panel_summary_metrics';
+  static const Color _statusOkColor = Color(0xFF7BE0A5);
+  static const Color _statusNeedsActionColor = Color(0xFFFFC970);
 
-  final LauncherUpdateClient _updateClient = LauncherUpdateClient();
+  late final LauncherUpdateClient _updateClient;
 
   LauncherUpdateRelease? _latestRelease;
+  bool _hasCheckedOfficialRelease = false;
   String _installedVersionLabel = '-';
   String _lastMessage = '';
   String? _downloadedApkPath;
   String? _downloadedAssetName;
+  String? _downloadFileName;
+  int _downloadedBytes = 0;
+  int _downloadTotalBytes = 0;
   double? _downloadProgress;
   bool _busy = false;
   bool _resumeInstallAfterPermission = false;
@@ -42,6 +51,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
   @override
   void initState() {
     super.initState();
+    _updateClient = widget.updateClient ?? LauncherUpdateClient();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_loadInstalledVersion());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,15 +84,25 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     return Selector<SystemBridgeService, Map<String, dynamic>>(
       selector: (_, service) => service.updateStatus,
       builder: (context, updateStatus, _) {
-        final permissionReady = updateStatus['canRequestPackageInstalls'] == true;
+        final permissionReady =
+            updateStatus['canRequestPackageInstalls'] == true;
         final adbEnabled = updateStatus['adbEnabled'] == true;
         final latestAsset = _latestRelease?.preferredApkAsset;
-        final latestReleaseLabel = _latestRelease?.displayName.trim().isNotEmpty == true
-            ? _latestRelease!.displayName
-            : localizations.launcherUpdateNotChecked;
+        final latestAssetSizeLabel = _resolveLatestAssetSizeLabel(
+          localizations,
+          latestAsset,
+        );
+        final latestAssetUploadedAtLabel = _resolveLatestAssetUploadedAtLabel(
+          context,
+          localizations,
+          latestAsset,
+        );
+        final latestReleaseLabel = _resolveLatestReleaseLabel(localizations);
         final installerLabel = permissionReady
             ? localizations.launcherUpdatePermissionReady
             : localizations.launcherUpdatePermissionMissing;
+        final permissionColor =
+            permissionReady ? _statusOkColor : _statusNeedsActionColor;
         final downloadedLabel =
             _downloadedAssetName ?? localizations.launcherUpdateNoDownloadedApk;
 
@@ -93,8 +113,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
             SettingsSummarySection(
               debugLabel: _summaryDebugLabel,
               child: SettingsAdaptiveGrid(
-                minChildWidth: 180,
-                maxColumns: 4,
+                minChildWidth: 170,
+                maxColumns: 3,
                 children: [
                   SettingsMetricTile(
                     label: localizations.launcherUpdateInstalledVersion,
@@ -112,11 +132,22 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                     icon: permissionReady
                         ? Icons.verified_user_outlined
                         : Icons.warning_amber_outlined,
+                    accentColor: permissionColor,
                   ),
                   SettingsMetricTile(
                     label: localizations.launcherUpdateDownloadedBuild,
                     value: downloadedLabel,
                     icon: Icons.download_done_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.launcherUpdateSizeLabel,
+                    value: latestAssetSizeLabel,
+                    icon: Icons.sd_storage_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.launcherUpdateUploadedAt,
+                    value: latestAssetUploadedAtLabel,
+                    icon: Icons.event_outlined,
                   ),
                 ],
               ),
@@ -130,9 +161,10 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                   SettingsActionCard(
                     focusNode: widget.primaryFocusNode,
                     onMoveUpAtBoundary: () =>
-                        focusCurrentSettingsNodeByDebugLabel(_summaryDebugLabel),
+                        focusCurrentSettingsNodeByDebugLabel(
+                            _summaryDebugLabel),
                     title: localizations.checkLatestRelease,
-                    subtitle: _latestRelease == null
+                    subtitle: !_hasCheckedOfficialRelease
                         ? localizations.launcherUpdateCheckSubtitle
                         : latestReleaseLabel,
                     icon: Icons.system_update_alt_outlined,
@@ -141,7 +173,9 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                   SettingsActionCard(
                     title: localizations.downloadLatestApk,
                     subtitle: latestAsset?.name ??
-                        localizations.launcherUpdateCheckBeforeDownload,
+                        (_hasCheckedOfficialRelease
+                            ? localizations.launcherUpdateNoOfficialRelease
+                            : localizations.launcherUpdateCheckBeforeDownload),
                     icon: Icons.download_for_offline_outlined,
                     onPressed: _busy || latestAsset == null
                         ? null
@@ -189,7 +223,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                 ],
               ),
             ),
-            if (_lastMessage.trim().isNotEmpty || _downloadProgress != null) ...[
+            if (_lastMessage.trim().isNotEmpty || _showDownloadProgress) ...[
               const SizedBox(height: 18),
               SettingsSurfaceCard(
                 child: Column(
@@ -206,8 +240,19 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],
-                    if (_downloadProgress != null) ...[
+                    if (_showDownloadProgress) ...[
                       const SizedBox(height: 12),
+                      if ((_downloadFileName ?? '').trim().isNotEmpty) ...[
+                        Text(
+                          _downloadFileName!,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       LinearProgressIndicator(
                         value: _downloadProgress,
                         minHeight: 8,
@@ -217,13 +262,23 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        localizations.launcherUpdateDownloadProgress(
-                          (_downloadProgress! * 100).round(),
-                        ),
+                        _downloadProgress == null
+                            ? localizations.launcherUpdateDownloadIndeterminate
+                            : localizations.launcherUpdateDownloadProgress(
+                                (_downloadProgress! * 100).round(),
+                              ),
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
                             ?.copyWith(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _resolveDownloadBytesLabel(localizations),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.white60),
                       ),
                     ],
                   ],
@@ -232,12 +287,11 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
             ],
             const SizedBox(height: 18),
             SettingsSurfaceCard(
-              child: _latestRelease == null
-                  ? Text(localizations.launcherUpdateEmptyState)
-                  : _ReleaseDetailsCard(
-                      release: _latestRelease!,
-                      installedVersionLabel: _installedVersionLabel,
-                    ),
+              child: _buildReleaseDetails(
+                context,
+                localizations,
+                permissionReady,
+              ),
             ),
           ],
         );
@@ -264,10 +318,13 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     }
     final bridge = context.read<SystemBridgeService>();
     await bridge.refreshLite();
-    if (!mounted || !_resumeInstallAfterPermission || _downloadedApkPath == null) {
+    if (!mounted ||
+        !_resumeInstallAfterPermission ||
+        _downloadedApkPath == null) {
       return;
     }
-    final permissionReady = bridge.updateStatus['canRequestPackageInstalls'] == true;
+    final permissionReady =
+        bridge.updateStatus['canRequestPackageInstalls'] == true;
     if (!permissionReady) {
       return;
     }
@@ -284,16 +341,19 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       _lastMessage = localizations.launcherUpdateChecking;
     });
     try {
-      final release = await _updateClient.fetchLatestRelease();
+      final release = await _updateClient.fetchLatestOfficialRelease();
       if (!mounted) {
         return;
       }
       setState(() {
+        _hasCheckedOfficialRelease = true;
         _latestRelease = release;
-        _lastMessage = release.preferredApkAsset == null
-            ? localizations.launcherUpdateNoApkAsset
+        _lastMessage = release == null
+            ? localizations.launcherUpdateNoOfficialRelease
             : localizations.launcherUpdateLatestReleaseReady(
-                release.displayName.isEmpty ? release.tagName : release.displayName,
+                release.displayName.isEmpty
+                    ? release.tagName
+                    : release.displayName,
               );
       });
     } catch (error) {
@@ -301,7 +361,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         return;
       }
       setState(() {
-        _lastMessage = localizations.launcherUpdateCheckFailed(error.toString());
+        _lastMessage =
+            localizations.launcherUpdateCheckFailed(error.toString());
       });
     } finally {
       if (mounted) {
@@ -314,36 +375,15 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
 
   Future<void> _downloadLatestApk(LauncherUpdateAsset asset) async {
     final localizations = AppLocalizations.of(context)!;
-    final downloadUri = asset.downloadUri;
-    if (downloadUri == null) {
-      setState(() {
-        _lastMessage = localizations.launcherUpdateNoApkAsset;
-      });
-      return;
-    }
-
     setState(() {
       _busy = true;
+      _downloadFileName = asset.name;
       _downloadProgress = 0;
+      _downloadedBytes = 0;
+      _downloadTotalBytes = asset.sizeBytes;
       _lastMessage = localizations.launcherUpdateDownloadStarted(asset.name);
     });
-
-    final client = HttpClient();
-    IOSink? sink;
     try {
-      final request = await client.getUrl(downloadUri);
-      request.headers.set(
-        HttpHeaders.userAgentHeader,
-        'ATVLauncher/${LauncherUpdateClient.githubOwner}-${LauncherUpdateClient.githubRepo}',
-      );
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException(
-          'GitHub asset download failed with HTTP ${response.statusCode}.',
-          uri: downloadUri,
-        );
-      }
-
       final updateDirectory = Directory(
         '${(await getTemporaryDirectory()).path}${Platform.pathSeparator}launcher_updates',
       );
@@ -356,52 +396,38 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       final outputFile = File(
         '${updateDirectory.path}${Platform.pathSeparator}$fileName',
       );
-      sink = outputFile.openWrite();
-
-      final totalBytes = response.contentLength;
-      var receivedBytes = 0;
-      var lastProgressAt = DateTime.fromMillisecondsSinceEpoch(0);
-      await for (final chunk in response) {
-        sink.add(chunk);
-        receivedBytes += chunk.length;
-        if (!mounted) {
-          continue;
-        }
-        if (totalBytes > 0) {
-          final now = DateTime.now();
-          if (now.difference(lastProgressAt).inMilliseconds >= 120 ||
-              receivedBytes >= totalBytes) {
-            lastProgressAt = now;
-            setState(() {
-              _downloadProgress = receivedBytes / totalBytes;
-            });
-          }
-        }
-      }
-      await sink.flush();
-      await sink.close();
-      sink = null;
+      final downloadedApk = await _updateClient.downloadApkAsset(
+        asset: asset,
+        destinationFile: outputFile,
+        onProgress: _handleDownloadProgress,
+      );
 
       if (!mounted) {
         return;
       }
       setState(() {
-        _downloadedApkPath = outputFile.path;
-        _downloadedAssetName = asset.name;
+        _downloadedApkPath = downloadedApk.filePath;
+        _downloadedAssetName = downloadedApk.fileName;
+        _downloadFileName = null;
+        _downloadedBytes = 0;
+        _downloadTotalBytes = 0;
         _downloadProgress = null;
-        _lastMessage = localizations.launcherUpdateDownloadComplete(asset.name);
+        _lastMessage = localizations
+            .launcherUpdateDownloadComplete(downloadedApk.fileName);
       });
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
+        _downloadFileName = null;
+        _downloadedBytes = 0;
+        _downloadTotalBytes = 0;
         _downloadProgress = null;
-        _lastMessage = localizations.launcherUpdateDownloadFailed(error.toString());
+        _lastMessage =
+            localizations.launcherUpdateDownloadFailed(error.toString());
       });
     } finally {
-      await sink?.close();
-      client.close(force: true);
       if (mounted) {
         setState(() {
           _busy = false;
@@ -455,7 +481,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     final localizations = AppLocalizations.of(context)!;
     _resumeInstallAfterPermission =
         resumeInstallAfterPermission && _downloadedApkPath != null;
-    final opened = await bridge.openSpecificSettingsPage('install_unknown_apps');
+    final opened =
+        await bridge.openSpecificSettingsPage('install_unknown_apps');
     if (!mounted) {
       return;
     }
@@ -496,7 +523,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         _lastMessage = result['message']?.toString().trim().isNotEmpty == true
             ? result['message'].toString()
             : localizations.launcherUpdateInstallLaunched(
-                _downloadedAssetName ?? apkPath.split(Platform.pathSeparator).last,
+                _downloadedAssetName ??
+                    apkPath.split(Platform.pathSeparator).last,
               );
       });
     } catch (error) {
@@ -504,7 +532,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         return;
       }
       setState(() {
-        _lastMessage = localizations.launcherUpdateInstallFailed(error.toString());
+        _lastMessage =
+            localizations.launcherUpdateInstallFailed(error.toString());
       });
     } finally {
       if (mounted) {
@@ -539,15 +568,111 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     final sanitized = trimmed.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
     return sanitized.isEmpty ? fallback : sanitized;
   }
+
+  String _resolveLatestAssetSizeLabel(
+    AppLocalizations localizations,
+    LauncherUpdateAsset? asset,
+  ) {
+    if (!_hasCheckedOfficialRelease) {
+      return localizations.launcherUpdateNotChecked;
+    }
+    if (_latestRelease == null) {
+      return localizations.launcherUpdateNoOfficialRelease;
+    }
+    if (asset == null) {
+      return localizations.launcherUpdateNoApkAsset;
+    }
+    return formatUpdateFileSize(asset.sizeBytes);
+  }
+
+  String _resolveLatestAssetUploadedAtLabel(
+    BuildContext context,
+    AppLocalizations localizations,
+    LauncherUpdateAsset? asset,
+  ) {
+    if (!_hasCheckedOfficialRelease) {
+      return localizations.launcherUpdateNotChecked;
+    }
+    if (_latestRelease == null) {
+      return localizations.launcherUpdateNoOfficialRelease;
+    }
+    return _formatUpdateDateTime(
+      context,
+      asset?.uploadedAt ?? _latestRelease?.publishedAt,
+      includeTime: false,
+    );
+  }
+
+  bool get _showDownloadProgress =>
+      (_downloadFileName ?? '').trim().isNotEmpty && _busy;
+
+  void _handleDownloadProgress(LauncherUpdateDownloadProgress progress) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _downloadFileName = progress.fileName;
+      _downloadedBytes = progress.receivedBytes;
+      _downloadTotalBytes = progress.totalBytes;
+      _downloadProgress = progress.fraction;
+    });
+  }
+
+  String _resolveLatestReleaseLabel(AppLocalizations localizations) {
+    if (_latestRelease?.displayName.trim().isNotEmpty == true) {
+      return _latestRelease!.displayName;
+    }
+    if (_hasCheckedOfficialRelease) {
+      return localizations.launcherUpdateNoOfficialRelease;
+    }
+    return localizations.launcherUpdateNotChecked;
+  }
+
+  String _resolveDownloadBytesLabel(AppLocalizations localizations) {
+    final downloaded = formatUpdateFileSize(_downloadedBytes);
+    if (_downloadTotalBytes > 0) {
+      return localizations.launcherUpdateDownloadBytesProgress(
+        downloaded,
+        formatUpdateFileSize(_downloadTotalBytes),
+      );
+    }
+    return localizations.launcherUpdateDownloadBytesReceived(downloaded);
+  }
+
+  Widget _buildReleaseDetails(
+    BuildContext context,
+    AppLocalizations localizations,
+    bool permissionReady,
+  ) {
+    if (!_hasCheckedOfficialRelease) {
+      return Text(localizations.launcherUpdateEmptyState);
+    }
+    if (_latestRelease == null) {
+      return Text(
+        localizations.launcherUpdateNoOfficialRelease,
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: Colors.white70),
+      );
+    }
+    return _ReleaseDetailsCard(
+      release: _latestRelease!,
+      installedVersionLabel: _installedVersionLabel,
+      permissionReady: permissionReady,
+    );
+  }
 }
 
 class _ReleaseDetailsCard extends StatelessWidget {
   final LauncherUpdateRelease release;
   final String installedVersionLabel;
+  final bool permissionReady;
 
   const _ReleaseDetailsCard({
     required this.release,
     required this.installedVersionLabel,
+    required this.permissionReady,
   });
 
   @override
@@ -555,7 +680,12 @@ class _ReleaseDetailsCard extends StatelessWidget {
     final localizations = AppLocalizations.of(context)!;
     final asset = release.preferredApkAsset;
     final publishedAt = release.publishedAt;
-    final matchesInstalled = release.matchesInstalledVersion(installedVersionLabel);
+    final uploadedAt = asset?.uploadedAt ?? publishedAt;
+    final matchesInstalled =
+        release.matchesInstalledVersion(installedVersionLabel);
+    final permissionColor = permissionReady
+        ? _UpdatePanelPageState._statusOkColor
+        : _UpdatePanelPageState._statusNeedsActionColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,7 +694,9 @@ class _ReleaseDetailsCard extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                release.displayName.isEmpty ? release.tagName : release.displayName,
+                release.displayName.isEmpty
+                    ? release.tagName
+                    : release.displayName,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
@@ -575,6 +707,13 @@ class _ReleaseDetailsCard extends StatelessWidget {
               color: matchesInstalled
                   ? const Color(0xFF7BE0A5)
                   : const Color(0xFF8CCBFF),
+            ),
+            const SizedBox(width: 10),
+            SettingsStatusChip(
+              label: permissionReady
+                  ? localizations.launcherUpdatePermissionReady
+                  : localizations.launcherUpdatePermissionMissing,
+              color: permissionColor,
             ),
           ],
         ),
@@ -590,7 +729,11 @@ class _ReleaseDetailsCard extends StatelessWidget {
         ),
         _ReleaseInfoRow(
           label: localizations.launcherUpdatePublishedAt,
-          value: publishedAt == null ? '-' : publishedAt.toString(),
+          value: _formatUpdateDateTime(context, publishedAt),
+        ),
+        _ReleaseInfoRow(
+          label: localizations.launcherUpdateUploadedAt,
+          value: _formatUpdateDateTime(context, uploadedAt),
         ),
         _ReleaseInfoRow(
           label: localizations.launcherUpdateAssetLabel,
@@ -598,6 +741,11 @@ class _ReleaseDetailsCard extends StatelessWidget {
               ? localizations.launcherUpdateNoApkAsset
               : '${asset.name}  •  ${formatUpdateFileSize(asset.sizeBytes)}',
         ),
+        if (asset != null)
+          _ReleaseInfoRow(
+            label: localizations.launcherUpdateSizeLabel,
+            value: formatUpdateFileSize(asset.sizeBytes),
+          ),
         if (asset != null)
           _ReleaseInfoRow(
             label: localizations.launcherUpdateDownloadsLabel,
@@ -621,6 +769,21 @@ class _ReleaseDetailsCard extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatUpdateDateTime(
+  BuildContext context,
+  DateTime? value, {
+  bool includeTime = true,
+}) {
+  if (value == null) {
+    return '-';
+  }
+  final localeName = Localizations.localeOf(context).toLanguageTag();
+  final dateFormat = includeTime
+      ? DateFormat.yMd(localeName).add_Hm()
+      : DateFormat.yMd(localeName);
+  return dateFormat.format(value);
 }
 
 class _ReleaseInfoRow extends StatelessWidget {

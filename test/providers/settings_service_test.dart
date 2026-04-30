@@ -133,6 +133,10 @@ void main() async {
         SettingsService.appCardLayoutScaleDefault,
       );
       expect(
+        settingsService.appHighlightAnimationColorPreset,
+        SettingsService.appCardHighlightColorDefault,
+      );
+      expect(
         settingsService.appCardMediaScalePercent,
         SettingsService.appCardMediaScaleDefault,
       );
@@ -163,6 +167,8 @@ void main() async {
         'settingsUiTransparencyPercent': 70,
         'appCardCornerRadius': 18,
         'appCardLayoutScalePercent': 95,
+        'appHighlightAnimationColorPreset':
+            SettingsService.appCardHighlightColorMint,
         'appCardMediaScalePercent': 125,
         'showRamInStatusBar': true,
         'statusBarClockScalePercent': 150,
@@ -186,6 +192,10 @@ void main() async {
       expect(settingsService.settingsUiTransparencyPercent, 70);
       expect(settingsService.appCardCornerRadius, 18);
       expect(settingsService.appCardLayoutScalePercent, 95);
+      expect(
+        settingsService.appHighlightAnimationColorPreset,
+        SettingsService.appCardHighlightColorMint,
+      );
       expect(settingsService.appCardMediaScalePercent, 125);
       expect(settingsService.showRamInStatusBar, true);
       expect(settingsService.statusBarClockScalePercent, 150);
@@ -204,6 +214,10 @@ void main() async {
       expect(backup['settingsUiTransparencyPercent'], 70);
       expect(backup['appCardCornerRadius'], 18);
       expect(backup['appCardLayoutScalePercent'], 95);
+      expect(
+        backup['appHighlightAnimationColorPreset'],
+        SettingsService.appCardHighlightColorMint,
+      );
       expect(backup['appCardMediaScalePercent'], 125);
       expect(backup['showRamInStatusBar'], true);
       expect(backup['statusBarClockScalePercent'], 150);
@@ -228,6 +242,9 @@ void main() async {
         SettingsService.homeDockPerformanceModeQuality,
       );
       await settingsService.setAppCardLayoutScalePercent(110);
+      await settingsService.setAppHighlightAnimationColorPreset(
+        SettingsService.appCardHighlightColorCoral,
+      );
       await settingsService.setAppCardMediaScalePercent(125);
       await settingsService.setVideoWallpaperRepeatCountPerItem(8);
       await settingsService.setStatusBarClockScalePercent(180);
@@ -267,6 +284,10 @@ void main() async {
       expect(
         settingsService.appCardLayoutScalePercent,
         SettingsService.appCardLayoutScaleDefault,
+      );
+      expect(
+        settingsService.appHighlightAnimationColorPreset,
+        SettingsService.appCardHighlightColorDefault,
       );
       expect(
         settingsService.appCardMediaScalePercent,

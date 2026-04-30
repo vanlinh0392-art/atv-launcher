@@ -23,6 +23,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _appHighlightAnimationEnabledKey = "app_highlight_animation_enabled";
+const _appHighlightAnimationColorPresetKey =
+    "app_highlight_animation_color_preset";
 const _appKeyClickEnabledKey = "app_key_click_enabled";
 const _autoHideAppBar = "auto_hide_app_bar";
 const _gradientUuidKey = "gradient_uuid";
@@ -86,6 +88,14 @@ class SettingsService extends ChangeNotifier {
   static const int appCardLayoutScaleMax = 115;
   static const int appCardLayoutScaleDefault = 90;
   static const int appCardLayoutScaleStep = 5;
+  static const String appCardHighlightColorLightBlue = 'light_blue';
+  static const String appCardHighlightColorMint = 'mint';
+  static const String appCardHighlightColorAmber = 'amber';
+  static const String appCardHighlightColorCoral = 'coral';
+  static const String appCardHighlightColorViolet = 'violet';
+  static const String appCardHighlightColorWhite = 'white';
+  static const String appCardHighlightColorDefault =
+      appCardHighlightColorLightBlue;
   static const int appCardMediaScaleMin = 80;
   static const int appCardMediaScaleMax = 125;
   static const int appCardMediaScaleDefault = 110;
@@ -133,6 +143,12 @@ class SettingsService extends ChangeNotifier {
 
   bool get appHighlightAnimationEnabled =>
       _sharedPreferences.getBool(_appHighlightAnimationEnabledKey) ?? true;
+
+  String get appHighlightAnimationColorPreset =>
+      _sanitizeAppHighlightAnimationColorPreset(
+        _sharedPreferences.getString(_appHighlightAnimationColorPresetKey) ??
+            appCardHighlightColorDefault,
+      );
 
   bool get appKeyClickEnabled =>
       _sharedPreferences.getBool(_appKeyClickEnabledKey) ?? true;
@@ -316,6 +332,14 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> setAppHighlightAnimationEnabled(bool value) async {
     return set(_appHighlightAnimationEnabledKey, value);
+  }
+
+  Future<void> setAppHighlightAnimationColorPreset(String value) async {
+    await _sharedPreferences.setString(
+      _appHighlightAnimationColorPresetKey,
+      _sanitizeAppHighlightAnimationColorPreset(value),
+    );
+    notifyListeners();
   }
 
   Future<void> setAppKeyClickEnabled(bool value) async {
@@ -593,6 +617,7 @@ class SettingsService extends ChangeNotifier {
   Map<String, dynamic> toBackupMap() {
     return <String, dynamic>{
       'appHighlightAnimationEnabled': appHighlightAnimationEnabled,
+      'appHighlightAnimationColorPreset': appHighlightAnimationColorPreset,
       'appKeyClickEnabled': appKeyClickEnabled,
       'autoHideAppBarEnabled': autoHideAppBarEnabled,
       'gradientUuid': gradientUuid,
@@ -646,6 +671,16 @@ class SettingsService extends ChangeNotifier {
         _appHighlightAnimationEnabledKey,
         _readBool(
             data, 'appHighlightAnimationEnabled', appHighlightAnimationEnabled),
+      ),
+      _sharedPreferences.setString(
+        _appHighlightAnimationColorPresetKey,
+        _sanitizeAppHighlightAnimationColorPreset(
+          _readString(
+            data,
+            'appHighlightAnimationColorPreset',
+            appCardHighlightColorDefault,
+          ),
+        ),
       ),
       _sharedPreferences.setBool(
         _appKeyClickEnabledKey,
@@ -964,6 +999,20 @@ class SettingsService extends ChangeNotifier {
     final offset = normalized - appCardLayoutScaleMin;
     final snappedStep = (offset / appCardLayoutScaleStep).round();
     return appCardLayoutScaleMin + (snappedStep * appCardLayoutScaleStep);
+  }
+
+  static String _sanitizeAppHighlightAnimationColorPreset(String value) {
+    switch (value.trim()) {
+      case appCardHighlightColorLightBlue:
+      case appCardHighlightColorMint:
+      case appCardHighlightColorAmber:
+      case appCardHighlightColorCoral:
+      case appCardHighlightColorViolet:
+      case appCardHighlightColorWhite:
+        return value.trim();
+      default:
+        return appCardHighlightColorDefault;
+    }
   }
 
   static int _normalizeStatusBarClockScale(int value) {

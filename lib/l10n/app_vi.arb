@@ -138,6 +138,8 @@
     "addSection": "Thêm mục",
     "alphabetical": "Theo bảng chữ cái",
     "appCardHighlightAnimation": "Hiệu ứng nhấn sáng thẻ ứng dụng",
+    "appCardHighlightColorTitle": "Màu nhấn sáng",
+    "appCardHighlightColorDescription": "Chọn màu cho hiệu ứng nhấn sáng thẻ ứng dụng ở HOME.",
     "appInfo": "Thông tin ứng dụng",
     "appKeyClick": "Âm thanh khi bấm phím",
     "appTitle": "ATV Launcher",
@@ -301,6 +303,9 @@
     "permissionHealthLabel": "Tình trạng quyền",
     "requiredMissingLabel": "Thiếu bắt buộc",
     "recommendedMissingLabel": "Thiếu khuyến nghị",
+    "optionalMissingLabel": "Thiếu tùy chọn",
+    "missingSetupItemsTitle": "Quyền và thiết lập còn thiếu",
+    "missingSetupItemsDescription": "Đỏ là bắt buộc, vàng là khuyến nghị, xanh là tùy chọn.",
     "provisioningWizardTitle": "Wizard cấp quyền",
     "provisioningWizardDescription": "Hướng dẫn người dùng mở Tùy chọn nhà phát triển khi cần, sau đó chạy local ADB grant và xác minh trạng thái launcher.",
     "grantViaLocalAdb": "Cấp qua local ADB",
@@ -338,33 +343,34 @@
     "requirementMediaReadLabel": "Quyền thư viện video",
     "requirementMediaReadGuidance": "Dùng hộp thoại trong app, wizard local ADB hoặc ADB từ PC để cấp",
     "launcherUpdateInstalledVersion": "Bản đang cài",
-    "launcherUpdateLatestRelease": "Release mới nhất",
+    "launcherUpdateLatestRelease": "Bản chính thức mới nhất",
     "launcherUpdateInstallerPermission": "Quyền cài đè",
     "launcherUpdateDownloadedBuild": "APK đã tải",
     "launcherUpdateNotChecked": "Chưa kiểm tra",
     "launcherUpdatePermissionReady": "Sẵn sàng",
     "launcherUpdatePermissionMissing": "Cần cấp quyền",
     "launcherUpdateNoDownloadedApk": "Chưa tải APK",
-    "checkLatestRelease": "Kiểm tra release mới nhất",
-    "launcherUpdateCheckSubtitle": "Truy vấn GitHub release mới nhất của launcher này.",
-    "downloadLatestApk": "Tải APK mới nhất",
-    "launcherUpdateCheckBeforeDownload": "Hãy kiểm tra GitHub trước để chọn đúng APK mới nhất.",
+    "checkLatestRelease": "Kiểm tra bản chính thức mới nhất",
+    "launcherUpdateCheckSubtitle": "Kiểm tra GitHub để lấy bản phát hành chính thức mới nhất của launcher này.",
+    "downloadLatestApk": "Tải APK chính thức mới nhất",
+    "launcherUpdateCheckBeforeDownload": "Hãy kiểm tra GitHub trước để chọn đúng tệp APK chính thức mới nhất.",
     "installDownloadedApk": "Cài APK đã tải",
     "launcherUpdatePermissionActionSubtitle": "Cho phép cài từ nguồn này nếu Android vẫn đang chặn cập nhật.",
     "grantInstallPermissionViaLocalAdb": "Cấp quyền cài qua local ADB",
     "launcherUpdateLocalAdbSubtitle": "Thử fallback local ADB trước khi mở màn hình quyền của Android.",
     "allowAppInstalls": "Cho phép cài ứng dụng",
     "launcherUpdateStatusTitle": "Trạng thái cập nhật",
-    "launcherUpdateEmptyState": "Hãy kiểm tra GitHub release để xem bản ATV Launcher mới nhất và tải trực tiếp ngay trên TV này.",
-    "launcherUpdateChecking": "Đang kiểm tra GitHub release mới nhất...",
-    "launcherUpdateNoApkAsset": "GitHub release mới nhất không có tệp APK.",
-    "launcherUpdateLatestReleaseReady": "Đã sẵn sàng release mới: {release}",
+    "launcherUpdateEmptyState": "Hãy kiểm tra GitHub releases để xem bản ATV Launcher chính thức mới nhất và tải trực tiếp ngay trên TV này.",
+    "launcherUpdateChecking": "Đang kiểm tra bản phát hành chính thức mới nhất trên GitHub...",
+    "launcherUpdateNoOfficialRelease": "Hiện chưa có bản phát hành chính thức phù hợp.",
+    "launcherUpdateNoApkAsset": "Bản phát hành GitHub mới nhất không có tệp APK chính thức phù hợp.",
+    "launcherUpdateLatestReleaseReady": "Đã sẵn sàng bản phát hành chính thức: {release}",
     "@launcherUpdateLatestReleaseReady": {
         "placeholders": {
             "release": {}
         }
     },
-    "launcherUpdateCheckFailed": "Kiểm tra GitHub release thất bại: {error}",
+    "launcherUpdateCheckFailed": "Kiểm tra bản phát hành chính thức trên GitHub thất bại: {error}",
     "@launcherUpdateCheckFailed": {
         "placeholders": {
             "error": {}
@@ -382,6 +388,20 @@
             "percent": {
                 "type": "int"
             }
+        }
+    },
+    "launcherUpdateDownloadIndeterminate": "Đang tải APK chính thức...",
+    "launcherUpdateDownloadBytesProgress": "{downloaded} / {total}",
+    "@launcherUpdateDownloadBytesProgress": {
+        "placeholders": {
+            "downloaded": {},
+            "total": {}
+        }
+    },
+    "launcherUpdateDownloadBytesReceived": "Đã tải {downloaded}",
+    "@launcherUpdateDownloadBytesReceived": {
+        "placeholders": {
+            "downloaded": {}
         }
     },
     "launcherUpdateDownloadComplete": "Đã tải xong {fileName}. Bây giờ bạn có thể cài ngay từ pane này.",
@@ -417,7 +437,9 @@
     "launcherUpdateRepoLabel": "Repo GitHub",
     "launcherUpdateTagLabel": "Tag release",
     "launcherUpdatePublishedAt": "Phát hành",
+    "launcherUpdateUploadedAt": "Ngày tải lên",
     "launcherUpdateAssetLabel": "Tệp APK",
+    "launcherUpdateSizeLabel": "Dung lượng bản cập nhật",
     "launcherUpdateDownloadsLabel": "Lượt tải",
     "launcherUpdateReleaseNotes": "Ghi chú phát hành",
     "actionCompleted": "Đã thực hiện xong.",
@@ -755,6 +777,12 @@
     "appLanguageVietnamese": "Tiếng Việt",
     "iconSizeTitle": "Kích thước icon",
     "iconSizeDescription": "Chỉ thay đổi phần banner hoặc hình icon bên trong từng thẻ ứng dụng, không đổi bố cục thẻ.",
+    "colorPresetLightBlue": "Xanh dương nhạt",
+    "colorPresetMint": "Xanh bạc hà",
+    "colorPresetAmber": "Vàng hổ phách",
+    "colorPresetCoral": "Cam san hô",
+    "colorPresetViolet": "Tím nhạt",
+    "colorPresetWhite": "Trắng",
 "homeDockAutoCollapseTitle": "Tự co dock",
 "homeDockAutoCollapseDescription": "Sau khoảng chờ đã đặt mà không có thao tác DPAD, HOME sẽ tự co về còn một hàng hiển thị.",
 "homeDockAutoCollapseDelayTitle": "Thời gian tự co dock",

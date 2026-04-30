@@ -92,8 +92,8 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
         },
         child: AppBar(
           automaticallyImplyLeading: false,
-          leadingWidth: showRam ? 92 : 18,
-          titleSpacing: showRam ? 10 : 16,
+          leadingWidth: showRam ? (isCompact ? 114 : 126) : 18,
+          titleSpacing: showRam ? 12 : 16,
           leading: showRam
               ? const Padding(
                   padding: EdgeInsets.only(left: 16),
@@ -276,31 +276,39 @@ class _MemoryStatusChip extends StatelessWidget {
         final bool hasReadableMemory =
             availableBytes != null && totalBytes != null && totalBytes > 0;
         final String rawValue = hasReadableMemory
-            ? '${_formatBytesAsGb(availableBytes)} / ${_formatBytesAsGb(totalBytes)}'
-            : '-- / --';
+            ? '${_formatBytesCompact(availableBytes)}/${_formatBytesCompact(totalBytes)}'
+            : '--/--';
         final String semanticsLabel = !hasReadableMemory
             ? localizations.ramChipUnavailable
             : localizations.ramChipLabel(
-                _formatBytesAsGb(availableBytes),
-                _formatBytesAsGb(totalBytes),
+                _formatBytesVerbose(availableBytes),
+                _formatBytesVerbose(totalBytes),
               );
         return Semantics(
           label: semanticsLabel,
-          child: Text(
-            rawValue,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color:
-                  lowMemory ? const Color(0xFFFF8A80) : const Color(0xFFF5F8FF),
-              fontWeight: FontWeight.w600,
-              shadows: const [
-                Shadow(
-                  color: Colors.black54,
-                  offset: Offset(0, 1),
-                  blurRadius: 6,
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                rawValue,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.visible,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: lowMemory
+                      ? const Color(0xFFFF8A80)
+                      : const Color(0xFFF5F8FF),
+                  fontWeight: FontWeight.w600,
+                  shadows: const [
+                    Shadow(
+                      color: Colors.black54,
+                      offset: Offset(0, 1),
+                      blurRadius: 6,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -308,9 +316,34 @@ class _MemoryStatusChip extends StatelessWidget {
     );
   }
 
-  String _formatBytesAsGb(num bytes) {
+  String _formatBytesCompact(num bytes) {
     final gigabytes = bytes / (1024 * 1024 * 1024);
-    return '${gigabytes.toStringAsFixed(gigabytes >= 10 ? 0 : 1)} GB';
+    if (gigabytes >= 1) {
+      return '${_formatDecimal(gigabytes, suffix: 'G')}';
+    }
+    final megabytes = bytes / (1024 * 1024);
+    return '${_formatDecimal(megabytes, suffix: 'M')}';
+  }
+
+  String _formatBytesVerbose(num bytes) {
+    final gigabytes = bytes / (1024 * 1024 * 1024);
+    if (gigabytes >= 1) {
+      return '${_formatDecimal(gigabytes, suffix: ' GB')}';
+    }
+    final megabytes = bytes / (1024 * 1024);
+    return '${_formatDecimal(megabytes, suffix: ' MB')}';
+  }
+
+  String _formatDecimal(
+    num value, {
+    required String suffix,
+  }) {
+    final decimals = value >= 10 ? 0 : 1;
+    final formatted = value.toStringAsFixed(decimals);
+    final normalized = formatted.endsWith('.0')
+        ? formatted.substring(0, formatted.length - 2)
+        : formatted;
+    return '$normalized$suffix';
   }
 }
 

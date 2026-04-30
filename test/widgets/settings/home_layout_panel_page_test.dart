@@ -33,6 +33,7 @@ void main() {
 
     expect(find.text('Card size'), findsAtLeastNWidgets(1));
     expect(find.text('Icon size'), findsAtLeastNWidgets(1));
+    expect(find.text('Highlight color'), findsAtLeastNWidgets(1));
     expect(find.text('Dock glass intensity'), findsAtLeastNWidgets(1));
     expect(find.text('Home performance mode'), findsAtLeastNWidgets(1));
     expect(find.text('Settings transparency'), findsAtLeastNWidgets(1));
@@ -49,6 +50,10 @@ void main() {
         find.byKey(const Key('app_card_layout_scale_stepper')), findsOneWidget);
     expect(
         find.byKey(const Key('app_card_media_scale_stepper')), findsOneWidget);
+    expect(
+      find.byKey(const Key('app_card_highlight_color_selector')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('home_dock_auto_collapse_delay_selector')),
         findsOneWidget);
     expect(find.byKey(const Key('home_dock_glass_intensity_selector')),

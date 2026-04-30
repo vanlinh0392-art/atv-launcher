@@ -11,16 +11,95 @@ class LauncherUpdateClient {
     HttpClient Function()? httpClientFactory,
   }) : _httpClientFactory = httpClientFactory ?? HttpClient.new;
 
-  static Uri get latestReleaseUri => Uri.https(
+  static Uri get releasesUri => Uri.https(
         'api.github.com',
-        '/repos/$githubOwner/$githubRepo/releases/latest',
+        '/repos/$githubOwner/$githubRepo/releases',
+        const <String, String>{
+          'per_page': '20',
+        },
       );
 
-  Future<LauncherUpdateRelease> fetchLatestRelease() async {
+  Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async {
+    final decoded = await _fetchJson(releasesUri);
+    if (decoded is! List) {
+      throw const FormatException('GitHub releases response is invalid.');
+    }
+    final releases = decoded
+        .whereType<Map>()
+        .map(
+          (release) => LauncherUpdateRelease.fromGitHubJson(
+            release.cast<String, dynamic>(),
+          ),
+        )
+        .toList(growable: false);
+    return LauncherUpdateRelease.pickLatestOfficialRelease(releases);
+  }
+
+  Future<LauncherDownloadedApk> downloadApkAsset({
+    required LauncherUpdateAsset asset,
+    required File destinationFile,
+    required void Function(LauncherUpdateDownloadProgress progress) onProgress,
+  }) async {
+    final downloadUri = asset.downloadUri;
+    if (downloadUri == null) {
+      throw const FormatException('GitHub APK asset URL is invalid.');
+    }
+
+    final client = _httpClientFactory();
+    IOSink? sink;
+    try {
+      final request = await client.getUrl(downloadUri);
+      request.headers.set(
+        HttpHeaders.userAgentHeader,
+        'ATVLauncher/$githubOwner-$githubRepo',
+      );
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          'GitHub asset download failed with HTTP ${response.statusCode}.',
+          uri: downloadUri,
+        );
+      }
+
+      sink = destinationFile.openWrite();
+      final totalBytes = response.contentLength;
+      var receivedBytes = 0;
+      var lastProgressAt = DateTime.fromMillisecondsSinceEpoch(0);
+      await for (final chunk in response) {
+        sink.add(chunk);
+        receivedBytes += chunk.length;
+        final now = DateTime.now();
+        if (now.difference(lastProgressAt).inMilliseconds >= 120 ||
+            (totalBytes > 0 && receivedBytes >= totalBytes)) {
+          lastProgressAt = now;
+          onProgress(
+            LauncherUpdateDownloadProgress(
+              fileName: asset.name,
+              receivedBytes: receivedBytes,
+              totalBytes: totalBytes,
+            ),
+          );
+        }
+      }
+      await sink.flush();
+      await sink.close();
+      sink = null;
+      return LauncherDownloadedApk(
+        fileName: asset.name,
+        filePath: destinationFile.path,
+      );
+    } finally {
+      await sink?.close();
+      client.close(force: true);
+    }
+  }
+
+  Future<dynamic> _fetchJson(Uri uri) async {
     final client = _httpClientFactory();
     try {
-      final request = await client.getUrl(latestReleaseUri);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+      final request = await client.getUrl(uri);
+      request.headers
+          .set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
       request.headers.set(
         HttpHeaders.userAgentHeader,
         'ATVLauncher/$githubOwner-$githubRepo',
@@ -30,14 +109,10 @@ class LauncherUpdateClient {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
           'GitHub release check failed with HTTP ${response.statusCode}.',
-          uri: latestReleaseUri,
+          uri: uri,
         );
       }
-      final decoded = jsonDecode(body);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('GitHub latest release response is invalid.');
-      }
-      return LauncherUpdateRelease.fromGitHubJson(decoded);
+      return jsonDecode(body);
     } finally {
       client.close(force: true);
     }
@@ -50,6 +125,8 @@ class LauncherUpdateRelease {
   final String htmlUrl;
   final DateTime? publishedAt;
   final String body;
+  final bool isDraft;
+  final bool isPrerelease;
   final List<LauncherUpdateAsset> assets;
 
   const LauncherUpdateRelease({
@@ -58,6 +135,8 @@ class LauncherUpdateRelease {
     required this.htmlUrl,
     required this.publishedAt,
     required this.body,
+    required this.isDraft,
+    required this.isPrerelease,
     required this.assets,
   });
 
@@ -69,6 +148,8 @@ class LauncherUpdateRelease {
       htmlUrl: json['html_url']?.toString() ?? '',
       publishedAt: _parseDateTime(json['published_at']?.toString()),
       body: json['body']?.toString() ?? '',
+      isDraft: json['draft'] == true,
+      isPrerelease: json['prerelease'] == true,
       assets: rawAssets
           .whereType<Map>()
           .map(
@@ -83,11 +164,7 @@ class LauncherUpdateRelease {
   String get displayName => name.trim().isNotEmpty ? name : tagName.trim();
 
   LauncherUpdateAsset? get preferredApkAsset {
-    final apkAssets = assets
-        .where(
-          (asset) => asset.name.toLowerCase().trim().endsWith('.apk'),
-        )
-        .toList(growable: false);
+    final apkAssets = eligibleApkAssets.toList(growable: false);
     if (apkAssets.isEmpty) {
       return null;
     }
@@ -95,6 +172,20 @@ class LauncherUpdateRelease {
       (left, right) => _apkAssetScore(right).compareTo(_apkAssetScore(left)),
     );
     return apkAssets.first;
+  }
+
+  Iterable<LauncherUpdateAsset> get eligibleApkAssets =>
+      assets.where((asset) => asset.isOfficialApkAsset);
+
+  bool get isOfficialRelease =>
+      !isDraft &&
+      !isPrerelease &&
+      !_looksLikeDebugRelease &&
+      preferredApkAsset != null;
+
+  bool get _looksLikeDebugRelease {
+    final token = '${tagName.toLowerCase()} ${name.toLowerCase()}';
+    return token.contains('debug');
   }
 
   bool matchesInstalledVersion(String installedVersion) {
@@ -121,6 +212,17 @@ class LauncherUpdateRelease {
     return false;
   }
 
+  static LauncherUpdateRelease? pickLatestOfficialRelease(
+    Iterable<LauncherUpdateRelease> releases,
+  ) {
+    for (final release in releases) {
+      if (release.isOfficialRelease) {
+        return release;
+      }
+    }
+    return null;
+  }
+
   static DateTime? _parseDateTime(String? value) {
     if (value == null || value.trim().isEmpty) {
       return null;
@@ -137,10 +239,9 @@ class LauncherUpdateRelease {
     if (name.contains('release')) {
       score += 90;
     }
-    if (!name.contains('debug')) {
-      score += 25;
-    }
-    if (name.contains('armeabi') || name.contains('v7a') || name.contains('arm')) {
+    if (name.contains('armeabi') ||
+        name.contains('v7a') ||
+        name.contains('arm')) {
       score += 18;
     }
     if (name.contains('universal')) {
@@ -157,6 +258,7 @@ class LauncherUpdateAsset {
   final int sizeBytes;
   final int downloadCount;
   final String contentType;
+  final DateTime? uploadedAt;
 
   const LauncherUpdateAsset({
     required this.name,
@@ -164,6 +266,7 @@ class LauncherUpdateAsset {
     required this.sizeBytes,
     required this.downloadCount,
     required this.contentType,
+    required this.uploadedAt,
   });
 
   factory LauncherUpdateAsset.fromGitHubJson(Map<String, dynamic> json) {
@@ -173,10 +276,47 @@ class LauncherUpdateAsset {
       sizeBytes: (json['size'] as num?)?.toInt() ?? 0,
       downloadCount: (json['download_count'] as num?)?.toInt() ?? 0,
       contentType: json['content_type']?.toString() ?? '',
+      uploadedAt: LauncherUpdateRelease._parseDateTime(
+        json['updated_at']?.toString() ?? json['created_at']?.toString(),
+      ),
     );
   }
 
   Uri? get downloadUri => Uri.tryParse(browserDownloadUrl);
+
+  bool get isOfficialApkAsset {
+    final lowerName = name.toLowerCase().trim();
+    return lowerName.endsWith('.apk') && !lowerName.contains('debug');
+  }
+}
+
+class LauncherUpdateDownloadProgress {
+  final String fileName;
+  final int receivedBytes;
+  final int totalBytes;
+
+  const LauncherUpdateDownloadProgress({
+    required this.fileName,
+    required this.receivedBytes,
+    required this.totalBytes,
+  });
+
+  double? get fraction {
+    if (totalBytes <= 0) {
+      return null;
+    }
+    return (receivedBytes / totalBytes).clamp(0, 1).toDouble();
+  }
+}
+
+class LauncherDownloadedApk {
+  final String fileName;
+  final String filePath;
+
+  const LauncherDownloadedApk({
+    required this.fileName,
+    required this.filePath,
+  });
 }
 
 String normalizeVersionToken(String raw) {
@@ -184,7 +324,8 @@ String normalizeVersionToken(String raw) {
   if (value.isEmpty) {
     return '';
   }
-  final match = RegExp(r'(?:v)?(\d{4}\.\d{2}(?:\.\d+)?(?:\+\d+)?)').firstMatch(value);
+  final match =
+      RegExp(r'(?:v)?(\d{4}\.\d{2}(?:\.\d+)?(?:\+\d+)?)').firstMatch(value);
   if (match != null) {
     return match.group(1) ?? '';
   }

@@ -1092,10 +1092,7 @@ public class MainActivity extends FlutterActivity {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("packageName", getPackageName());
         map.put("recommendedPolicy", BridgeStateStore.ADB_POLICY_ADB_AND_WIFI);
-        map.put("missingRequiredCount", evaluation.missingRequiredCount);
-        map.put("missingRecommendedCount", evaluation.missingRecommendedCount);
-        map.put("missingOptionalCount", evaluation.missingOptionalCount);
-        map.put("health", evaluation.health);
+        applyProvisioningEvaluation(map, evaluation);
         return map;
     }
 
@@ -1126,12 +1123,23 @@ public class MainActivity extends FlutterActivity {
                 "Select the long-term ADB automation policy."
         ));
         ProvisioningEvaluation evaluation = evaluateProvisioning();
+        applyProvisioningEvaluation(map, evaluation);
+        return map;
+    }
+
+    private void applyProvisioningEvaluation(
+            Map<String, Object> map,
+            ProvisioningEvaluation evaluation
+    ) {
         map.put("requirements", evaluation.requirements);
         map.put("missingRequiredCount", evaluation.missingRequiredCount);
         map.put("missingRecommendedCount", evaluation.missingRecommendedCount);
         map.put("missingOptionalCount", evaluation.missingOptionalCount);
         map.put("health", evaluation.health);
-        return map;
+    }
+
+    private boolean hasActionableProvisioningGaps(ProvisioningEvaluation evaluation) {
+        return evaluation.missingRequiredCount > 0 || evaluation.missingRecommendedCount > 0;
     }
 
     private Map<String, Object> buildUpdateStatus() {
@@ -1303,32 +1311,57 @@ public class MainActivity extends FlutterActivity {
             success = true;
             message = "Provisioning state refreshed.";
         } else if (TextUtils.equals(normalizedAction, "grant_all_local_adb")) {
+            ProvisioningEvaluation beforeEvaluation = evaluateProvisioning();
+            boolean hadActionableGaps = hasActionableProvisioningGaps(beforeEvaluation);
+            boolean adbEnabledBefore = readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1;
             AccessibilityGrantCoordinator.LocalGrantResult grantResult =
                     AccessibilityGrantCoordinator.tryGrantWriteSecureSettingsWithLocalAdb(this);
             log.add(grantResult.message);
             if (grantResult.success) {
-                BridgeStateStore.setLastProvisioningVerifyAt(this, System.currentTimeMillis());
-                log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + mediaReadPermissionName()));
-                if (requiresNotificationRuntimePermission()) {
-                    log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS));
+                if (adbEnabledBefore) {
+                    log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + mediaReadPermissionName()));
+                    if (requiresNotificationRuntimePermission()) {
+                        log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS));
+                    }
+                    log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
+                    log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow"));
+                    log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " WRITE_SETTINGS allow"));
+                    log.add(runLocalAdbBestEffort("cmd deviceidle whitelist +" + getPackageName()));
+                    if (!TextUtils.isEmpty(suggestedPolicy)) {
+                        Map<String, Object> policyResult = SystemBridgeCoordinator.setAdbAutomationPolicy(
+                                this,
+                                suggestedPolicy,
+                                false
+                        );
+                        log.add(policyResult.get("message") == null ? "" : policyResult.get("message").toString());
+                    }
+                } else if (hadActionableGaps) {
+                    log.add("Local ADB commands skipped because ADB is still disabled.");
                 }
-                log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
-                log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow"));
-                log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " WRITE_SETTINGS allow"));
-                log.add(runLocalAdbBestEffort("cmd deviceidle whitelist +" + getPackageName()));
-                if (!TextUtils.isEmpty(suggestedPolicy)) {
-                    Map<String, Object> policyResult = SystemBridgeCoordinator.setAdbAutomationPolicy(
-                            this,
-                            suggestedPolicy,
-                            false
-                    );
-                    log.add(policyResult.get("message") == null ? "" : policyResult.get("message").toString());
-                }
+            }
+            ProvisioningEvaluation afterEvaluation = evaluateProvisioning();
+            boolean hasActionableGapsAfter = hasActionableProvisioningGaps(afterEvaluation);
+            boolean requiresAdbSetup = !adbEnabledBefore && hasActionableGapsAfter;
+            BridgeStateStore.setLastProvisioningVerifyAt(this, System.currentTimeMillis());
+            map = buildProvisioningChecklist();
+            map.put("requiresAdbSetup", requiresAdbSetup);
+            map.put("remainingRequiredCount", afterEvaluation.missingRequiredCount);
+            map.put("remainingRecommendedCount", afterEvaluation.missingRecommendedCount);
+            if (!hadActionableGaps && !hasActionableGapsAfter) {
                 success = true;
-                message = "Local ADB provisioning completed.";
+                message = "Provisioning already verified.";
+            } else if (!hasActionableGapsAfter) {
+                success = true;
+                message = "Local ADB provisioning completed and verified.";
+            } else if (requiresAdbSetup) {
+                success = false;
+                message = "ADB is disabled. Enable Developer options and retry the local ADB grant.";
+            } else if (afterEvaluation.missingRequiredCount > 0) {
+                success = false;
+                message = "Local ADB grant finished, but required permissions are still missing.";
             } else {
                 success = false;
-                message = grantResult.message;
+                message = "Local ADB grant finished, but some recommended permissions still need approval.";
             }
         } else if (TextUtils.equals(normalizedAction, "grant_update_install_local_adb")) {
             if (readGlobalInt(Settings.Global.ADB_ENABLED, 0) != 1) {
