@@ -4,6 +4,8 @@ import 'dart:io';
 class LauncherUpdateClient {
   static const String githubOwner = 'xfire0392-netizen';
   static const String githubRepo = 'atv-launcher';
+  static const String officialChannelMarker =
+      'Updater-Channel: xfire0392-netizen-official';
   static const int releasePageSize = 50;
   static const int maxReleasePages = 6;
 
@@ -209,11 +211,25 @@ class LauncherUpdateRelease {
       !isDraft &&
       !isPrerelease &&
       !_looksLikeDebugRelease &&
+      _hasOfficialChannelMarker &&
+      _looksLikeManagedRelease &&
       preferredApkAsset != null;
 
   bool get _looksLikeDebugRelease {
     final token = '${tagName.toLowerCase()} ${name.toLowerCase()}';
     return token.contains('debug');
+  }
+
+  bool get _hasOfficialChannelMarker =>
+      body.toLowerCase().contains(
+            LauncherUpdateClient.officialChannelMarker.toLowerCase(),
+          );
+
+  bool get _looksLikeManagedRelease {
+    final normalizedTag = tagName.trim().toLowerCase();
+    final normalizedName = name.trim().toLowerCase();
+    return normalizedTag.endsWith('-release') &&
+        normalizedName.contains('atv launcher');
   }
 
   bool matchesInstalledVersion(String installedVersion) {
@@ -353,7 +369,9 @@ class LauncherUpdateAsset {
 
   bool get isOfficialApkAsset {
     final lowerName = name.toLowerCase().trim();
-    return lowerName.endsWith('.apk') && !lowerName.contains('debug');
+    return lowerName.endsWith('.apk') &&
+        !lowerName.contains('debug') &&
+        lowerName.startsWith('atv-launcher');
   }
 }
 

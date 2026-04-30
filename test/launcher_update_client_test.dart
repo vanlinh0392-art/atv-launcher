@@ -5,6 +5,8 @@ import 'package:flauncher/launcher_update_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  const officialMarker = LauncherUpdateClient.officialChannelMarker;
+
   group('LauncherUpdateRelease', () {
     test('skips debug releases and picks the newest official release', () {
       final releases = <LauncherUpdateRelease>[
@@ -13,7 +15,7 @@ void main() {
           'name': 'ATV Launcher Debug',
           'html_url': 'https://example.com/debug',
           'published_at': '2026-04-30T10:00:00Z',
-          'body': '',
+          'body': officialMarker,
           'assets': [
             {
               'name': 'atv-launcher-armeabi-v7a-debug.apk',
@@ -29,7 +31,7 @@ void main() {
           'name': 'ATV Launcher Release',
           'html_url': 'https://example.com/release',
           'published_at': '2026-04-29T10:00:00Z',
-          'body': '',
+          'body': officialMarker,
           'assets': [
             {
               'name': 'atv-launcher-armeabi-v7a-release.apk',
@@ -55,7 +57,7 @@ void main() {
         'html_url':
             'https://github.com/xfire0392-netizen/atv-launcher/releases/tag/v2026.04.30-release',
         'published_at': '2026-04-30T10:00:00Z',
-        'body': 'Release notes',
+        'body': 'Release notes\n$officialMarker',
         'assets': [
           {
             'name': 'atv-launcher-armeabi-v7a-debug.apk',
@@ -88,7 +90,7 @@ void main() {
         'name': 'ATV Launcher Release',
         'html_url': 'https://example.com/release',
         'published_at': '2026-04-30T10:00:00Z',
-        'body': '',
+        'body': officialMarker,
         'assets': [
           {
             'name': 'atv-launcher-universal-release.apk',
@@ -119,7 +121,7 @@ void main() {
         'name': 'ATV Launcher Release',
         'html_url': 'https://example.com',
         'published_at': '2026-04-30T10:00:00Z',
-        'body': '',
+        'body': officialMarker,
         'assets': [
           {
             'name': 'atv-launcher-armeabi-v7a-debug.apk',
@@ -141,7 +143,7 @@ void main() {
         'name': 'ATV Launcher v2024.11.001',
         'html_url': 'https://example.com',
         'published_at': '2026-04-30T10:00:00Z',
-        'body': '',
+        'body': officialMarker,
         'assets': [
           {
             'name': 'atv-launcher-v2024.11.001-release.apk',
@@ -155,6 +157,27 @@ void main() {
 
       expect(release.matchesInstalledVersion('2024.11.001+15'), isTrue);
       expect(release.matchesInstalledVersion('2025.01.002+1'), isFalse);
+    });
+
+    test('does not treat legacy unmarked releases as official', () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.04.30-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-04-30T10:00:00Z',
+        'body': 'Legacy release body without channel marker',
+        'assets': [
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/release.apk',
+            'size': 456,
+            'download_count': 10,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(release.isOfficialRelease, isFalse);
     });
   });
 
@@ -182,7 +205,7 @@ void main() {
               'name': 'ATV Launcher Debug',
               'html_url': 'https://example.com/debug/$index',
               'published_at': '2026-04-30T10:00:00Z',
-              'body': '',
+              'body': officialMarker,
               'assets': [
                 {
                   'name': 'atv-launcher-armeabi-v7a-debug.apk',
@@ -202,7 +225,7 @@ void main() {
               'name': 'ATV Launcher Release v2024.11.001',
               'html_url': 'https://example.com/release',
               'published_at': '2026-04-29T10:00:00Z',
-              'body': '',
+              'body': officialMarker,
               'assets': [
                 {
                   'name': 'atv-launcher-armeabi-v7a-release.apk',

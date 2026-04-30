@@ -85,7 +85,7 @@ jobs:
           tag_name="v${version_name}-release"
           echo "version_name=${version_name}" >> "${GITHUB_OUTPUT}"
           echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
-          echo "release_name=ATV Launcher Release v${version_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_name=ATV Launcher xfire0392-netizen v${version_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload official APK artifact
         uses: actions/upload-artifact@v4
@@ -101,6 +101,8 @@ jobs:
           name: ${{ steps.official_release_meta.outputs.release_name }}
           body: |
             Official ATV Launcher release APK.
+            Maintained by xfire0392-netizen.
+            Updater-Channel: xfire0392-netizen-official
 
             File: `atv-launcher-armeabi-v7a-release.apk`
 
