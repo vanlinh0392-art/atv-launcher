@@ -20,6 +20,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flauncher/custom_traversal_policy.dart';
+import 'package:flauncher/home_performance_profile.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
@@ -39,7 +40,6 @@ import 'package:provider/provider.dart';
 
 import 'models/category.dart';
 
-const Duration _dockHeightAnimationDuration = Duration(milliseconds: 320);
 typedef _WallpaperSnapshot = ({
   String wallpaperMode,
   ImageProvider<Object>? wallpaper,
@@ -113,6 +113,9 @@ class _WallpaperLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final performanceMode = context.select<SettingsService, String>(
+      (service) => service.homeDockPerformanceMode,
+    );
     final wallpaper = context.select<WallpaperService, _WallpaperSnapshot>(
       (service) => (
         wallpaperMode: service.wallpaperMode,
@@ -140,6 +143,7 @@ class _WallpaperLayer extends StatelessWidget {
       context,
       wallpaper: wallpaper,
       wallpaperStatus: wallpaperStatus,
+      performanceProfile: HomePerformanceProfile.resolve(performanceMode),
     );
   }
 }
@@ -296,6 +300,7 @@ Widget _buildWallpaperLayer(
   BuildContext context, {
   required _WallpaperSnapshot wallpaper,
   required _WallpaperStatusSnapshot wallpaperStatus,
+  required HomePerformanceProfile performanceProfile,
 }) {
   final physicalSize = MediaQuery.sizeOf(context);
   final baseWallpaper =
@@ -306,7 +311,7 @@ Widget _buildWallpaperLayer(
               fit: BoxFit.cover,
               height: physicalSize.height,
               width: physicalSize.width,
-              filterQuality: FilterQuality.low,
+              filterQuality: performanceProfile.wallpaperFilterQuality,
               gaplessPlayback: true,
             )
           : Container(
@@ -318,7 +323,8 @@ Widget _buildWallpaperLayer(
     return RepaintBoundary(child: baseWallpaper);
   }
 
-  final blurSigma = _videoBlurSigma(wallpaper.videoBlur);
+  final blurSigma = performanceProfile
+      .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
   final dimOpacity = wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
 
   Widget videoLayer = SizedBox.expand(
@@ -429,6 +435,9 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   String? _lastFocusedRowSignature;
   BuildContext? _lastFocusedItemContext;
 
+  HomePerformanceProfile get _performanceProfile =>
+      HomePerformanceProfile.resolve(widget.performanceMode);
+
   @override
   void initState() {
     super.initState();
@@ -521,6 +530,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
 
   @override
   Widget build(BuildContext context) {
+    final performanceProfile = _performanceProfile;
     final metrics = resolveHomeCardMetricsForSections(
       widget.sections,
       widget.maxWidth,
@@ -542,7 +552,12 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         child: ListView(
           key: _dockListKey,
           controller: _dockScrollController,
-          cacheExtent: metrics.rowStride * math.max(_visibleRows + 2, 4),
+          cacheExtent: metrics.rowStride *
+              math.max(
+                (_visibleRows + performanceProfile.dockCacheRowsAhead)
+                    .toDouble(),
+                performanceProfile.dockMinimumCacheRows.toDouble(),
+              ),
           physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             0,
@@ -572,6 +587,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
                   child: _DockSectionLabel(
                     title: _activeSectionName!,
                     glassIntensityPercent: widget.glassIntensityPercent,
+                    performanceMode: widget.performanceMode,
                   ),
                 ),
               ),
@@ -581,7 +597,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
               onFocusChange: _handleDockFocusChange,
               onKeyEvent: _handleDockKeyEvent,
               child: AnimatedContainer(
-                duration: _dockHeightAnimationDuration,
+                duration: performanceProfile.dockHeightAnimationDuration,
                 curve: Curves.easeInOutCubic,
                 onEnd: _handleDockHeightAnimationEnd,
                 height: dockHeight,
@@ -1096,7 +1112,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     }
 
     final targetDelta = (targetOffset - currentOffset).abs();
-    if (!animate || targetDelta < 14) {
+    if (!animate || targetDelta < _performanceProfile.dockScrollJumpThreshold) {
       _dockScrollController.jumpTo(targetOffset);
       return;
     }
@@ -1104,9 +1120,8 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     if (animate) {
       _dockScrollController.animateTo(
         targetOffset,
-        duration: Duration(
-          milliseconds: targetDelta < (viewport.size.height * 0.35) ? 82 : 110,
-        ),
+        duration: _performanceProfile.dockScrollDuration(
+            targetDelta, viewport.size.height),
         curve: Curves.easeOutCubic,
       );
     }
@@ -1169,20 +1184,30 @@ bool _hasCategoryNamed(List<LauncherSection> sections, String name) {
 class _DockSectionLabel extends StatelessWidget {
   final String title;
   final int glassIntensityPercent;
+  final String performanceMode;
 
   const _DockSectionLabel({
     required this.title,
     required this.glassIntensityPercent,
+    required this.performanceMode,
   });
 
   @override
   Widget build(BuildContext context) {
+    final performanceProfile = HomePerformanceProfile.resolve(performanceMode);
     final intensity = glassIntensityPercent.clamp(0, 100).toDouble() / 100.0;
-    final blurSigma = lerpDouble(0, 10, intensity) ?? 0;
+    final blurSigma = lerpDouble(
+          0,
+          math.min(performanceProfile.dockStaticMaxBlurSigma, 10),
+          intensity,
+        ) ??
+        0;
     final fillOpacity = lerpDouble(0.08, 0.44, intensity) ?? 0.08;
     final borderOpacity = lerpDouble(0.10, 0.22, intensity) ?? 0.10;
     final shadowOpacity = lerpDouble(0.06, 0.18, intensity) ?? 0.06;
-    final useBackdropBlur = intensity >= 0.16 && blurSigma > 0;
+    final useBackdropBlur = performanceProfile.dockBackdropBlurEnabled &&
+        intensity >= 0.16 &&
+        blurSigma > 0;
 
     final surface = DecoratedBox(
       decoration: BoxDecoration(
@@ -1247,25 +1272,26 @@ class _BottomDockShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final profile = _DockPerformanceProfile.resolve(performanceMode);
+    final profile = HomePerformanceProfile.resolve(performanceMode);
     final intensity = glassIntensityPercent.clamp(0, 100).toDouble() / 100.0;
     final maxBlurSigma = videoWallpaperActive
-        ? profile.videoMaxBlurSigma
-        : profile.staticMaxBlurSigma;
+        ? profile.dockVideoMaxBlurSigma
+        : profile.dockStaticMaxBlurSigma;
     final blurSigma = lerpDouble(0, maxBlurSigma, intensity) ?? 0;
     final borderOpacity = lerpDouble(0.10, 0.16, intensity) ?? 0.10;
     final shadowOpacity = videoWallpaperActive
-        ? (lerpDouble(0.08, profile.videoShadowOpacity, intensity) ?? 0.08)
-        : (lerpDouble(0.10, profile.staticShadowOpacity, intensity) ?? 0.10);
+        ? (lerpDouble(0.08, profile.dockVideoShadowOpacity, intensity) ?? 0.08)
+        : (lerpDouble(0.10, profile.dockStaticShadowOpacity, intensity) ??
+            0.10);
     final shadowBlurRadius = videoWallpaperActive
-        ? profile.videoShadowBlurRadius
-        : profile.staticShadowBlurRadius;
-    final useBackdropBlur = profile.backdropBlurEnabled &&
-        (!videoWallpaperActive || profile.videoBackdropBlurEnabled) &&
+        ? profile.dockVideoShadowBlurRadius
+        : profile.dockStaticShadowBlurRadius;
+    final useBackdropBlur = profile.dockBackdropBlurEnabled &&
+        (!videoWallpaperActive || profile.dockVideoBackdropBlurEnabled) &&
         intensity >= 0.14 &&
         blurSigma > 0;
     final fakeGlassBoost =
-        videoWallpaperActive ? profile.videoFakeGlassBoost : 1.0;
+        videoWallpaperActive ? profile.dockVideoFakeGlassBoost : 1.0;
     final backgroundColors = <Color>[
       _scaledOpacity(const Color(0x6E132238), intensity * fakeGlassBoost),
       _scaledOpacity(const Color(0x8A14253B), intensity * fakeGlassBoost),
@@ -1366,82 +1392,5 @@ class _BottomDockShell extends StatelessWidget {
 
   static Color _scaledOpacity(Color color, double factor) {
     return color.withOpacity((color.opacity * factor).clamp(0.0, 1.0));
-  }
-}
-
-class _DockPerformanceProfile {
-  final double staticMaxBlurSigma;
-  final double videoMaxBlurSigma;
-  final double staticShadowBlurRadius;
-  final double videoShadowBlurRadius;
-  final double staticShadowOpacity;
-  final double videoShadowOpacity;
-  final double videoFakeGlassBoost;
-  final bool backdropBlurEnabled;
-  final bool videoBackdropBlurEnabled;
-
-  const _DockPerformanceProfile({
-    required this.staticMaxBlurSigma,
-    required this.videoMaxBlurSigma,
-    required this.staticShadowBlurRadius,
-    required this.videoShadowBlurRadius,
-    required this.staticShadowOpacity,
-    required this.videoShadowOpacity,
-    required this.videoFakeGlassBoost,
-    required this.backdropBlurEnabled,
-    required this.videoBackdropBlurEnabled,
-  });
-
-  static _DockPerformanceProfile resolve(String mode) {
-    switch (mode) {
-      case SettingsService.homeDockPerformanceModeQuality:
-        return const _DockPerformanceProfile(
-          staticMaxBlurSigma: 16,
-          videoMaxBlurSigma: 6,
-          staticShadowBlurRadius: 30,
-          videoShadowBlurRadius: 22,
-          staticShadowOpacity: 0.27,
-          videoShadowOpacity: 0.20,
-          videoFakeGlassBoost: 1.1,
-          backdropBlurEnabled: true,
-          videoBackdropBlurEnabled: true,
-        );
-      case SettingsService.homeDockPerformanceModeSmooth:
-        return const _DockPerformanceProfile(
-          staticMaxBlurSigma: 6,
-          videoMaxBlurSigma: 0,
-          staticShadowBlurRadius: 18,
-          videoShadowBlurRadius: 12,
-          staticShadowOpacity: 0.18,
-          videoShadowOpacity: 0.14,
-          videoFakeGlassBoost: 1.3,
-          backdropBlurEnabled: true,
-          videoBackdropBlurEnabled: false,
-        );
-      case SettingsService.homeDockPerformanceModeOff:
-        return const _DockPerformanceProfile(
-          staticMaxBlurSigma: 0,
-          videoMaxBlurSigma: 0,
-          staticShadowBlurRadius: 10,
-          videoShadowBlurRadius: 8,
-          staticShadowOpacity: 0.12,
-          videoShadowOpacity: 0.10,
-          videoFakeGlassBoost: 1.35,
-          backdropBlurEnabled: false,
-          videoBackdropBlurEnabled: false,
-        );
-      default:
-        return const _DockPerformanceProfile(
-          staticMaxBlurSigma: 10,
-          videoMaxBlurSigma: 0,
-          staticShadowBlurRadius: 24,
-          videoShadowBlurRadius: 16,
-          staticShadowOpacity: 0.24,
-          videoShadowOpacity: 0.18,
-          videoFakeGlassBoost: 1.25,
-          backdropBlurEnabled: true,
-          videoBackdropBlurEnabled: false,
-        );
-    }
   }
 }

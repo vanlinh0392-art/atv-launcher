@@ -12,13 +12,13 @@ import 'dart:io';
 
 import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/gradients.dart';
+import 'package:flauncher/home_performance_profile.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
 class WallpaperService extends ChangeNotifier {
   static const bool fastStartupEnabled = true;
-  static const Duration _videoWarmUpDelay = Duration(milliseconds: 400);
 
   final FLauncherChannel _fLauncherChannel;
   final SettingsService _settingsService;
@@ -61,6 +61,10 @@ class WallpaperService extends ChangeNotifier {
         (gradient) => gradient.uuid == _settingsService.gradientUuid,
         orElse: () => FLauncherGradients.greatWhale,
       );
+
+  Duration get _videoWarmUpDelay =>
+      HomePerformanceProfile.resolve(_settingsService.homeDockPerformanceMode)
+          .wallpaperVideoWarmUpDelay;
 
   WallpaperService(this._fLauncherChannel, this._settingsService) {
     _init();

@@ -22,6 +22,7 @@ import 'dart:collection';
 import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_image_type.dart';
+import 'package:flauncher/home_performance_profile.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
@@ -316,6 +317,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           final homeReorderModeEnabled = context.select<AppsService, bool>(
             (service) => service.homeReorderModeEnabled,
           );
+          final performanceProfile =
+              context.select<SettingsService, HomePerformanceProfile>(
+            (service) =>
+                HomePerformanceProfile.resolve(service.homeDockPerformanceMode),
+          );
           final layout = _AppCardLayout.fromMediaScale(mediaScale);
           final locked = context.select<ProfileSecurityService?, bool>(
             (service) => service?.isAppLocked(widget.application) ?? false,
@@ -335,15 +341,20 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                     width: constraints.maxWidth,
                     height: constraints.maxHeight,
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 90),
+                      duration: performanceProfile.appCardTransformDuration,
                       curve: Curves.easeOutCubic,
                       transformAlignment: Alignment.center,
-                      transform: _scaleTransform(context),
+                      transform: _scaleTransform(
+                        shouldHighlight,
+                        performanceProfile,
+                      ),
                       child: RepaintBoundary(
                         child: Material(
                           borderRadius: BorderRadius.circular(cornerRadius),
                           clipBehavior: Clip.antiAlias,
-                          elevation: shouldHighlight ? 16 : 0,
+                          elevation: shouldHighlight
+                              ? performanceProfile.appCardFocusedElevation
+                              : 0,
                           shadowColor: Colors.black,
                           child: Stack(
                             fit: StackFit.expand,
@@ -356,6 +367,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                   layout,
                                   layoutScale: layoutScale,
                                   mediaScale: mediaScale,
+                                  performanceProfile: performanceProfile,
                                 ),
                                 onTap: () => _onPressed(
                                   context,
@@ -392,6 +404,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                     shouldHighlight,
                                 cornerRadius: cornerRadius,
                                 highlightColor: highlightColor,
+                                performanceProfile: performanceProfile,
                               ),
                               if (locked) _lockBadge(),
                             ],
@@ -411,10 +424,22 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     required bool enabled,
     required double cornerRadius,
     required Color highlightColor,
+    required HomePerformanceProfile performanceProfile,
   }) {
     if (!enabled) {
       _animation.stop();
       return const SizedBox();
+    }
+
+    _animation.duration = performanceProfile.appCardHighlightPulseDuration;
+    if (!performanceProfile.appCardHighlightPulseEnabled) {
+      _animation.stop();
+      return _buildHighlightFrameDecoration(
+        cornerRadius: cornerRadius,
+        highlightColor: highlightColor,
+        performanceProfile: performanceProfile,
+        pulse: 0,
+      );
     }
 
     _animation.repeat(reverse: true);
@@ -422,25 +447,52 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       animation: _animation,
       builder: (context, child) {
         final pulse = (_animation.value / 255).clamp(0.0, 1.0);
-        return IgnorePointer(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(cornerRadius),
-              border: Border.all(
-                color: highlightColor.withOpacity(0.34 + (pulse * 0.66)),
-                width: 3,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: highlightColor.withOpacity(0.10 + (pulse * 0.16)),
-                  blurRadius: 18 + (pulse * 8),
-                  spreadRadius: 0.5 + (pulse * 0.8),
-                ),
-              ],
-            ),
-          ),
+        return _buildHighlightFrameDecoration(
+          cornerRadius: cornerRadius,
+          highlightColor: highlightColor,
+          performanceProfile: performanceProfile,
+          pulse: pulse,
         );
       },
+    );
+  }
+
+  Widget _buildHighlightFrameDecoration({
+    required double cornerRadius,
+    required Color highlightColor,
+    required HomePerformanceProfile performanceProfile,
+    required double pulse,
+  }) {
+    final borderOpacity = performanceProfile.appCardHighlightBorderBaseOpacity +
+        (pulse * performanceProfile.appCardHighlightBorderPulseOpacityDelta);
+    final glowOpacity = performanceProfile.appCardHighlightGlowBaseOpacity +
+        (pulse * performanceProfile.appCardHighlightGlowPulseOpacityDelta);
+    final glowBlur = performanceProfile.appCardHighlightGlowBaseBlur +
+        (pulse * performanceProfile.appCardHighlightGlowPulseBlurDelta);
+    final glowSpread = performanceProfile.appCardHighlightGlowBaseSpread +
+        (pulse * performanceProfile.appCardHighlightGlowPulseSpreadDelta);
+
+    return IgnorePointer(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(cornerRadius),
+          border: Border.all(
+            color: highlightColor.withOpacity(borderOpacity.clamp(0.0, 1.0)),
+            width: performanceProfile.appCardHighlightBorderWidth,
+          ),
+          boxShadow: glowOpacity <= 0 || glowBlur <= 0
+              ? const <BoxShadow>[]
+              : [
+                  BoxShadow(
+                    color: highlightColor.withOpacity(
+                      glowOpacity.clamp(0.0, 1.0),
+                    ),
+                    blurRadius: glowBlur,
+                    spreadRadius: glowSpread,
+                  ),
+                ],
+        ),
+      ),
     );
   }
 
@@ -463,6 +515,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     _AppCardLayout layout, {
     required double layoutScale,
     required double mediaScale,
+    required HomePerformanceProfile performanceProfile,
   }) {
     final app = widget.application;
     final localizations = AppLocalizations.of(context)!;
@@ -477,7 +530,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       if (tuple.item1 == AppImageType.Banner) {
         return ColoredBox(
           color: surfaceColor,
-          child: _bannerMedia(tuple.item2, mediaScale),
+          child: _bannerMedia(
+            tuple.item2,
+            mediaScale,
+            performanceProfile,
+          ),
         );
       }
 
@@ -503,7 +560,8 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                               fit: BoxFit.contain,
                               width: iconLaneWidth,
                               height: constraints.maxHeight,
-                              filterQuality: FilterQuality.low,
+                              filterQuality:
+                                  performanceProfile.appCardFilterQuality,
                             ),
                           ),
                         ),
@@ -570,7 +628,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _bannerMedia(ImageProvider imageProvider, double mediaScale) {
+  Widget _bannerMedia(
+    ImageProvider imageProvider,
+    double mediaScale,
+    HomePerformanceProfile performanceProfile,
+  ) {
     final shrinkFactor = mediaScale < 1 ? mediaScale : 1.0;
     final zoomScale = mediaScale > 1 ? mediaScale : 1.0;
 
@@ -585,7 +647,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
               image: imageProvider,
               fit: BoxFit.cover,
               gaplessPlayback: true,
-              filterQuality: FilterQuality.low,
+              filterQuality: performanceProfile.appCardFilterQuality,
             ),
           ),
         ),
@@ -686,10 +748,13 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
         Focus.of(context).hasFocus;
   }
 
-  Matrix4 _scaleTransform(BuildContext context) {
+  Matrix4 _scaleTransform(
+    bool shouldHighlight,
+    HomePerformanceProfile performanceProfile,
+  ) {
     double scale = 1.0;
-    if (!_moving && _shouldHighlight(context)) {
-      scale = 1.05;
+    if (!_moving && shouldHighlight) {
+      scale = performanceProfile.appCardFocusedScale;
     }
     return Matrix4.diagonal3Values(scale, scale, 1.0);
   }
