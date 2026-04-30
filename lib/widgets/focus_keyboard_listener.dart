@@ -16,6 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -42,7 +44,15 @@ class FocusKeyboardListener extends StatefulWidget {
 }
 
 class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
-  int? _keyDownAt;
+  Timer? _longPressTimer;
+  LogicalKeyboardKey? _pendingLongPressKey;
+  bool _longPressTriggered = false;
+
+  @override
+  void dispose() {
+    _longPressTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Focus(
@@ -55,6 +65,8 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
     switch (keyEvent.runtimeType) {
       case KeyDownEvent:
         return _keyDownEvent(keyEvent.logicalKey);
+      case KeyRepeatEvent:
+        return _keyRepeatEvent(keyEvent.logicalKey);
       case KeyUpEvent:
         return _keyUpEvent(keyEvent.logicalKey);
     }
@@ -65,25 +77,43 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
     if (!longPressableKeys.contains(key)) {
       return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
     }
-    if (_keyDownAt == null) {
-      _keyDownAt = DateTime.now().millisecondsSinceEpoch;
-      return KeyEventResult.handled;
-    } else if (_longPress()) {
-      _keyDownAt = null;
-      return widget.onLongPress?.call(key) ?? KeyEventResult.ignored;
+
+    if (_pendingLongPressKey != key) {
+      _longPressTimer?.cancel();
+      _pendingLongPressKey = key;
+      _longPressTriggered = false;
+      _longPressTimer = Timer(const Duration(milliseconds: 500), () {
+        if (!mounted || _pendingLongPressKey != key || _longPressTriggered) {
+          return;
+        }
+        _longPressTriggered = true;
+        widget.onLongPress?.call(key);
+      });
     }
+
     return KeyEventResult.handled;
   }
 
   KeyEventResult _keyUpEvent(LogicalKeyboardKey key) {
-    if (_keyDownAt != null) {
-      _keyDownAt = null;
+    if (_pendingLongPressKey == key) {
+      _longPressTimer?.cancel();
+      _pendingLongPressKey = null;
+      if (_longPressTriggered) {
+        _longPressTriggered = false;
+        return KeyEventResult.handled;
+      }
       return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
     }
     return KeyEventResult.ignored;
   }
 
-  bool _longPress() =>
-      _keyDownAt != null &&
-      DateTime.now().millisecondsSinceEpoch - _keyDownAt! >= 500;
+  KeyEventResult _keyRepeatEvent(LogicalKeyboardKey key) {
+    if (longPressableKeys.contains(key)) {
+      if (_pendingLongPressKey != key) {
+        return _keyDownEvent(key);
+      }
+      return KeyEventResult.handled;
+    }
+    return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
+  }
 }

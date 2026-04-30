@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 class VoiceSearchPanelPage extends StatelessWidget {
   static const String routeName = "voice_search_panel";
+  static const String _summaryDebugLabel = 'voice_search_summary_metrics';
   final FocusNode? primaryFocusNode;
 
   const VoiceSearchPanelPage({
@@ -47,27 +48,30 @@ class VoiceSearchPanelPage extends StatelessWidget {
         return ListView(
           key: const PageStorageKey<String>(VoiceSearchPanelPage.routeName),
           children: [
-            SettingsAdaptiveGrid(
-              children: [
-                SettingsMetricTile(
-                  label: localizations.voiceModeLabel,
-                  value: localizedVoiceMode(localizations, mode),
-                  icon: Icons.mic_none_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.keyCodeLabel,
-                  value: keyCode,
-                  icon: Icons.keyboard_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.accessibilityLabel,
-                  value: localizedBridgeHealth(
-                    localizations,
-                    status['health']?.toString() ?? '',
+            SettingsSummarySection(
+              debugLabel: _summaryDebugLabel,
+              child: SettingsAdaptiveGrid(
+                children: [
+                  SettingsMetricTile(
+                    label: localizations.voiceModeLabel,
+                    value: localizedVoiceMode(localizations, mode),
+                    icon: Icons.mic_none_outlined,
                   ),
-                  icon: Icons.health_and_safety_outlined,
-                ),
-              ],
+                  SettingsMetricTile(
+                    label: localizations.keyCodeLabel,
+                    value: keyCode,
+                    icon: Icons.keyboard_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.accessibilityLabel,
+                    value: localizedBridgeHealth(
+                      localizations,
+                      status['health']?.toString() ?? '',
+                    ),
+                    icon: Icons.health_and_safety_outlined,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             SettingsSurfaceCard(
@@ -76,6 +80,10 @@ class VoiceSearchPanelPage extends StatelessWidget {
                 children: [
                   SettingsChoiceCard<int>(
                     focusNode: primaryFocusNode,
+                    onMoveUpAtBoundary: () =>
+                        focusCurrentSettingsNodeByDebugLabel(
+                      _summaryDebugLabel,
+                    ),
                     selectorKey: const Key('voice_search_mode_selector'),
                     optionKeyPrefix: 'voice_search_mode_option',
                     title: localizations.pressMode,

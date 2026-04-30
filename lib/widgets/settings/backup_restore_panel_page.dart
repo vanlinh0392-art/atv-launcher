@@ -27,6 +27,7 @@ class BackupRestorePanelPage extends StatefulWidget {
 }
 
 class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
+  static const String _summaryDebugLabel = 'backup_restore_summary_metrics';
   Map<String, dynamic>? _preview;
   String _previewName = '';
   String _lastMessage = '';
@@ -40,33 +41,36 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
     return ListView(
       key: const PageStorageKey<String>(BackupRestorePanelPage.routeName),
       children: [
-        SettingsAdaptiveGrid(
-          children: [
-            SettingsMetricTile(
-              label: localizations.lastExport,
-              value: settings.backupLastExportName.isEmpty
-                  ? '-'
-                  : settings.backupLastExportName,
-              icon: Icons.upload_file_outlined,
-            ),
-            SettingsMetricTile(
-              label: localizations.lastImport,
-              value: settings.backupLastImportName.isEmpty
-                  ? '-'
-                  : settings.backupLastImportName,
-              icon: Icons.download_for_offline_outlined,
-            ),
-            SettingsMetricTile(
-              label: localizations.lastRestore,
-              value: settings.backupLastRestoreAt <= 0
-                  ? '-'
-                  : DateTime.fromMillisecondsSinceEpoch(
-                          settings.backupLastRestoreAt)
-                      .toLocal()
-                      .toString(),
-              icon: Icons.history_outlined,
-            ),
-          ],
+        SettingsSummarySection(
+          debugLabel: _summaryDebugLabel,
+          child: SettingsAdaptiveGrid(
+            children: [
+              SettingsMetricTile(
+                label: localizations.lastExport,
+                value: settings.backupLastExportName.isEmpty
+                    ? '-'
+                    : settings.backupLastExportName,
+                icon: Icons.upload_file_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.lastImport,
+                value: settings.backupLastImportName.isEmpty
+                    ? '-'
+                    : settings.backupLastImportName,
+                icon: Icons.download_for_offline_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.lastRestore,
+                value: settings.backupLastRestoreAt <= 0
+                    ? '-'
+                    : DateTime.fromMillisecondsSinceEpoch(
+                            settings.backupLastRestoreAt)
+                        .toLocal()
+                        .toString(),
+                icon: Icons.history_outlined,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 18),
         SettingsSurfaceCard(
@@ -76,12 +80,16 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
             children: [
               SettingsActionCard(
                 focusNode: widget.primaryFocusNode,
+                onMoveUpAtBoundary: () =>
+                    focusCurrentSettingsNodeByDebugLabel(_summaryDebugLabel),
                 title: localizations.exportBackup,
                 subtitle: localizations.lastExport,
                 icon: Icons.save_alt,
                 onPressed: _busy ? null : () => _exportBackup(context),
               ),
               SettingsActionCard(
+                onMoveUpAtBoundary: () =>
+                    focusCurrentSettingsNodeByDebugLabel(_summaryDebugLabel),
                 title: localizations.previewBackup,
                 subtitle: localizations.selectedBackup,
                 icon: Icons.preview_outlined,
@@ -146,9 +154,9 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
         _lastMessage = result['cancelled'] == true
             ? localizations.backupExportCancelled
             : localizations.backupExportedTo(
-                result['displayName']?.toString() ??
-                    localizations.selectedBackup,
-              ) +
+                  result['displayName']?.toString() ??
+                      localizations.selectedBackup,
+                ) +
                 (exportPath.trim().isEmpty ? '' : '\n$exportPath');
       });
     } catch (error) {

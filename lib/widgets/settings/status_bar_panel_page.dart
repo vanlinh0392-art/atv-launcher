@@ -27,6 +27,7 @@ import '../../providers/settings_service.dart';
 
 class StatusBarPanelPage extends StatelessWidget {
   static const String routeName = "status_bar_panel";
+  static const String _summaryDebugLabel = 'status_bar_summary_metrics';
   final FocusNode? primaryFocusNode;
 
   const StatusBarPanelPage({
@@ -41,28 +42,31 @@ class StatusBarPanelPage extends StatelessWidget {
 
     return ListView(
       children: [
-        SettingsAdaptiveGrid(
-          children: [
-            SettingsMetricTile(
-              label: localizations.autoHideAppBar,
-              value: settings.autoHideAppBarEnabled
-                  ? localizations.settingStateOn
-                  : localizations.settingStateOff,
-              icon: Icons.visibility_off_outlined,
-            ),
-            SettingsMetricTile(
-              label: localizations.showRamInStatusBar,
-              value: settings.showRamInStatusBar
-                  ? localizations.settingStateOn
-                  : localizations.settingStateOff,
-              icon: Icons.memory_outlined,
-            ),
-            SettingsMetricTile(
-              label: localizations.dateAndTimeScaleTitle,
-              value: '${settings.statusBarClockScalePercent}%',
-              icon: Icons.text_fields_outlined,
-            ),
-          ],
+        SettingsSummarySection(
+          debugLabel: _summaryDebugLabel,
+          child: SettingsAdaptiveGrid(
+            children: [
+              SettingsMetricTile(
+                label: localizations.autoHideAppBar,
+                value: settings.autoHideAppBarEnabled
+                    ? localizations.settingStateOn
+                    : localizations.settingStateOff,
+                icon: Icons.visibility_off_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.showRamInStatusBar,
+                value: settings.showRamInStatusBar
+                    ? localizations.settingStateOn
+                    : localizations.settingStateOff,
+                icon: Icons.memory_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.dateAndTimeScaleTitle,
+                value: '${settings.statusBarClockScalePercent}%',
+                icon: Icons.text_fields_outlined,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 14),
         SettingsSurfaceCard(
@@ -71,6 +75,8 @@ class StatusBarPanelPage extends StatelessWidget {
             children: [
               RoundedSwitchListTile(
                 focusNode: primaryFocusNode,
+                onMoveUpAtBoundary: () =>
+                    focusCurrentSettingsNodeByDebugLabel(_summaryDebugLabel),
                 value: settings.autoHideAppBarEnabled,
                 onChanged: settings.setAutoHideAppBarEnabled,
                 title: Text(

@@ -1,6 +1,7 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_localized_values.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -20,6 +21,8 @@ class DiagnosticsPanelPage extends StatefulWidget {
 }
 
 class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
+  static const String _summaryDebugLabel = 'diagnostics_summary_metrics';
+
   @override
   void initState() {
     super.initState();
@@ -41,55 +44,68 @@ class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
         return ListView(
           key: const PageStorageKey<String>(DiagnosticsPanelPage.routeName),
           children: [
-            SettingsAdaptiveGrid(
-              children: [
-                SettingsMetricTile(
-                  label: localizations.reportLines,
-                  value: lineCount.toString(),
-                  icon: Icons.receipt_long_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.adbAutomationPolicyTitle,
-                  value: localizedAdbPolicy(
-                    localizations,
-                    bridgeService.adbAutomationStatus['policy']?.toString() ??
-                        '',
+            SettingsSummarySection(
+              debugLabel: _summaryDebugLabel,
+              child: SettingsAdaptiveGrid(
+                children: [
+                  SettingsMetricTile(
+                    label: localizations.reportLines,
+                    value: lineCount.toString(),
+                    icon: Icons.receipt_long_outlined,
                   ),
-                  icon: Icons.adb_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.coreHealthLabel,
-                  value: localizedBridgeHealth(
-                    localizations,
-                    bridgeService.systemCoreStatus['coreServiceHealth']
-                            ?.toString() ??
-                        '',
+                  SettingsMetricTile(
+                    label: localizations.adbAutomationPolicyTitle,
+                    value: localizedAdbPolicy(
+                      localizations,
+                      bridgeService.adbAutomationStatus['policy']?.toString() ??
+                          '',
+                    ),
+                    icon: Icons.adb_outlined,
                   ),
-                  icon: Icons.favorite_outline,
-                ),
-              ],
+                  SettingsMetricTile(
+                    label: localizations.coreHealthLabel,
+                    value: localizedBridgeHealth(
+                      localizations,
+                      bridgeService.systemCoreStatus['coreServiceHealth']
+                              ?.toString() ??
+                          '',
+                    ),
+                    icon: Icons.favorite_outline,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             SettingsSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  SettingsAdaptiveGrid(
+                    minChildWidth: 220,
+                    maxColumns: 2,
                     children: [
-                      FilledButton.icon(
+                      SettingsActionCard(
                         key: const Key('diagnostics_refresh_button'),
                         focusNode: widget.primaryFocusNode,
-                        onPressed: () => bridgeService.refreshFull(),
-                        icon: const Icon(Icons.refresh),
-                        label: Text(localizations.refreshLabel),
+                        onMoveUpAtBoundary: () =>
+                            focusCurrentSettingsNodeByDebugLabel(
+                          _summaryDebugLabel,
+                        ),
+                        title: localizations.refreshLabel,
+                        subtitle: localizations.reportLines,
+                        icon: Icons.refresh,
+                        onPressed: () async => bridgeService.refreshFull(),
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () =>
+                      SettingsActionCard(
+                        onMoveUpAtBoundary: () =>
+                            focusCurrentSettingsNodeByDebugLabel(
+                          _summaryDebugLabel,
+                        ),
+                        title: localizations.copyReport,
+                        subtitle: localizations.reportLines,
+                        icon: Icons.copy_outlined,
+                        onPressed: () async =>
                             Clipboard.setData(ClipboardData(text: report)),
-                        icon: const Icon(Icons.copy_outlined),
-                        label: Text(localizations.copyReport),
                       ),
                     ],
                   ),

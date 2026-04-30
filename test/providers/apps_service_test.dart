@@ -234,6 +234,119 @@ void main() {
     expect(service.startupPhase, AppsService.startupPhaseReady);
     expect(service.lastLiveSyncAt, greaterThan(0));
   });
+
+  test('cancelApplicationReorderSession restores original alphabetical order',
+      () async {
+    final harness = await _createHarness([
+      {
+        'packageName': 'alpha.app',
+        'name': 'Alpha App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'beta.app',
+        'name': 'Beta App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'gamma.app',
+        'name': 'Gamma App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+    ]);
+    addTearDown(harness.dispose);
+
+    final category = harness.service.categories.single;
+    await harness.service.setCategorySort(category, CategorySort.alphabetical);
+
+    expect(
+      harness.service.categories.single.applications
+          .map((app) => app.packageName)
+          .toList(),
+      ['alpha.app', 'beta.app', 'gamma.app'],
+    );
+
+    expect(harness.service.beginApplicationReorderSession(category), isTrue);
+    expect(harness.service.reorderApplication(category, 2, 0), isTrue);
+    expect(
+      harness.service.categories.single.applications
+          .map((app) => app.packageName)
+          .toList(),
+      ['gamma.app', 'alpha.app', 'beta.app'],
+    );
+
+    await harness.service.cancelApplicationReorderSession(category);
+
+    expect(harness.service.categories.single.sort, CategorySort.alphabetical);
+    expect(
+      harness.service.categories.single.applications
+          .map((app) => app.packageName)
+          .toList(),
+      ['alpha.app', 'beta.app', 'gamma.app'],
+    );
+  });
+
+  test(
+      'commitApplicationReorderSession persists preview order and switches alphabetical categories to manual',
+      () async {
+    final harness = await _createHarness([
+      {
+        'packageName': 'alpha.app',
+        'name': 'Alpha App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'beta.app',
+        'name': 'Beta App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'gamma.app',
+        'name': 'Gamma App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+    ]);
+    addTearDown(harness.dispose);
+
+    final category = harness.service.categories.single;
+    await harness.service.setCategorySort(category, CategorySort.alphabetical);
+
+    expect(harness.service.beginApplicationReorderSession(category), isTrue);
+    expect(harness.service.reorderApplication(category, 1, 0), isTrue);
+
+    await harness.service.commitApplicationReorderSession(category);
+
+    final committedCategory = harness.service.categories.single;
+    expect(committedCategory.sort, CategorySort.manual);
+    expect(
+      committedCategory.applications.map((app) => app.packageName).toList(),
+      ['beta.app', 'alpha.app', 'gamma.app'],
+    );
+
+    final beta = harness.service.applications
+        .firstWhere((app) => app.packageName == 'beta.app');
+    final alpha = harness.service.applications
+        .firstWhere((app) => app.packageName == 'alpha.app');
+    expect(beta.categoryOrders[committedCategory.id], 0);
+    expect(alpha.categoryOrders[committedCategory.id], 1);
+
+    final storedCategories = await harness.database.getCategories();
+    final storedAppsCategories = await harness.database.getAppsCategories();
+    storedAppsCategories
+        .sort((left, right) => left.order.compareTo(right.order));
+
+    expect(storedCategories.single.sort, CategorySort.manual);
+    expect(
+      storedAppsCategories.map((row) => row.appPackageName).toList(),
+      ['beta.app', 'alpha.app', 'gamma.app'],
+    );
+  });
 }
 
 class _AppsHarness {

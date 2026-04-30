@@ -87,6 +87,57 @@ void main() {
     expect(find.byKey(const Key('home_bottom_dock')), findsOneWidget);
   });
 
+  testWidgets('status bar reorder button toggles home reorder mode',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final favorites =
+        fakeCategory(name: 'Favorites', order: 0, type: CategoryType.row);
+    favorites.applications
+        .add(fakeApp(packageName: 'row.app', name: 'Row App'));
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([favorites]);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    await tester.tap(find.byIcon(Icons.drive_file_move_outline));
+    await tester.pump();
+
+    verify(appsService.toggleHomeReorderMode()).called(1);
+  });
+
   testWidgets('shows image wallpaper when image mode is active',
       (tester) async {
     _prepareView(tester);
@@ -556,6 +607,96 @@ void main() {
     await tester.pump(const Duration(milliseconds: 420));
     expect(find.text('Vertical 1'), findsOneWidget);
     _expectCardNearDockCenter(tester, const Key('vertical.app.1'));
+  });
+
+  testWidgets(
+      'long press on home opens app management menu when reorder mode is off',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Reorder',
+      order: 0,
+      type: CategoryType.row,
+    );
+    category.applications.addAll([
+      fakeApp(packageName: 'reorder.app.0', name: 'Reorder App 0'),
+      fakeApp(packageName: 'reorder.app.1', name: 'Reorder App 1'),
+    ]);
+    final fillerSections = List<LauncherSection>.generate(4, (index) {
+      final filler = fakeCategory(
+        name: 'Filler $index',
+        order: index + 1,
+        type: CategoryType.row,
+      );
+      filler.applications.add(
+        fakeApp(
+          packageName: 'filler.app.$index',
+          name: 'Filler App $index',
+        ),
+      );
+      return filler;
+    });
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections)
+        .thenReturn([category, ...fillerSections]);
+    when(appsService.beginApplicationReorderSession(any)).thenReturn(true);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setHomeDockRowsPreset(3);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    final dockFinder = find.byKey(const Key('home_bottom_dock'));
+    final collapsedHeight = tester.getSize(dockFinder).height;
+
+    await tester.longPress(
+      find.descendant(
+        of: find.byKey(const Key('reorder.app.0')),
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    final currentHeight = tester.getSize(dockFinder).height;
+    expect(currentHeight, greaterThanOrEqualTo(collapsedHeight));
+    verifyNever(appsService.beginApplicationReorderSession(any));
+    expect(find.byIcon(Icons.open_in_new), findsOneWidget);
+    expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
   });
 }
 

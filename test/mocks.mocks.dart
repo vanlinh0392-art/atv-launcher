@@ -1573,6 +1573,13 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
       ) as int);
 
   @override
+  bool get homeReorderModeEnabled => (super.noSuchMethod(
+        Invocation.getter(#homeReorderModeEnabled),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
   List<_i16.App> get applications => (super.noSuchMethod(
         Invocation.getter(#applications),
         returnValue: <_i16.App>[],
@@ -1681,6 +1688,24 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
       ) as _i2.Future<void>);
 
   @override
+  void setHomeReorderModeEnabled(bool? value) => super.noSuchMethod(
+        Invocation.method(
+          #setHomeReorderModeEnabled,
+          [value],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void toggleHomeReorderMode() => super.noSuchMethod(
+        Invocation.method(
+          #toggleHomeReorderMode,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
   _i2.Future<bool> isDefaultLauncher() => (super.noSuchMethod(
         Invocation.method(
           #isDefaultLauncher,
@@ -1747,12 +1772,45 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
       ) as _i2.Future<void>);
 
   @override
-  void reorderApplication(
+  bool beginApplicationReorderSession(_i17.Category? category) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #beginApplicationReorderSession,
+          [category],
+        ),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
+  _i2.Future<void> cancelApplicationReorderSession(_i17.Category? category) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #cancelApplicationReorderSession,
+          [category],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> commitApplicationReorderSession(_i17.Category? category) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #commitApplicationReorderSession,
+          [category],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  bool reorderApplication(
     _i17.Category? category,
     int? oldIndex,
     int? newIndex,
   ) =>
-      super.noSuchMethod(
+      (super.noSuchMethod(
         Invocation.method(
           #reorderApplication,
           [
@@ -1761,8 +1819,9 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
             newIndex,
           ],
         ),
-        returnValueForMissingStub: null,
-      );
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
 
   @override
   _i2.Future<int> addCategory(

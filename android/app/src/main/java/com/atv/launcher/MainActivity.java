@@ -27,6 +27,7 @@ import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -122,6 +123,10 @@ public class MainActivity extends FlutterActivity {
     private static final int MAX_ICON_WIDTH = 256;
     private static final int MAX_ICON_HEIGHT = 256;
     private static final String PRIVATE_DNS_SETTINGS_ACTION = "android.settings.PRIVATE_DNS_SETTINGS";
+    private static final String FLUTTER_SHARED_PREFERENCES_NAME = "FlutterSharedPreferences";
+    private static final String FLUTTER_PREFS_KEY_VIDEO_WALLPAPER_URIS = "flutter.video_wallpaper_uris";
+    private static final String FLUTTER_PREFS_KEY_SEARCH_RECENT_QUERIES = "flutter.search_recent_queries";
+    private static final String FLUTTER_PREFS_KEY_SEARCH_RECENT_SELECTION_IDS = "flutter.search_recent_selection_ids";
     private static final String ADB_WIFI_KEY = "adb_wifi_enabled";
     private static final int REQUEST_PICK_WALLPAPER_ASSET = 4101;
     private static final int REQUEST_PICK_WALLPAPER_FILES = 4102;
@@ -439,8 +444,38 @@ public class MainActivity extends FlutterActivity {
                             ? -1L
                             : sharedVideoWallpaperController.ensureTextureId());
             case "getDiagnosticsReport" -> result.success(SystemBridgeCoordinator.buildStatusReport(this));
+            case "repairSharedPreferences" -> result.success(repairSharedPreferences());
+            case "clearLauncherSharedPreferences" -> result.success(clearLauncherSharedPreferences());
             default -> throw new IllegalArgumentException("Unsupported method: " + call.method);
         }
+    }
+
+    private Map<String, Serializable> repairSharedPreferences() {
+        SharedPreferences sharedPreferences =
+                getSharedPreferences(FLUTTER_SHARED_PREFERENCES_NAME, MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        List<String> removedKeys = new ArrayList<>();
+        for (String key : Arrays.asList(
+                FLUTTER_PREFS_KEY_VIDEO_WALLPAPER_URIS,
+                FLUTTER_PREFS_KEY_SEARCH_RECENT_QUERIES,
+                FLUTTER_PREFS_KEY_SEARCH_RECENT_SELECTION_IDS)) {
+            if (sharedPreferences.contains(key)) {
+                editor.remove(key);
+                removedKeys.add(key);
+            }
+        }
+        boolean committed = editor.commit();
+        Map<String, Serializable> result = new HashMap<>();
+        result.put("repaired", committed);
+        result.put("removedKeys", new ArrayList<>(removedKeys));
+        return result;
+    }
+
+    private boolean clearLauncherSharedPreferences() {
+        return getSharedPreferences(FLUTTER_SHARED_PREFERENCES_NAME, MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit();
     }
 
     private List<Map<String, Serializable>> getApplications() {

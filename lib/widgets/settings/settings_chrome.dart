@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flauncher/providers/settings_service.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 double _lerpOpacity(double solid, double transparent, double amount) =>
@@ -544,7 +546,9 @@ class SettingsStatusChip extends StatelessWidget {
   }
 }
 
-class SettingsMetricTile extends StatelessWidget {
+class SettingsMetricTile extends StatefulWidget {
+  final FocusNode? focusNode;
+  final bool autofocus;
   final String label;
   final String value;
   final IconData icon;
@@ -552,6 +556,8 @@ class SettingsMetricTile extends StatelessWidget {
 
   const SettingsMetricTile({
     super.key,
+    this.focusNode,
+    this.autofocus = false,
     required this.label,
     required this.value,
     required this.icon,
@@ -559,45 +565,215 @@ class SettingsMetricTile extends StatelessWidget {
   });
 
   @override
+  State<SettingsMetricTile> createState() => _SettingsMetricTileState();
+}
+
+class _SettingsMetricTileState extends State<SettingsMetricTile> {
+  late FocusNode _focusNode;
+  late bool _ownsFocusNode;
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _configureFocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsMetricTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode == widget.focusNode &&
+        oldWidget.label == widget.label) {
+      return;
+    }
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    _configureFocusNode();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final chromeSpec = SettingsChromeSpec.of(context);
-    return Container(
-      width: width,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(chromeSpec.metricTileOpacity),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(chromeSpec.metricBorderOpacity),
+    final titleColor = _focused ? Colors.white : Colors.white.withOpacity(0.96);
+    final subtitleColor =
+        _focused ? Colors.white.withOpacity(0.84) : Colors.white70;
+    final iconColor = _focused ? Colors.white : Colors.white70;
+
+    return EnsureVisible(
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: widget.autofocus,
+        canRequestFocus: true,
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SizedBox(
+          width: widget.width,
+          child: SettingsFocusFrame(
+            padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
+            borderRadius: BorderRadius.circular(20),
+            baseColor: Colors.white.withOpacity(chromeSpec.metricTileOpacity),
+            focusEmphasis: 1.08,
+            variant: SettingsFocusFrameVariant.rowOnly,
+            focused: _focused,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, size: 22, color: iconColor),
+                const SizedBox(height: 10),
+                Text(
+                  widget.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: titleColor,
+                        fontWeight:
+                            _focused ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: subtitleColor),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 22, color: Colors.white70),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.white70),
-          ),
-        ],
+    );
+  }
+
+  void _configureFocusNode() {
+    _ownsFocusNode = widget.focusNode == null;
+    final debugToken = widget.label.trim().replaceAll(RegExp(r'\s+'), '_');
+    _focusNode = widget.focusNode ??
+        FocusNode(debugLabel: 'settings_metric_$debugToken');
+  }
+}
+
+class SettingsSummarySection extends StatefulWidget {
+  final String debugLabel;
+  final FocusNode? focusNode;
+  final Widget child;
+  final double focusEmphasis;
+
+  const SettingsSummarySection({
+    super.key,
+    required this.debugLabel,
+    this.focusNode,
+    required this.child,
+    this.focusEmphasis = 1.12,
+  });
+
+  @override
+  State<SettingsSummarySection> createState() => _SettingsSummarySectionState();
+}
+
+class _SettingsSummarySectionState extends State<SettingsSummarySection> {
+  late FocusNode _focusNode;
+  late bool _ownsFocusNode;
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _configureFocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsSummarySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode == widget.focusNode &&
+        oldWidget.debugLabel == widget.debugLabel) {
+      return;
+    }
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    _configureFocusNode();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return EnsureVisible(
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
+      child: Focus(
+        focusNode: _focusNode,
+        canRequestFocus: true,
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SettingsFocusFrame(
+          padding: const EdgeInsets.all(12),
+          borderRadius: BorderRadius.circular(24),
+          baseColor: Colors.transparent,
+          focusEmphasis: widget.focusEmphasis,
+          variant: SettingsFocusFrameVariant.rowOnly,
+          focused: _focused,
+          child: widget.child,
+        ),
       ),
     );
+  }
+
+  void _configureFocusNode() {
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ?? FocusNode(debugLabel: widget.debugLabel);
   }
 }
 

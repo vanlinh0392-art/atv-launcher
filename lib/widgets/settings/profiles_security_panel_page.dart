@@ -27,6 +27,8 @@ class ProfilesSecurityPanelPage extends StatefulWidget {
 }
 
 class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
+  static const String _summaryDebugLabel = 'profiles_security_summary_metrics';
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
@@ -48,42 +50,47 @@ class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
               const PageStorageKey<String>(ProfilesSecurityPanelPage.routeName),
           padding: const EdgeInsets.only(bottom: 16),
           children: [
-            SettingsAdaptiveGrid(
-              minChildWidth: metricsWideLayout ? 190 : 240,
-              maxColumns: metricsWideLayout ? 4 : 2,
-              children: [
-                SettingsMetricTile(
-                  width: double.infinity,
-                  label: localizations.ownerPinStatusLabel,
-                  value: security.hasPin
-                      ? localizations.profilePinSet
-                      : localizations.profilePinNotSet,
-                  icon: Icons.pin_outlined,
-                ),
-                SettingsMetricTile(
-                  width: double.infinity,
-                  label: localizations.settingsLockTitle,
-                  value: security.settingsLockEnabled
-                      ? localizations.settingStateOn
-                      : localizations.settingStateOff,
-                  icon: Icons.lock_person_outlined,
-                ),
-                SettingsMetricTile(
-                  width: double.infinity,
-                  label: localizations.hiddenAppsProfileLabel,
-                  value: '$hiddenAppsCount',
-                  icon: Icons.visibility_off_outlined,
-                ),
-                SettingsMetricTile(
-                  width: double.infinity,
-                  label: localizations.lockedAppsProfileLabel,
-                  value: '$lockedAppsCount',
-                  icon: Icons.lock_outline,
-                ),
-              ],
+            SettingsSummarySection(
+              debugLabel: _summaryDebugLabel,
+              child: SettingsAdaptiveGrid(
+                minChildWidth: metricsWideLayout ? 190 : 240,
+                maxColumns: metricsWideLayout ? 4 : 2,
+                children: [
+                  SettingsMetricTile(
+                    width: double.infinity,
+                    label: localizations.ownerPinStatusLabel,
+                    value: security.hasPin
+                        ? localizations.profilePinSet
+                        : localizations.profilePinNotSet,
+                    icon: Icons.pin_outlined,
+                  ),
+                  SettingsMetricTile(
+                    width: double.infinity,
+                    label: localizations.settingsLockTitle,
+                    value: security.settingsLockEnabled
+                        ? localizations.settingStateOn
+                        : localizations.settingStateOff,
+                    icon: Icons.lock_person_outlined,
+                  ),
+                  SettingsMetricTile(
+                    width: double.infinity,
+                    label: localizations.hiddenAppsProfileLabel,
+                    value: '$hiddenAppsCount',
+                    icon: Icons.visibility_off_outlined,
+                  ),
+                  SettingsMetricTile(
+                    width: double.infinity,
+                    label: localizations.lockedAppsProfileLabel,
+                    value: '$lockedAppsCount',
+                    icon: Icons.lock_outline,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
-            const _AppVisibilityCard(),
+            const _AppVisibilityCard(
+              summaryDebugLabel: _summaryDebugLabel,
+            ),
             const SizedBox(height: 14),
             _LauncherSecurityCard(
               security: security,
@@ -97,7 +104,11 @@ class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
 }
 
 class _AppVisibilityCard extends StatelessWidget {
-  const _AppVisibilityCard();
+  final String summaryDebugLabel;
+
+  const _AppVisibilityCard({
+    required this.summaryDebugLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +136,8 @@ class _AppVisibilityCard extends StatelessWidget {
             title: localizations.manageHiddenAppsAction,
             subtitle: localizations.manageHiddenAppsDescription,
             debugLabel: 'profiles_security_manage_hidden_apps',
+            onMoveUpAtBoundary: () =>
+                focusCurrentSettingsNodeByDebugLabel(summaryDebugLabel),
             onPressed: () => _openManager(context, hiddenMode: true),
           ),
           const SizedBox(height: 10),
@@ -333,6 +346,7 @@ class _ProfileActionTile extends StatefulWidget {
   final String? subtitle;
   final bool enabled;
   final String? debugLabel;
+  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
   final VoidCallback onPressed;
 
   const _ProfileActionTile({
@@ -341,6 +355,7 @@ class _ProfileActionTile extends StatefulWidget {
     this.subtitle,
     this.enabled = true,
     this.debugLabel,
+    this.onMoveUpAtBoundary,
     required this.onPressed,
   });
 
@@ -405,6 +420,28 @@ class _ProfileActionTileState extends State<_ProfileActionTile> {
         onKeyEvent: (_, event) {
           if (event is! KeyDownEvent) {
             return KeyEventResult.ignored;
+          }
+          final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+              ? TraversalDirection.up
+              : event.logicalKey == LogicalKeyboardKey.arrowDown
+                  ? TraversalDirection.down
+                  : null;
+          if (direction != null) {
+            if (direction == TraversalDirection.up &&
+                widget.onMoveUpAtBoundary?.call() == true) {
+              return KeyEventResult.handled;
+            }
+            if (!moveSettingsVerticalFocus(
+              direction: direction,
+              localNodes: <FocusNode>[_focusNode],
+            )) {
+              if (direction == TraversalDirection.up &&
+                  focusNearestSettingsSummaryAbove(_focusNode)) {
+                return KeyEventResult.handled;
+              }
+              _focusNode.focusInDirection(direction);
+            }
+            return KeyEventResult.handled;
           }
           if (isSettingsActivateKey(event.logicalKey) && widget.enabled) {
             widget.onPressed();

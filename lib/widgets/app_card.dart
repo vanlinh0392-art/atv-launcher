@@ -43,6 +43,15 @@ const _validationKeys = [
 ];
 
 typedef AppCardFocusCallback = void Function(BuildContext itemContext);
+typedef AppCardMoveStartCallback = bool Function(BuildContext itemContext);
+typedef AppCardMoveCallback = bool Function(
+  BuildContext itemContext,
+  AxisDirection direction,
+);
+typedef AppCardMoveEndCallback = Future<void> Function(
+  BuildContext itemContext,
+  bool committed,
+);
 
 class AppCard extends StatefulWidget {
   static const int _maxImageCacheSize = 96;
@@ -62,8 +71,9 @@ class AppCard extends StatefulWidget {
   final Category category;
   final bool autofocus;
   final AppCardFocusCallback? onFocused;
-  final void Function(AxisDirection) onMove;
-  final VoidCallback onMoveEnd;
+  final AppCardMoveStartCallback? onMoveStart;
+  final AppCardMoveCallback onMove;
+  final AppCardMoveEndCallback onMoveEnd;
 
   const AppCard({
     super.key,
@@ -71,6 +81,7 @@ class AppCard extends StatefulWidget {
     required this.category,
     required this.autofocus,
     this.onFocused,
+    this.onMoveStart,
     required this.onMove,
     required this.onMoveEnd,
   });
@@ -217,6 +228,8 @@ class _QueuedAppImageLoad {
 
 class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   bool _moving = false;
+  late final FocusNode _cardFocusNode =
+      FocusNode(debugLabel: 'app_card_${widget.application.packageName}');
 
   late Future<Tuple2<AppImageType, ImageProvider>> _appImageLoadFuture;
   Tuple2<AppImageType, ImageProvider>? _resolvedAppImage;
@@ -255,6 +268,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
         .removeHighlightModeListener(_focusHighlightModeChanged);
     AppImageCacheInvalidator.instance.removeListener(_syncImageCacheRevision);
     _deferredImageLoadTimer?.cancel();
+    _cardFocusNode.dispose();
     _animation.dispose();
 
     super.dispose();
@@ -274,6 +288,9 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           );
           final mediaScale = context.select<SettingsService, double>(
             (service) => service.appCardMediaScalePercent / 100,
+          );
+          final homeReorderModeEnabled = context.select<AppsService, bool>(
+            (service) => service.homeReorderModeEnabled,
           );
           final layout = _AppCardLayout.fromMediaScale(mediaScale);
           final locked = context.select<ProfileSecurityService?, bool>(
@@ -308,6 +325,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                             fit: StackFit.expand,
                             children: [
                               InkWell(
+                                focusNode: _cardFocusNode,
                                 autofocus: widget.autofocus,
                                 focusColor: Colors.transparent,
                                 child: _appImage(
@@ -332,6 +350,10 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                 },
                               ),
                               if (_moving) ..._arrows(),
+                              if (homeReorderModeEnabled &&
+                                  !_moving &&
+                                  shouldHighlight)
+                                _moveReadyBadge(),
                               IgnorePointer(
                                 child: AnimatedOpacity(
                                   duration: const Duration(milliseconds: 140),
@@ -640,59 +662,89 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
   List<Widget> _arrows() => [
         _arrow(Alignment.centerLeft, Icons.keyboard_arrow_left, () {
-          widget.onMove(AxisDirection.left);
+          final moved = widget.onMove(context, AxisDirection.left);
+          if (moved) {
+            _restoreCardFocusAfterMove();
+          }
         }),
         _arrow(Alignment.topCenter, Icons.keyboard_arrow_up, () {
-          widget.onMove(AxisDirection.up);
+          final moved = widget.onMove(context, AxisDirection.up);
+          if (moved) {
+            _restoreCardFocusAfterMove();
+          }
         }),
         _arrow(Alignment.bottomCenter, Icons.keyboard_arrow_down, () {
-          widget.onMove(AxisDirection.down);
+          final moved = widget.onMove(context, AxisDirection.down);
+          if (moved) {
+            _restoreCardFocusAfterMove();
+          }
         }),
         _arrow(Alignment.centerRight, Icons.keyboard_arrow_right, () {
-          widget.onMove(AxisDirection.right);
+          final moved = widget.onMove(context, AxisDirection.right);
+          if (moved) {
+            _restoreCardFocusAfterMove();
+          }
         }),
       ];
 
   Widget _arrow(Alignment alignment, IconData icon, VoidCallback onTap) =>
       Align(
         alignment: alignment,
-        child: Ink(
-          decoration: ShapeDecoration(
-            color: Theme.of(context).primaryColor.withOpacity(0.8),
-            shape: const CircleBorder(),
-          ),
-          child: SizedBox(
-            height: 36,
-            width: 36,
-            child: IconButton(
-              icon: Icon(icon, size: 24),
-              onPressed: onTap,
-              padding: EdgeInsets.zero,
+        child: ExcludeFocus(
+          child: Ink(
+            decoration: ShapeDecoration(
+              color: Theme.of(context).primaryColor.withOpacity(0.8),
+              shape: const CircleBorder(),
+            ),
+            child: SizedBox(
+              height: 36,
+              width: 36,
+              child: IconButton(
+                icon: Icon(icon, size: 24),
+                onPressed: onTap,
+                padding: EdgeInsets.zero,
+              ),
             ),
           ),
         ),
       );
 
   KeyEventResult _onPressed(BuildContext context, LogicalKeyboardKey? key) {
+    final homeReorderModeEnabled =
+        context.read<AppsService>().homeReorderModeEnabled;
     if (_moving) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _ensureFullyVisible());
+      var moved = false;
       if (key == LogicalKeyboardKey.arrowLeft) {
-        widget.onMove(AxisDirection.left);
+        moved = widget.onMove(context, AxisDirection.left);
       } else if (key == LogicalKeyboardKey.arrowUp) {
-        widget.onMove(AxisDirection.up);
+        moved = widget.onMove(context, AxisDirection.up);
       } else if (key == LogicalKeyboardKey.arrowRight) {
-        widget.onMove(AxisDirection.right);
+        moved = widget.onMove(context, AxisDirection.right);
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        widget.onMove(AxisDirection.down);
-      } else if (_validationKeys.contains(key) ||
-          key == LogicalKeyboardKey.escape) {
-        setState(() => _moving = false);
-        widget.onMoveEnd();
+        moved = widget.onMove(context, AxisDirection.down);
+      } else if (_validationKeys.contains(key)) {
+        unawaited(_finishMoveSession(context, committed: true));
+      } else if (key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack ||
+          key == LogicalKeyboardKey.gameButtonB) {
+        unawaited(_finishMoveSession(context, committed: false));
       } else {
         return KeyEventResult.ignored;
       }
 
+      if (moved) {
+        _restoreCardFocusAfterMove();
+      }
+
+      return KeyEventResult.handled;
+    } else if (homeReorderModeEnabled && _validationKeys.contains(key)) {
+      _enterMoveMode(context);
+      return KeyEventResult.handled;
+    } else if (homeReorderModeEnabled &&
+        (key == LogicalKeyboardKey.escape ||
+            key == LogicalKeyboardKey.goBack ||
+            key == LogicalKeyboardKey.gameButtonB)) {
+      context.read<AppsService>().setHomeReorderModeEnabled(false);
       return KeyEventResult.handled;
     } else if (_validationKeys.contains(key)) {
       unawaited(_launchApplication(context));
@@ -702,24 +754,53 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   }
 
   KeyEventResult _onLongPress(BuildContext context, LogicalKeyboardKey? key) {
-    if (!_moving && (key == null || longPressableKeys.contains(key))) {
-      _showPanel(context);
+    final homeReorderModeEnabled =
+        context.read<AppsService>().homeReorderModeEnabled;
+    if (!_moving &&
+        homeReorderModeEnabled &&
+        (key == null || longPressableKeys.contains(key))) {
+      _enterMoveMode(context);
+      return KeyEventResult.handled;
+    }
+    if (!_moving &&
+        !homeReorderModeEnabled &&
+        (key == null || longPressableKeys.contains(key))) {
+      unawaited(_showAppMenu(context));
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
 
-  Future<void> _showPanel(BuildContext context) async {
-    final result = await showDialog<ApplicationInfoPanelResult>(
+  Future<void> _showAppMenu(BuildContext context) async {
+    await showDialog<void>(
       context: context,
       builder: (context) => ApplicationInfoPanel(
         category: widget.category,
         application: widget.application,
       ),
     );
-    if (result == ApplicationInfoPanelResult.reorderApp) {
-      setState(() => _moving = true);
+    _restoreCardFocusAfterMove();
+  }
+
+  void _enterMoveMode(BuildContext context) {
+    final started = widget.onMoveStart?.call(context) ?? true;
+    if (!started) {
+      return;
     }
+    setState(() => _moving = true);
+    _restoreCardFocusAfterMove();
+  }
+
+  Future<void> _finishMoveSession(
+    BuildContext context, {
+    required bool committed,
+  }) async {
+    if (!_moving) {
+      return;
+    }
+    setState(() => _moving = false);
+    await widget.onMoveEnd(context, committed);
+    _restoreCardFocusAfterMove();
   }
 
   Future<void> _launchApplication(BuildContext context) async {
@@ -750,44 +831,31 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
         ),
       );
 
-  void _ensureFullyVisible() {
-    final scrollable = _findHostScrollableState();
-    final renderObject = context.findRenderObject();
-    if (scrollable == null || renderObject == null) {
-      return;
-    }
+  Widget _moveReadyBadge() => Align(
+        alignment: Alignment.topLeft,
+        child: Container(
+          margin: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xC0102032),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFF7BE0A5), width: 1.2),
+          ),
+          child: const Icon(
+            Icons.open_with_rounded,
+            size: 16,
+            color: Color(0xFF7BE0A5),
+          ),
+        ),
+      );
 
-    if (!scrollable.position.hasPixels) {
-      return;
-    }
-
-    scrollable.position.ensureVisible(
-      renderObject,
-      alignment: 0.5,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-      duration: const Duration(milliseconds: 90),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  ScrollableState? _findHostScrollableState() {
-    ScrollableState? result;
-
-    context.visitAncestorElements((element) {
-      if (element is StatefulElement && element.state is ScrollableState) {
-        final state = element.state as ScrollableState;
-        final isVertical =
-            axisDirectionToAxis(state.widget.axisDirection) == Axis.vertical;
-        final canScroll = state.widget.physics is! NeverScrollableScrollPhysics;
-        if (isVertical && canScroll) {
-          result = state;
-          return false;
-        }
+  void _restoreCardFocusAfterMove() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
       }
-      return true;
+      _cardFocusNode.requestFocus();
     });
-
-    return result;
   }
 
   double _surfaceOpacity({

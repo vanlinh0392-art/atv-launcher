@@ -48,6 +48,7 @@ class AppsService extends ChangeNotifier {
   bool _staleCache = false;
   String _startupPhase = startupPhaseBootstrapCached;
   int _lastLiveSyncAt = 0;
+  bool _homeReorderModeEnabled = false;
   Timer? _liveSyncRetryTimer;
   Future<void>? _liveSyncFuture;
   final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
@@ -56,6 +57,7 @@ class AppsService extends ChangeNotifier {
   List<LauncherSection> _launcherSections = List.empty(growable: true);
   Map<String, App> _applications = Map();
   Map<int, Category> _categoriesById = Map();
+  _ApplicationReorderSession? _applicationReorderSession;
   List<App>? _applicationsSnapshot;
   List<LauncherSection>? _launcherSectionsSnapshot;
   List<Category>? _categoriesSnapshot;
@@ -69,6 +71,7 @@ class AppsService extends ChangeNotifier {
       _categoriesById.isNotEmpty;
   String get startupPhase => _startupPhase;
   int get lastLiveSyncAt => _lastLiveSyncAt;
+  bool get homeReorderModeEnabled => _homeReorderModeEnabled;
 
   List<App> get applications => _applicationsSnapshot ??= List.unmodifiable(
       _applications.values.sortedBy((application) => application.name));
@@ -475,6 +478,18 @@ class AppsService extends ChangeNotifier {
 
   Future<void> openSettings() => _fLauncherChannel.openSettings();
 
+  void setHomeReorderModeEnabled(bool value) {
+    if (_homeReorderModeEnabled == value) {
+      return;
+    }
+    _homeReorderModeEnabled = value;
+    notifyListeners();
+  }
+
+  void toggleHomeReorderMode() {
+    setHomeReorderModeEnabled(!_homeReorderModeEnabled);
+  }
+
   Future<bool> isDefaultLauncher() => _fLauncherChannel.isDefaultLauncher();
 
   Future<void> startAmbientMode() => _fLauncherChannel.startAmbientMode();
@@ -514,6 +529,13 @@ class AppsService extends ChangeNotifier {
   }
 
   Future<void> saveApplicationOrderInCategory(Category category) async {
+    await _saveApplicationOrderInCategory(category);
+  }
+
+  Future<void> _saveApplicationOrderInCategory(
+    Category category, {
+    bool shouldNotifyListeners = true,
+  }) async {
     if (!_categoriesById.containsKey(category.id)) {
       return;
     }
@@ -523,6 +545,7 @@ class AppsService extends ChangeNotifier {
     List<AppsCategoriesCompanion> orderedAppCategories = [];
 
     for (int i = 0; i < applications.length; ++i) {
+      applications[i].categoryOrders[categoryFound.id] = i;
       orderedAppCategories.add(AppsCategoriesCompanion(
         categoryId: Value(categoryFound.id),
         appPackageName: Value(applications[i].packageName),
@@ -530,19 +553,99 @@ class AppsService extends ChangeNotifier {
       ));
     }
     await _database.replaceAppsCategories(orderedAppCategories);
+    if (shouldNotifyListeners) {
+      notifyListeners();
+    }
+  }
+
+  bool beginApplicationReorderSession(Category category) {
+    if (!_categoriesById.containsKey(category.id)) {
+      return false;
+    }
+
+    final categoryFound = _categoriesById[category.id]!;
+    if (categoryFound.applications.length <= 1) {
+      return false;
+    }
+
+    final existingSession = _applicationReorderSession;
+    if (existingSession != null) {
+      if (existingSession.categoryId == category.id) {
+        return true;
+      }
+      _restoreApplicationReorderSession(existingSession);
+    }
+
+    _applicationReorderSession = _ApplicationReorderSession(
+      categoryId: categoryFound.id,
+      originalSort: categoryFound.sort,
+      originalPackageOrder: List<String>.from(
+        categoryFound.applications
+            .map((application) => application.packageName),
+      ),
+    );
+    return true;
+  }
+
+  Future<void> cancelApplicationReorderSession(Category category) async {
+    final session = _applicationReorderSession;
+    if (session == null || session.categoryId != category.id) {
+      return;
+    }
+    _restoreApplicationReorderSession(session);
+    _applicationReorderSession = null;
     notifyListeners();
   }
 
-  void reorderApplication(Category category, int oldIndex, int newIndex) {
-    if (!_categoriesById.containsKey(category.id)) {
+  Future<void> commitApplicationReorderSession(Category category) async {
+    final session = _applicationReorderSession;
+    if (session == null || session.categoryId != category.id) {
       return;
+    }
+    if (!_categoriesById.containsKey(category.id)) {
+      _applicationReorderSession = null;
+      return;
+    }
+
+    final categoryFound = _categoriesById[category.id]!;
+    if (session.originalSort == CategorySort.alphabetical &&
+        categoryFound.sort == CategorySort.alphabetical) {
+      await _database.updateCategory(
+        categoryFound.id,
+        const CategoriesCompanion(sort: Value(CategorySort.manual)),
+      );
+      categoryFound.sort = CategorySort.manual;
+    }
+
+    await _saveApplicationOrderInCategory(
+      categoryFound,
+      shouldNotifyListeners: false,
+    );
+    _applicationReorderSession = null;
+    notifyListeners();
+  }
+
+  bool reorderApplication(Category category, int oldIndex, int newIndex) {
+    if (!_categoriesById.containsKey(category.id)) {
+      return false;
+    }
+    if (oldIndex == newIndex) {
+      return false;
     }
     Category categoryFound = _categoriesById[category.id]!;
     List<App> applications = categoryFound.applications;
+    if (oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= applications.length ||
+        newIndex >= applications.length) {
+      return false;
+    }
+    beginApplicationReorderSession(categoryFound);
     App application = applications.removeAt(oldIndex);
     applications.insert(newIndex, application);
 
     notifyListeners();
+    return true;
   }
 
   Future<int> addCategory(String categoryName,
@@ -976,4 +1079,46 @@ class AppsService extends ChangeNotifier {
     _liveSyncRetryTimer?.cancel();
     super.dispose();
   }
+
+  void _restoreApplicationReorderSession(_ApplicationReorderSession session) {
+    final category = _categoriesById[session.categoryId];
+    if (category == null) {
+      return;
+    }
+    category.sort = session.originalSort;
+    _applyPackageOrderToCategory(category, session.originalPackageOrder);
+  }
+
+  void _applyPackageOrderToCategory(
+    Category category,
+    List<String> orderedPackageNames,
+  ) {
+    final currentByPackage = <String, App>{
+      for (final application in category.applications)
+        application.packageName: application,
+    };
+    final reorderedApplications = <App>[];
+    for (final packageName in orderedPackageNames) {
+      final application = currentByPackage.remove(packageName);
+      if (application != null) {
+        reorderedApplications.add(application);
+      }
+    }
+    reorderedApplications.addAll(currentByPackage.values);
+    category.applications
+      ..clear()
+      ..addAll(reorderedApplications);
+  }
+}
+
+class _ApplicationReorderSession {
+  final int categoryId;
+  final CategorySort originalSort;
+  final List<String> originalPackageOrder;
+
+  const _ApplicationReorderSession({
+    required this.categoryId,
+    required this.originalSort,
+    required this.originalPackageOrder,
+  });
 }

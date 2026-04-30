@@ -20,6 +20,7 @@ class PrivateDnsPanelPage extends StatefulWidget {
 }
 
 class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
+  static const String _summaryDebugLabel = 'private_dns_summary_metrics';
   late final TextEditingController _controller;
 
   @override
@@ -49,29 +50,32 @@ class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
         return ListView(
           key: const PageStorageKey<String>(PrivateDnsPanelPage.routeName),
           children: [
-            SettingsAdaptiveGrid(
-              children: [
-                SettingsMetricTile(
-                  label: localizations.modeSettingLabel,
-                  value: localizedPrivateDnsMode(
-                    localizations,
-                    status['effectiveMode']?.toString() ?? '',
+            SettingsSummarySection(
+              debugLabel: _summaryDebugLabel,
+              child: SettingsAdaptiveGrid(
+                children: [
+                  SettingsMetricTile(
+                    label: localizations.modeSettingLabel,
+                    value: localizedPrivateDnsMode(
+                      localizations,
+                      status['effectiveMode']?.toString() ?? '',
+                    ),
+                    icon: Icons.router_outlined,
                   ),
-                  icon: Icons.router_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.hostnameLabel,
-                  value: status['specifier']?.toString() ?? '-',
-                  icon: Icons.dns_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.accessPathLabel,
-                  value: status['hasWriteSecureSettings'] == true
-                      ? localizations.wssLabel
-                      : localizations.localAdbLabel,
-                  icon: Icons.security_outlined,
-                ),
-              ],
+                  SettingsMetricTile(
+                    label: localizations.hostnameLabel,
+                    value: status['specifier']?.toString() ?? '-',
+                    icon: Icons.dns_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.accessPathLabel,
+                    value: status['hasWriteSecureSettings'] == true
+                        ? localizations.wssLabel
+                        : localizations.localAdbLabel,
+                    icon: Icons.security_outlined,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             SettingsSurfaceCard(
@@ -80,6 +84,10 @@ class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
                 children: [
                   SettingsActionCard(
                     focusNode: widget.primaryFocusNode,
+                    onMoveUpAtBoundary: () =>
+                        focusCurrentSettingsNodeByDebugLabel(
+                      _summaryDebugLabel,
+                    ),
                     title: localizations.privateDnsHostname,
                     subtitle: _controller.text.trim().isEmpty
                         ? localizations.privateDnsHostname

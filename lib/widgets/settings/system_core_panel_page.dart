@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 class SystemCorePanelPage extends StatelessWidget {
   static const String routeName = "system_core_panel";
+  static const String _summaryDebugLabel = 'system_core_summary_metrics';
   final FocusNode? primaryFocusNode;
 
   const SystemCorePanelPage({
@@ -31,34 +32,39 @@ class SystemCorePanelPage extends StatelessWidget {
         return ListView(
           key: const PageStorageKey<String>(SystemCorePanelPage.routeName),
           children: [
-            SettingsAdaptiveGrid(
-              children: [
-                SettingsMetricTile(
-                  label: localizations.adbLabel,
-                  value: localizedOnOff(localizations, status['adbEnabled']),
-                  icon: Icons.adb_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.adbWifiLabel,
-                  value:
-                      localizedOnOff(localizations, status['adbWifiEnabled']),
-                  icon: Icons.wifi_tethering_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.coreHealthLabel,
-                  value: localizedBridgeHealth(
-                    localizations,
-                    status['coreServiceHealth']?.toString() ?? '',
+            SettingsSummarySection(
+              debugLabel: _summaryDebugLabel,
+              child: SettingsAdaptiveGrid(
+                children: [
+                  SettingsMetricTile(
+                    label: localizations.adbLabel,
+                    value: localizedOnOff(localizations, status['adbEnabled']),
+                    icon: Icons.adb_outlined,
                   ),
-                  icon: Icons.favorite_outline,
-                ),
-                SettingsMetricTile(
-                  label: localizations.permissionHealthLabel,
-                  value: localizedProvisioningHealth(localizations,
-                      provisioning['health']?.toString() ?? 'missing_required'),
-                  icon: Icons.verified_user_outlined,
-                ),
-              ],
+                  SettingsMetricTile(
+                    label: localizations.adbWifiLabel,
+                    value:
+                        localizedOnOff(localizations, status['adbWifiEnabled']),
+                    icon: Icons.wifi_tethering_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.coreHealthLabel,
+                    value: localizedBridgeHealth(
+                      localizations,
+                      status['coreServiceHealth']?.toString() ?? '',
+                    ),
+                    icon: Icons.favorite_outline,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.permissionHealthLabel,
+                    value: localizedProvisioningHealth(
+                      localizations,
+                      provisioning['health']?.toString() ?? 'missing_required',
+                    ),
+                    icon: Icons.verified_user_outlined,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             SettingsSurfaceCard(
@@ -68,11 +74,15 @@ class SystemCorePanelPage extends StatelessWidget {
                   Text(localizations.adbAutomationPolicyTitle,
                       style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 12),
-                SettingsChoiceCard<String>(
-                  focusNode: primaryFocusNode,
-                  selectorKey: const Key('system_core_adb_policy_selector'),
-                  optionKeyPrefix: 'system_core_adb_policy_option',
-                  title: localizations.adbAutomationPolicyTitle,
+                  SettingsChoiceCard<String>(
+                    focusNode: primaryFocusNode,
+                    onMoveUpAtBoundary: () =>
+                        focusCurrentSettingsNodeByDebugLabel(
+                      _summaryDebugLabel,
+                    ),
+                    selectorKey: const Key('system_core_adb_policy_selector'),
+                    optionKeyPrefix: 'system_core_adb_policy_option',
+                    title: localizations.adbAutomationPolicyTitle,
                     subtitle: localizations.disableAdbOnSleepSubtitle,
                     icon: Icons.adb_outlined,
                     value: policy,

@@ -22,17 +22,27 @@ class PermissionsPanelPage extends StatefulWidget {
 }
 
 class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
+  static const String _headerDebugLabel = 'permissions_summary_header';
+  static const String _summaryDebugLabel = 'permissions_summary_metrics';
   bool _showAdvanced = false;
+  late final FocusNode _headerFocusNode;
 
   @override
   void initState() {
     super.initState();
+    _headerFocusNode = FocusNode(debugLabel: _headerDebugLabel);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bridgeService = context.read<SystemBridgeService>();
       if (bridgeService.provisioningStatus.isEmpty) {
         bridgeService.refreshLite();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _headerFocusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -65,316 +75,345 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
             .where((item) => item['granted'] == true)
             .toList(growable: false);
 
-        return ListView(
+        return SingleChildScrollView(
           key: const PageStorageKey<String>(PermissionsPanelPage.routeName),
           padding: const EdgeInsets.only(bottom: 16),
-          children: [
-            SettingsSurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          localizations.provisioningWizardTitle,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
-                      SettingsStatusChip(
-                        label:
-                            '${localizations.adbLabel} ${adbEnabled ? localizations.yesLabel : localizations.noLabel}',
-                        color: adbEnabled
-                            ? const Color(0xFF7BE0A5)
-                            : const Color(0xFFFFC970),
-                      ),
-                      const SizedBox(width: 10),
-                      SettingsStatusChip(
-                        label:
-                            '${localizations.adbWifiLabel} ${adbWifiEnabled ? localizations.yesLabel : localizations.noLabel}',
-                        color: adbWifiEnabled
-                            ? const Color(0xFF8CCBFF)
-                            : const Color(0x66FFFFFF),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    adbEnabled
-                        ? localizations.provisioningWizardDescription
-                        : localizations.wizardStepOpenDeveloperOptions,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
-                        ),
-                  ),
-                  if (!adbEnabled) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0x22FFC970),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: const Color(0x66FFC970),
-                        ),
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SettingsSurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SettingsSummarySection(
+                      debugLabel: _headerDebugLabel,
+                      focusNode: _headerFocusNode,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            localizations.requirementAdbEnabledGuidance,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(color: const Color(0xFFFFD99A)),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  localizations.provisioningWizardTitle,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                              SettingsStatusChip(
+                                label:
+                                    '${localizations.adbLabel} ${adbEnabled ? localizations.yesLabel : localizations.noLabel}',
+                                color: adbEnabled
+                                    ? const Color(0xFF7BE0A5)
+                                    : const Color(0xFFFFC970),
+                              ),
+                              const SizedBox(width: 10),
+                              SettingsStatusChip(
+                                label:
+                                    '${localizations.adbWifiLabel} ${adbWifiEnabled ? localizations.yesLabel : localizations.noLabel}',
+                                color: adbWifiEnabled
+                                    ? const Color(0xFF8CCBFF)
+                                    : const Color(0x66FFFFFF),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            localizations.wizardStepGrantWss,
+                            adbEnabled
+                                ? localizations.provisioningWizardDescription
+                                : localizations.wizardStepOpenDeveloperOptions,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
-                                ?.copyWith(color: Colors.white70),
+                                ?.copyWith(
+                                  color: Colors.white70,
+                                ),
+                          ),
+                          if (!adbEnabled) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0x22FFC970),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: const Color(0x66FFC970),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    localizations.requirementAdbEnabledGuidance,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          color: const Color(0xFFFFD99A),
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    localizations.wizardStepGrantWss,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SettingsSummarySection(
+                      debugLabel: _summaryDebugLabel,
+                      child: SettingsAdaptiveGrid(
+                        minChildWidth: 180,
+                        maxColumns: 3,
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          SettingsMetricTile(
+                            label: localizations.permissionHealthLabel,
+                            value: localizedProvisioningHealth(
+                              localizations,
+                              health,
+                            ),
+                            icon: health == 'healthy'
+                                ? Icons.verified_user_outlined
+                                : Icons.warning_amber_outlined,
+                          ),
+                          SettingsMetricTile(
+                            label: localizations.requiredMissingLabel,
+                            value: missingRequired.toString(),
+                            icon: Icons.warning_amber_outlined,
+                          ),
+                          SettingsMetricTile(
+                            label: localizations.recommendedMissingLabel,
+                            value: missingRecommended.toString(),
+                            icon: Icons.info_outline,
                           ),
                         ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 14),
-                  SettingsAdaptiveGrid(
-                    minChildWidth: 180,
-                    maxColumns: 3,
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      SettingsMetricTile(
-                        label: localizations.permissionHealthLabel,
-                        value:
-                            localizedProvisioningHealth(localizations, health),
-                        icon: health == 'healthy'
-                            ? Icons.verified_user_outlined
-                            : Icons.warning_amber_outlined,
-                      ),
-                      SettingsMetricTile(
-                        label: localizations.requiredMissingLabel,
-                        value: missingRequired.toString(),
-                        icon: Icons.warning_amber_outlined,
-                      ),
-                      SettingsMetricTile(
-                        label: localizations.recommendedMissingLabel,
-                        value: missingRecommended.toString(),
-                        icon: Icons.info_outline,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Column(
-                    children: [
-                      SettingsActionCard(
-                        key: const Key('permissions_quick_grant_button'),
-                        focusNode: widget.primaryFocusNode,
-                        title: localizations.grantViaLocalAdb,
-                        subtitle: adbEnabled
-                            ? localizations.provisioningWizardDescription
-                            : localizations.wizardStepOpenDeveloperOptions,
-                        icon: Icons.auto_fix_high_outlined,
-                        onPressed: () async {
-                          if (!adbEnabled) {
-                            await _showAdbSetupGuidance(context, bridgeService);
-                            return;
-                          }
-                          _showActionResult(
-                            context,
-                            await bridgeService.runProvisioningAction(
-                              action: 'grant_all_local_adb',
-                              suggestedPolicy: 'adb_and_wifi',
-                            ),
-                          );
-                        },
-                      ),
-                      if (!adbEnabled) ...[
-                        const SizedBox(height: 10),
+                    const SizedBox(height: 14),
+                    Column(
+                      children: [
                         SettingsActionCard(
-                          title: localizations.openDeveloperOptions,
-                          subtitle: localizations.wizardStepGrantWss,
-                          icon: Icons.developer_mode_outlined,
+                          key: const Key('permissions_quick_grant_button'),
+                          focusNode: widget.primaryFocusNode,
+                          onMoveUpAtBoundary: () {
+                            _headerFocusNode.requestFocus();
+                            return true;
+                          },
+                          title: localizations.grantViaLocalAdb,
+                          subtitle: adbEnabled
+                              ? localizations.provisioningWizardDescription
+                              : localizations.wizardStepOpenDeveloperOptions,
+                          icon: Icons.auto_fix_high_outlined,
+                          onPressed: () async {
+                            if (!adbEnabled) {
+                              await _showAdbSetupGuidance(
+                                context,
+                                bridgeService,
+                              );
+                              return;
+                            }
+                            _showActionResult(
+                              context,
+                              await bridgeService.runProvisioningAction(
+                                action: 'grant_all_local_adb',
+                                suggestedPolicy: 'adb_and_wifi',
+                              ),
+                            );
+                          },
+                        ),
+                        if (!adbEnabled) ...[
+                          const SizedBox(height: 10),
+                          SettingsActionCard(
+                            title: localizations.openDeveloperOptions,
+                            subtitle: localizations.wizardStepGrantWss,
+                            icon: Icons.developer_mode_outlined,
+                            onPressed: () async => _showActionResult(
+                              context,
+                              await bridgeService.runProvisioningAction(
+                                action: 'open_development',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              SettingsSurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      localizations.provisioningWizardTitle,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    for (var index = 0; index < wizardSteps.length; index += 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SettingsStatusChip(
+                              label: '${index + 1}',
+                              color: const Color(0xFF8CCBFF),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(wizardSteps[index])),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 14),
+                    Column(
+                      children: [
+                        SettingsActionCard(
+                          title: localizations.grantMediaAccess,
+                          subtitle: localizations.requirementMediaReadLabel,
+                          icon: Icons.perm_media_outlined,
                           onPressed: () async => _showActionResult(
                             context,
-                            await bridgeService.runProvisioningAction(
-                              action: 'open_development',
-                            ),
+                            await bridgeService.requestMediaReadPermission(),
                           ),
+                        ),
+                        const SizedBox(height: 10),
+                        SettingsActionCard(
+                          title: localizations.batteryAccess,
+                          subtitle: localizations.wizardStepWhitelistBattery,
+                          icon: Icons.battery_charging_full_outlined,
+                          onPressed: () async {
+                            await bridgeService.openSpecificSettingsPage(
+                              'battery',
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        SettingsActionCard(
+                          title: localizations.overlayAccess,
+                          subtitle:
+                              localizations.requirementSystemAlertWindowLabel,
+                          icon: Icons.layers_outlined,
+                          onPressed: () async {
+                            await bridgeService.openSpecificSettingsPage(
+                              'overlay',
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        SettingsActionCard(
+                          title: localizations.writeSettingsAccess,
+                          subtitle: localizations.requirementWriteSettingsLabel,
+                          icon: Icons.edit_note_outlined,
+                          onPressed: () async {
+                            await bridgeService.openSpecificSettingsPage(
+                              'write_settings',
+                            );
+                          },
                         ),
                       ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            SettingsSurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    localizations.provisioningWizardTitle,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  for (var index = 0; index < wizardSteps.length; index += 1)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SettingsStatusChip(
-                            label: '${index + 1}',
-                            color: const Color(0xFF8CCBFF),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(wizardSteps[index])),
-                        ],
-                      ),
                     ),
-                  const SizedBox(height: 14),
-                  Column(
-                    children: [
-                      SettingsActionCard(
-                        title: localizations.grantMediaAccess,
-                        subtitle: localizations.requirementMediaReadLabel,
-                        icon: Icons.perm_media_outlined,
-                        onPressed: () async => _showActionResult(
-                          context,
-                          await bridgeService.requestMediaReadPermission(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SettingsActionCard(
-                        title: localizations.batteryAccess,
-                        subtitle: localizations.wizardStepWhitelistBattery,
-                        icon: Icons.battery_charging_full_outlined,
-                        onPressed: () async {
-                          await bridgeService.openSpecificSettingsPage(
-                            'battery',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      SettingsActionCard(
-                        title: localizations.overlayAccess,
-                        subtitle:
-                            localizations.requirementSystemAlertWindowLabel,
-                        icon: Icons.layers_outlined,
-                        onPressed: () async {
-                          await bridgeService.openSpecificSettingsPage(
-                            'overlay',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      SettingsActionCard(
-                        title: localizations.writeSettingsAccess,
-                        subtitle: localizations.requirementWriteSettingsLabel,
-                        icon: Icons.edit_note_outlined,
-                        onPressed: () async {
-                          await bridgeService.openSpecificSettingsPage(
-                            'write_settings',
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            SettingsSurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _PermissionsAdvancedToggleTile(
-                    key: const Key('permissions_advanced_toggle'),
-                    title: localizations.requirementChecklistTitle,
-                    subtitle:
-                        '${localizations.requiredMissingLabel}: $missingRequired  /  ${localizations.recommendedMissingLabel}: $missingRecommended',
-                    expanded: _showAdvanced,
-                    onPressed: () {
-                      setState(() {
-                        _showAdvanced = !_showAdvanced;
-                      });
-                    },
-                  ),
-                  if (_showAdvanced) ...[
-                    const SizedBox(height: 14),
-                    if (missingRequirements.isNotEmpty) ...[
-                      Text(
-                        localizations.requirementChecklistTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      for (final item in missingRequirements)
-                        _PermissionRequirementTile(
-                          title: _requirementLabel(
-                            localizations,
-                            item['name']?.toString() ?? '',
-                          ),
-                          subtitle: _requirementGuidance(
-                            localizations,
-                            item['name']?.toString() ?? '',
-                            item['guidance']?.toString() ?? '',
-                          ),
-                          granted: false,
-                        ),
-                    ],
-                    if (grantedRequirements.isNotEmpty) ...[
-                      if (missingRequirements.isNotEmpty)
-                        const SizedBox(height: 8),
-                      Text(
-                        localizations.grantedLabel,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      for (final item in grantedRequirements)
-                        _PermissionRequirementTile(
-                          title: _requirementLabel(
-                            localizations,
-                            item['name']?.toString() ?? '',
-                          ),
-                          subtitle: _requirementGuidance(
-                            localizations,
-                            item['name']?.toString() ?? '',
-                            item['guidance']?.toString() ?? '',
-                          ),
-                          granted: true,
-                        ),
-                    ],
-                    if (commands.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              SettingsSurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PermissionsAdvancedToggleTile(
+                      key: const Key('permissions_advanced_toggle'),
+                      title: localizations.requirementChecklistTitle,
+                      subtitle:
+                          '${localizations.requiredMissingLabel}: $missingRequired  /  ${localizations.recommendedMissingLabel}: $missingRecommended',
+                      expanded: _showAdvanced,
+                      onPressed: () {
+                        setState(() {
+                          _showAdvanced = !_showAdvanced;
+                        });
+                      },
+                    ),
+                    if (_showAdvanced) ...[
                       const SizedBox(height: 14),
-                      Text(
-                        localizations.pcProvisioningCommandsTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 10),
-                      for (final command in commands)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: SettingsActionCard(
-                            title: command,
-                            icon: Icons.copy_outlined,
-                            onPressed: () async {
-                              await Clipboard.setData(
-                                ClipboardData(text: command),
-                              );
-                            },
-                          ),
+                      if (missingRequirements.isNotEmpty) ...[
+                        Text(
+                          localizations.requirementChecklistTitle,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
+                        const SizedBox(height: 8),
+                        for (final item in missingRequirements)
+                          _PermissionRequirementTile(
+                            title: _requirementLabel(
+                              localizations,
+                              item['name']?.toString() ?? '',
+                            ),
+                            subtitle: _requirementGuidance(
+                              localizations,
+                              item['name']?.toString() ?? '',
+                              item['guidance']?.toString() ?? '',
+                            ),
+                            granted: false,
+                          ),
+                      ],
+                      if (grantedRequirements.isNotEmpty) ...[
+                        if (missingRequirements.isNotEmpty)
+                          const SizedBox(height: 8),
+                        Text(
+                          localizations.grantedLabel,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        for (final item in grantedRequirements)
+                          _PermissionRequirementTile(
+                            title: _requirementLabel(
+                              localizations,
+                              item['name']?.toString() ?? '',
+                            ),
+                            subtitle: _requirementGuidance(
+                              localizations,
+                              item['name']?.toString() ?? '',
+                              item['guidance']?.toString() ?? '',
+                            ),
+                            granted: true,
+                          ),
+                      ],
+                      if (commands.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Text(
+                          localizations.pcProvisioningCommandsTitle,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        for (final command in commands)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: SettingsActionCard(
+                              title: command,
+                              icon: Icons.copy_outlined,
+                              onPressed: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(text: command),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
                     ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -560,6 +599,20 @@ class _PermissionsAdvancedToggleTileState
         onKeyEvent: (_, event) {
           if (event is! KeyDownEvent) {
             return KeyEventResult.ignored;
+          }
+          final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+              ? TraversalDirection.up
+              : event.logicalKey == LogicalKeyboardKey.arrowDown
+                  ? TraversalDirection.down
+                  : null;
+          if (direction != null) {
+            if (!moveSettingsVerticalFocus(
+              direction: direction,
+              localNodes: <FocusNode>[Focus.of(context)],
+            )) {
+              Focus.of(context).focusInDirection(direction);
+            }
+            return KeyEventResult.handled;
           }
           if (isSettingsActivateKey(event.logicalKey)) {
             widget.onPressed();

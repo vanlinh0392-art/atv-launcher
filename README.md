@@ -46,6 +46,18 @@ ATV Launcher không còn là một mirror tối giản của upstream. Bản for
 - Lưu bố cục home, voice mapping, accessibility management, wallpaper config, ADB policy, DNS, DPI intent
 - Song ngữ English / Tiếng Việt
 
+## Screenshots
+
+### Home
+
+![ATV Launcher Home](docs/screenshots/01-home-main.png)
+
+### Settings
+
+![ATV Launcher Home Layout Settings](docs/screenshots/02-settings-home-layout.png)
+
+![ATV Launcher Accessibility Settings](docs/screenshots/03-settings-accessibility.png)
+
 ## Hồ sơ kỹ thuật
 
 - Package: `com.atv.launcher`

@@ -30,6 +30,7 @@ import 'package:flauncher/widgets/apps_grid.dart';
 import 'package:flauncher/widgets/category_row.dart';
 import 'package:flauncher/widgets/focus_aware_app_bar.dart';
 import 'package:flauncher/widgets/home_card_metrics.dart';
+import 'package:flauncher/widgets/home_reorder.dart';
 import 'package:flauncher/widgets/launcher_alternative_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -165,6 +166,9 @@ class _HomeContent extends StatelessWidget {
     final videoWallpaperActive = context.select<WallpaperService, bool>(
       (service) => service.isVideoMode && service.videoTextureId != null,
     );
+    final homeReorderModeEnabled = context.select<AppsService, bool>(
+      (service) => service.homeReorderModeEnabled,
+    );
     final navigation =
         context.select<SystemBridgeService, _NavigationSnapshot>((service) {
       final rawNavigation = service.status['navigation'];
@@ -220,6 +224,7 @@ class _HomeContent extends StatelessWidget {
             rowSpacing: dockSettings.rowSpacing,
             homeSequence: navigation.homeSequence,
             homeNavigationReason: navigation.reason,
+            homeReorderModeEnabled: homeReorderModeEnabled,
           ),
         );
       },
@@ -387,6 +392,7 @@ class _HomeDockViewport extends StatefulWidget {
   final double rowSpacing;
   final int homeSequence;
   final String homeNavigationReason;
+  final bool homeReorderModeEnabled;
 
   const _HomeDockViewport({
     required this.sections,
@@ -403,6 +409,7 @@ class _HomeDockViewport extends StatefulWidget {
     required this.rowSpacing,
     required this.homeSequence,
     required this.homeNavigationReason,
+    required this.homeReorderModeEnabled,
   });
 
   @override
@@ -416,6 +423,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   Timer? _collapseTimer;
   bool _collapsed = false;
   bool _hasInteractedSinceEntry = false;
+  bool _reorderModeActive = false;
   bool _pendingCenterAfterExpand = false;
   String? _activeSectionName;
   String? _lastFocusedRowSignature;
@@ -435,6 +443,13 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         widget.homeSequence > 0 &&
         widget.homeNavigationReason == 'home_reentry') {
       _handleHomeReentry();
+    }
+    if (widget.homeReorderModeEnabled != oldWidget.homeReorderModeEnabled) {
+      if (widget.homeReorderModeEnabled) {
+        _enterHomeReorderArmedMode();
+      } else {
+        _exitHomeReorderArmedMode();
+      }
     }
     final nextTitle = _activeSectionName;
     if (nextTitle == null || !_hasCategoryNamed(widget.sections, nextTitle)) {
@@ -601,6 +616,18 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         int rowIndex,
       ) =>
           _handleAppFocused(categoryName, itemContext, rowIndex);
+      final onReorder = (
+        String categoryName,
+        BuildContext itemContext,
+        HomeAppReorderEventType eventType, {
+        bool committed = false,
+      }) =>
+          _handleAppReorder(
+            categoryName,
+            itemContext,
+            eventType,
+            committed: committed,
+          );
 
       final categoryWidget = switch (category.type) {
         CategoryType.row => CategoryRow(
@@ -610,6 +637,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             autofocusFirstItem: shouldAutofocus,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
+            onApplicationReorder: onReorder,
           ),
         CategoryType.grid => AppsGrid(
             key: sectionKey,
@@ -618,6 +646,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             autofocusFirstItem: shouldAutofocus,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
+            onApplicationReorder: onReorder,
           ),
       };
 
@@ -637,7 +666,10 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       _collapseTimer?.cancel();
       return;
     }
-    if (widget.autoCollapseEnabled && _hasInteractedSinceEntry) {
+    if (widget.autoCollapseEnabled &&
+        _hasInteractedSinceEntry &&
+        !widget.homeReorderModeEnabled &&
+        !_reorderModeActive) {
       _scheduleCollapse();
     }
   }
@@ -754,8 +786,34 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     }
     if (widget.autoCollapseEnabled &&
         _dockFocusNode.hasFocus &&
-        _hasInteractedSinceEntry) {
+        _hasInteractedSinceEntry &&
+        !widget.homeReorderModeEnabled &&
+        !_reorderModeActive) {
       _scheduleCollapse();
+    }
+  }
+
+  void _handleAppReorder(
+    String categoryName,
+    BuildContext itemContext,
+    HomeAppReorderEventType eventType, {
+    bool committed = false,
+  }) {
+    _lastFocusedItemContext = itemContext;
+    switch (eventType) {
+      case HomeAppReorderEventType.started:
+        _beginDockReorderSession(categoryName, itemContext);
+        break;
+      case HomeAppReorderEventType.moved:
+        _updateDockReorderPosition(categoryName, itemContext);
+        break;
+      case HomeAppReorderEventType.ended:
+        _finishDockReorderSession(
+          categoryName,
+          itemContext,
+          committed: committed,
+        );
+        break;
     }
   }
 
@@ -775,14 +833,19 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       _hasInteractedSinceEntry = true;
     }
 
-    if (widget.autoCollapseEnabled) {
+    if (widget.autoCollapseEnabled &&
+        !widget.homeReorderModeEnabled &&
+        !_reorderModeActive) {
       _scheduleCollapse();
     }
   }
 
   void _scheduleCollapse() {
     _collapseTimer?.cancel();
-    if (!widget.autoCollapseEnabled || !_dockFocusNode.hasFocus) {
+    if (!widget.autoCollapseEnabled ||
+        !_dockFocusNode.hasFocus ||
+        widget.homeReorderModeEnabled ||
+        _reorderModeActive) {
       return;
     }
     _collapseTimer = Timer(
@@ -792,7 +855,11 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   }
 
   void _collapseDock() {
-    if (!mounted || !widget.autoCollapseEnabled || !_dockFocusNode.hasFocus) {
+    if (!mounted ||
+        !widget.autoCollapseEnabled ||
+        !_dockFocusNode.hasFocus ||
+        widget.homeReorderModeEnabled ||
+        _reorderModeActive) {
       return;
     }
     if (_collapsed) {
@@ -830,6 +897,127 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         return;
       }
       _centerFocusedItemInDock(itemContext);
+    });
+  }
+
+  void _beginDockReorderSession(
+    String categoryName,
+    BuildContext itemContext,
+  ) {
+    _collapseTimer?.cancel();
+    final shouldExpand = widget.autoCollapseEnabled && _collapsed;
+    final shouldUpdateSection = _activeSectionName != categoryName;
+    if (mounted &&
+        (!_reorderModeActive || shouldExpand || shouldUpdateSection)) {
+      setState(() {
+        _reorderModeActive = true;
+        _hasInteractedSinceEntry = true;
+        if (shouldExpand) {
+          _collapsed = false;
+          _pendingCenterAfterExpand = true;
+        }
+        _activeSectionName = categoryName;
+      });
+    } else {
+      _reorderModeActive = true;
+      _hasInteractedSinceEntry = true;
+    }
+    if (!shouldExpand) {
+      _scheduleCenterForReorder(itemContext);
+    }
+  }
+
+  void _updateDockReorderPosition(
+    String categoryName,
+    BuildContext itemContext,
+  ) {
+    if (_activeSectionName != categoryName && mounted) {
+      setState(() {
+        _activeSectionName = categoryName;
+      });
+    }
+    _scheduleCenterForReorder(itemContext);
+  }
+
+  void _finishDockReorderSession(
+    String categoryName,
+    BuildContext itemContext, {
+    required bool committed,
+  }) {
+    if (_activeSectionName != categoryName && mounted) {
+      setState(() {
+        _activeSectionName = categoryName;
+        _reorderModeActive = false;
+      });
+    } else {
+      _reorderModeActive = false;
+    }
+    _scheduleCenterForReorder(itemContext, animate: !committed);
+    if (widget.autoCollapseEnabled &&
+        _dockFocusNode.hasFocus &&
+        _hasInteractedSinceEntry &&
+        !widget.homeReorderModeEnabled) {
+      _scheduleCollapse();
+    }
+  }
+
+  void _enterHomeReorderArmedMode() {
+    _collapseTimer?.cancel();
+    final shouldExpand = widget.autoCollapseEnabled && _collapsed;
+    final firstCategoryName = _firstCategoryName(widget.sections);
+    if (mounted) {
+      setState(() {
+        _hasInteractedSinceEntry = true;
+        _activeSectionName = firstCategoryName;
+        _lastFocusedRowSignature = null;
+        _lastFocusedItemContext = null;
+        if (shouldExpand) {
+          _collapsed = false;
+          _pendingCenterAfterExpand = true;
+        }
+      });
+    } else {
+      _hasInteractedSinceEntry = true;
+      _activeSectionName = firstCategoryName;
+      _lastFocusedRowSignature = null;
+      _lastFocusedItemContext = null;
+      if (shouldExpand) {
+        _collapsed = false;
+        _pendingCenterAfterExpand = true;
+      }
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _jumpDockToTop();
+      _focusFirstDockItem();
+      _centerLatestFocusedRow(animate: false);
+    });
+  }
+
+  void _exitHomeReorderArmedMode() {
+    if (widget.autoCollapseEnabled &&
+        _dockFocusNode.hasFocus &&
+        _hasInteractedSinceEntry &&
+        !_reorderModeActive) {
+      _scheduleCollapse();
+    }
+  }
+
+  void _scheduleCenterForReorder(
+    BuildContext itemContext, {
+    bool animate = false,
+  }) {
+    if (_collapsed) {
+      _jumpDockToTop();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _lastFocusedItemContext != itemContext || _collapsed) {
+        return;
+      }
+      _centerFocusedItemInDock(itemContext, animate: animate);
     });
   }
 

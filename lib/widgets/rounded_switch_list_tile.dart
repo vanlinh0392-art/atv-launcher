@@ -10,6 +10,7 @@ class RoundedSwitchListTile extends StatefulWidget {
   final bool autofocus;
   final FocusNode? focusNode;
   final String? debugLabel;
+  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
   final ValueChanged<bool>? onChanged;
   final Widget title;
   final Widget secondary;
@@ -22,7 +23,8 @@ class RoundedSwitchListTile extends StatefulWidget {
       required this.secondary,
       this.autofocus = false,
       this.focusNode,
-      this.debugLabel});
+      this.debugLabel,
+      this.onMoveUpAtBoundary});
 
   @override
   State<RoundedSwitchListTile> createState() => _RoundedSwitchListTileState();
@@ -77,6 +79,28 @@ class _RoundedSwitchListTileState extends State<RoundedSwitchListTile> {
           onKeyEvent: (_, event) {
             if (event is! KeyDownEvent) {
               return KeyEventResult.ignored;
+            }
+            final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+                ? TraversalDirection.up
+                : event.logicalKey == LogicalKeyboardKey.arrowDown
+                    ? TraversalDirection.down
+                    : null;
+            if (direction != null) {
+              if (direction == TraversalDirection.up &&
+                  widget.onMoveUpAtBoundary?.call() == true) {
+                return KeyEventResult.handled;
+              }
+              if (!moveSettingsVerticalFocus(
+                direction: direction,
+                localNodes: <FocusNode>[_focusNode],
+              )) {
+                if (direction == TraversalDirection.up &&
+                    focusNearestSettingsSummaryAbove(_focusNode)) {
+                  return KeyEventResult.handled;
+                }
+                _focusNode.focusInDirection(direction);
+              }
+              return KeyEventResult.handled;
             }
             if (isSettingsActivateKey(event.logicalKey) &&
                 widget.onChanged != null) {

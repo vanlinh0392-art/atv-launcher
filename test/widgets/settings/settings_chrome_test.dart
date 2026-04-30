@@ -122,6 +122,31 @@ void main() {
     expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
   });
 
+  testWidgets('settings metric tiles are focusable row-only summaries',
+      (tester) async {
+    final focusNode = FocusNode(debugLabel: 'metric_tile_focus');
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      _settingsHarness(
+        SettingsMetricTile(
+          focusNode: focusNode,
+          label: 'Permission health',
+          value: 'Healthy',
+          icon: Icons.verified_user_outlined,
+        ),
+      ),
+    );
+
+    focusNode.requestFocus();
+    await tester.pumpAndSettle();
+
+    final frame =
+        tester.widget<SettingsFocusFrame>(find.byType(SettingsFocusFrame));
+    expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
+    expect(frame.focused, isTrue);
+  });
+
   testWidgets('explicit row-only focus binding produces a visible focus frame',
       (tester) async {
     await tester.pumpWidget(

@@ -20,6 +20,7 @@ class DensityPanelPage extends StatefulWidget {
 }
 
 class _DensityPanelPageState extends State<DensityPanelPage> {
+  static const String _summaryDebugLabel = 'density_summary_metrics';
   late final TextEditingController _controller;
 
   @override
@@ -50,24 +51,27 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
         return ListView(
           key: const PageStorageKey<String>(DensityPanelPage.routeName),
           children: [
-            SettingsAdaptiveGrid(
-              children: [
-                SettingsMetricTile(
-                  label: localizations.currentDpi,
-                  value: status['currentDensity']?.toString() ?? '-',
-                  icon: Icons.monitor_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.factoryDpi,
-                  value: status['factoryDensity']?.toString() ?? '-',
-                  icon: Icons.settings_backup_restore_outlined,
-                ),
-                SettingsMetricTile(
-                  label: localizations.overrideLabel,
-                  value: status['overrideDensity']?.toString() ?? '-',
-                  icon: Icons.tune_outlined,
-                ),
-              ],
+            SettingsSummarySection(
+              debugLabel: _summaryDebugLabel,
+              child: SettingsAdaptiveGrid(
+                children: [
+                  SettingsMetricTile(
+                    label: localizations.currentDpi,
+                    value: status['currentDensity']?.toString() ?? '-',
+                    icon: Icons.monitor_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.factoryDpi,
+                    value: status['factoryDensity']?.toString() ?? '-',
+                    icon: Icons.settings_backup_restore_outlined,
+                  ),
+                  SettingsMetricTile(
+                    label: localizations.overrideLabel,
+                    value: status['overrideDensity']?.toString() ?? '-',
+                    icon: Icons.tune_outlined,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             SettingsSurfaceCard(
@@ -100,6 +104,10 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                       SettingsActionCard(
                         key: const Key('density_apply_button'),
                         focusNode: widget.primaryFocusNode,
+                        onMoveUpAtBoundary: () =>
+                            focusCurrentSettingsNodeByDebugLabel(
+                          _summaryDebugLabel,
+                        ),
                         title: localizations.applyLabel,
                         subtitle: localizations.customDpiRange,
                         icon: Icons.check_circle_outline,
@@ -119,6 +127,10 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                         },
                       ),
                       SettingsActionCard(
+                        onMoveUpAtBoundary: () =>
+                            focusCurrentSettingsNodeByDebugLabel(
+                          _summaryDebugLabel,
+                        ),
                         title: localizations.reset,
                         subtitle: localizations.factoryDpi,
                         icon: Icons.restart_alt,

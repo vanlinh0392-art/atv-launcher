@@ -116,22 +116,9 @@ class ApplicationInfoPanel extends StatelessWidget {
               return;
             }
             await context.read<AppsService>().launchApp(application);
-            Navigator.of(context).pop(ApplicationInfoPanelResult.none);
+            Navigator.of(context).pop();
           },
         ),
-        if (canManage && category?.sort == CategorySort.manual)
-          TextButton(
-            child: Row(
-              children: [
-                const Icon(Icons.open_with),
-                Container(width: 8),
-                Text(localizations.reorder,
-                    style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-            onPressed: () => Navigator.of(context)
-                .pop(ApplicationInfoPanelResult.reorderApp),
-          ),
         if (canManage)
           TextButton(
             child: Row(
@@ -153,7 +140,7 @@ class ApplicationInfoPanel extends StatelessWidget {
               } else {
                 await context.read<AppsService>().hideApplication(application);
               }
-              Navigator.of(context).pop(ApplicationInfoPanelResult.none);
+              Navigator.of(context).pop();
             },
           ),
         if (canManage && category != null)
@@ -176,7 +163,7 @@ class ApplicationInfoPanel extends StatelessWidget {
               await context
                   .read<AppsService>()
                   .removeFromCategory(application, category!);
-              Navigator.of(context).pop(ApplicationInfoPanelResult.none);
+              Navigator.of(context).pop();
             },
           ),
         if (canManage) ...[
@@ -204,7 +191,7 @@ class ApplicationInfoPanel extends StatelessWidget {
             ),
             onPressed: () async {
               await context.read<AppsService>().uninstallApp(application);
-              Navigator.of(context).pop(ApplicationInfoPanelResult.none);
+              Navigator.of(context).pop();
             },
           ),
         ],
@@ -212,5 +199,3 @@ class ApplicationInfoPanel extends StatelessWidget {
     ]));
   }
 }
-
-enum ApplicationInfoPanelResult { none, reorderApp }

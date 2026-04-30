@@ -27,13 +27,16 @@ class WallpaperPanelPage extends StatefulWidget {
 
 class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
   static const String _scrollStorageId = 'wallpaper_panel_scroll_offset';
+  static const String _summaryDebugLabel = 'wallpaper_summary_metrics';
 
   late final ScrollController _scrollController;
+  late final FocusNode _summaryFocusNode;
   bool _showDeferredSections = false;
 
   @override
   void initState() {
     super.initState();
+    _summaryFocusNode = FocusNode(debugLabel: _summaryDebugLabel);
     _scrollController = ScrollController(keepScrollOffset: false);
     _scrollController.addListener(_persistScrollOffset);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -54,6 +57,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
   void dispose() {
     _scrollController.removeListener(_persistScrollOffset);
     _scrollController.dispose();
+    _summaryFocusNode.dispose();
     super.dispose();
   }
 
@@ -66,38 +70,42 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
         key: const PageStorageKey<String>(WallpaperPanelPage.routeName),
         padding: const EdgeInsets.only(bottom: 16),
         children: [
-          SettingsAdaptiveGrid(
-            children: [
-              SettingsMetricTile(
-                label: localizations.modeSettingLabel,
-                value: localizedWallpaperMode(
-                  localizations,
-                  wallpaperService.wallpaperMode,
+          SettingsSummarySection(
+            debugLabel: _summaryDebugLabel,
+            focusNode: _summaryFocusNode,
+            child: SettingsAdaptiveGrid(
+              children: [
+                SettingsMetricTile(
+                  label: localizations.modeSettingLabel,
+                  value: localizedWallpaperMode(
+                    localizations,
+                    wallpaperService.wallpaperMode,
+                  ),
+                  icon: Icons.wallpaper_outlined,
                 ),
-                icon: Icons.wallpaper_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.sourceLabel,
-                value: localizedVideoSourceType(
-                  localizations,
-                  wallpaperService.videoSourceType,
+                SettingsMetricTile(
+                  label: localizations.sourceLabel,
+                  value: localizedVideoSourceType(
+                    localizations,
+                    wallpaperService.videoSourceType,
+                  ),
+                  icon: Icons.video_library_outlined,
                 ),
-                icon: Icons.video_library_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.mediaAccess,
-                value:
-                    bridgeService.fileAccessStatus['hasMediaPermission'] == true
-                        ? localizations.grantedLabel
-                        : localizations.missingLabel,
-                icon: Icons.folder_open_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.playlistSize,
-                value: wallpaperService.videoUris.length.toString(),
-                icon: Icons.playlist_play_outlined,
-              ),
-            ],
+                SettingsMetricTile(
+                  label: localizations.mediaAccess,
+                  value: bridgeService.fileAccessStatus['hasMediaPermission'] ==
+                          true
+                      ? localizations.grantedLabel
+                      : localizations.missingLabel,
+                  icon: Icons.folder_open_outlined,
+                ),
+                SettingsMetricTile(
+                  label: localizations.playlistSize,
+                  value: wallpaperService.videoUris.length.toString(),
+                  icon: Icons.playlist_play_outlined,
+                ),
+              ],
+            ),
           ),
           if (bridgeService.fileAccessStatus['hasMediaPermission'] != true) ...[
             const SizedBox(height: 18),
@@ -137,6 +145,10 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                   children: [
                     SettingsActionCard(
                       focusNode: widget.primaryFocusNode,
+                      onMoveUpAtBoundary: () {
+                        _summaryFocusNode.requestFocus();
+                        return true;
+                      },
                       title: localizations.gradient,
                       icon: Icons.gradient,
                       onPressed: () async {
@@ -146,6 +158,10 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       },
                     ),
                     SettingsActionCard(
+                      onMoveUpAtBoundary: () {
+                        _summaryFocusNode.requestFocus();
+                        return true;
+                      },
                       title: localizations.picture,
                       icon: Icons.image_outlined,
                       onPressed: () async {
@@ -153,6 +169,10 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       },
                     ),
                     SettingsActionCard(
+                      onMoveUpAtBoundary: () {
+                        _summaryFocusNode.requestFocus();
+                        return true;
+                      },
                       title: localizations.singleVideo,
                       icon: Icons.movie_outlined,
                       onPressed: () async {
@@ -286,8 +306,8 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                             SettingsService.videoWallpaperRepeatCountPerItemMin,
                         maximum:
                             SettingsService.videoWallpaperRepeatCountPerItemMax,
-                        step:
-                            SettingsService.videoWallpaperRepeatCountPerItemStep,
+                        step: SettingsService
+                            .videoWallpaperRepeatCountPerItemStep,
                         onChanged: wallpaperService.isVideoMode
                             ? wallpaperService.setVideoRepeatCountPerItem
                             : null,
@@ -474,13 +494,12 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
       if (!mounted || !_scrollController.hasClients) {
         return;
       }
-      final storedOffset =
-          (PageStorage.maybeOf(context)?.readState(
-                    context,
-                    identifier: _scrollStorageId,
-                  ) as num?)
-                  ?.toDouble() ??
-              0.0;
+      final storedOffset = (PageStorage.maybeOf(context)?.readState(
+            context,
+            identifier: _scrollStorageId,
+          ) as num?)
+              ?.toDouble() ??
+          0.0;
       if (storedOffset <= 0) {
         return;
       }

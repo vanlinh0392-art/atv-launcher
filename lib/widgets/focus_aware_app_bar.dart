@@ -1,6 +1,7 @@
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
+import 'package:flauncher/providers/apps_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -56,11 +57,18 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _toggleHomeReorderMode(BuildContext context) {
+    context.read<AppsService>().toggleHomeReorderMode();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCompact = MediaQuery.sizeOf(context).width < 1000;
     final showRam = context.select<SettingsService, bool>(
       (settings) => settings.showRamInStatusBar,
+    );
+    final homeReorderModeEnabled = context.select<AppsService, bool>(
+      (service) => service.homeReorderModeEnabled,
     );
     return Selector<SettingsService, bool>(
         selector: (_, settings) => settings.autoHideAppBarEnabled,
@@ -108,6 +116,19 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
                     icon: Icons.search_rounded,
                     tooltip: AppLocalizations.of(context)!.searchHint,
                     onPressed: () => _startVoiceSearch(context),
+                  ),
+                  const SizedBox(width: _statusBarActionSpacing),
+                  _StatusBarIconButton(
+                    icon: homeReorderModeEnabled
+                        ? Icons.open_with_rounded
+                        : Icons.drive_file_move_outline,
+                    tooltip: AppLocalizations.of(context)!.reorder,
+                    iconColor: homeReorderModeEnabled
+                        ? const Color(0xFF7BE0A5)
+                        : _statusBarGlyphColor,
+                    badgeColor:
+                        homeReorderModeEnabled ? const Color(0xFF7BE0A5) : null,
+                    onPressed: () => _toggleHomeReorderMode(context),
                   ),
                   const SizedBox(width: _statusBarActionSpacing),
                   _StatusBarIconButton(
@@ -328,11 +349,15 @@ class _StatusBarIconButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final Color iconColor;
+  final Color? badgeColor;
 
   const _StatusBarIconButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.iconColor = _statusBarGlyphColor,
+    this.badgeColor,
   });
 
   @override
@@ -340,10 +365,11 @@ class _StatusBarIconButton extends StatelessWidget {
     return _StatusBarActionSurface(
       tooltip: tooltip,
       onPressed: onPressed,
+      badgeColor: badgeColor,
       child: Icon(
         icon,
         size: _statusBarGlyphSize,
-        color: _statusBarGlyphColor,
+        color: iconColor,
       ),
     );
   }

@@ -21,6 +21,7 @@ import 'dart:math';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/widgets/app_card.dart';
 import 'package:flauncher/widgets/home_card_metrics.dart';
+import 'package:flauncher/widgets/home_reorder.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +39,7 @@ class AppsGrid extends StatelessWidget {
     BuildContext itemContext,
     int rowIndex,
   )? onApplicationFocused;
+  final HomeAppReorderCallback? onApplicationReorder;
 
   AppsGrid({
     Key? key,
@@ -46,6 +48,7 @@ class AppsGrid extends StatelessWidget {
     this.autofocusFirstItem = false,
     this.rowSpacing = homeRowSpacingDefault,
     this.onApplicationFocused,
+    this.onApplicationReorder,
   }) : super(key: key);
 
   @override
@@ -91,8 +94,12 @@ class AppsGrid extends StatelessWidget {
                         itemContext,
                         index ~/ category.columnsCount,
                       ),
-                      onMove: (direction) => _onMove(context, direction, index),
-                      onMoveEnd: () => _saveOrder(context),
+                      onMoveStart: (itemContext) =>
+                          _onMoveStart(context, itemContext),
+                      onMove: (itemContext, direction) =>
+                          _onMove(context, itemContext, direction, index),
+                      onMoveEnd: (itemContext, committed) =>
+                          _onMoveEnd(context, itemContext, committed),
                     ),
                   ),
                 ),
@@ -109,7 +116,25 @@ class AppsGrid extends StatelessWidget {
   int _findChildIndex(Key key) => applications
       .indexWhere((app) => app.packageName == (key as ValueKey<String>).value);
 
-  void _onMove(BuildContext context, AxisDirection direction, int index) {
+  bool _onMoveStart(BuildContext context, BuildContext itemContext) {
+    final appsService = context.read<AppsService>();
+    final started = appsService.beginApplicationReorderSession(category);
+    if (started) {
+      onApplicationReorder?.call(
+        category.name,
+        itemContext,
+        HomeAppReorderEventType.started,
+      );
+    }
+    return started;
+  }
+
+  bool _onMove(
+    BuildContext context,
+    BuildContext itemContext,
+    AxisDirection direction,
+    int index,
+  ) {
     final currentRow = (index / category.columnsCount).floor();
     final totalRows =
         ((applications.length - 1) / category.columnsCount).floor();
@@ -138,15 +163,42 @@ class AppsGrid extends StatelessWidget {
         }
         break;
     }
-    if (newIndex != null) {
-      final appsService = context.read<AppsService>();
-      appsService.reorderApplication(category, index, newIndex);
+    if (newIndex == null) {
+      return false;
     }
+    final appsService = context.read<AppsService>();
+    final moved = appsService.reorderApplication(category, index, newIndex);
+    if (moved) {
+      onApplicationReorder?.call(
+        category.name,
+        itemContext,
+        HomeAppReorderEventType.moved,
+      );
+    }
+    return moved;
   }
 
-  void _saveOrder(BuildContext context) {
+  Future<void> _onMoveEnd(
+    BuildContext context,
+    BuildContext itemContext,
+    bool committed,
+  ) async {
     final appsService = context.read<AppsService>();
-    appsService.saveApplicationOrderInCategory(category);
+    if (committed) {
+      await appsService.commitApplicationReorderSession(category);
+    } else {
+      await appsService.cancelApplicationReorderSession(category);
+    }
+    appsService.setHomeReorderModeEnabled(false);
+    if (!context.mounted) {
+      return;
+    }
+    onApplicationReorder?.call(
+      category.name,
+      itemContext,
+      HomeAppReorderEventType.ended,
+      committed: committed,
+    );
   }
 
   SliverGridDelegate _buildSliverGridDelegate(HomeCardMetrics metrics) =>

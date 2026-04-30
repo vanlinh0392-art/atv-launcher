@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flauncher/custom_traversal_policy.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
@@ -13,6 +14,7 @@ import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_perf_probe.dart';
 import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flauncher/widgets/settings/system_core_panel_page.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flauncher/widgets/settings/voice_search_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
@@ -217,6 +219,10 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
                       _focusSelectedRail();
                       return KeyEventResult.handled;
                     }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+                        _moveFocusWithinDetail(TraversalDirection.right)) {
+                      return KeyEventResult.handled;
+                    }
                     return KeyEventResult.ignored;
                   },
                   child: FocusScope(
@@ -246,14 +252,17 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
                           const SizedBox(height: 12),
                           Expanded(
                             child: _detailContentReady
-                                ? PageStorage(
-                                    bucket: _detailPageStorageBucket,
-                                    child: KeyedSubtree(
-                                      key: ValueKey<String>(_selectedRoute),
-                                      child: _buildPage(
-                                        selectedIndex < 0
-                                            ? destinations.first.route
-                                            : _selectedRoute,
+                                ? FocusTraversalGroup(
+                                    policy: RowByRowTraversalPolicy(),
+                                    child: PageStorage(
+                                      bucket: _detailPageStorageBucket,
+                                      child: KeyedSubtree(
+                                        key: ValueKey<String>(_selectedRoute),
+                                        child: _buildPage(
+                                          selectedIndex < 0
+                                              ? destinations.first.route
+                                              : _selectedRoute,
+                                        ),
                                       ),
                                     ),
                                   )
@@ -355,11 +364,116 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
     final searcher = NodeSearcher(direction);
     final candidates = searcher.findCandidates(nodes, current);
     if (candidates.isEmpty) {
+      if ((direction == TraversalDirection.left ||
+              direction == TraversalDirection.right) &&
+          _shouldUseRelaxedHorizontalDetailFallback(current)) {
+        final fallback = _findRelaxedHorizontalDetailCandidate(
+          current: current,
+          direction: direction,
+          nodes: nodes,
+        );
+        if (fallback != null) {
+          fallback.requestFocus();
+          return true;
+        }
+        final sequentialFallback = _findSequentialActionGridCandidate(
+          current: current,
+          direction: direction,
+          nodes: nodes,
+        );
+        if (sequentialFallback != null) {
+          sequentialFallback.requestFocus();
+          return true;
+        }
+      }
       return false;
     }
     searcher.findBestFocusNode(candidates, current).requestFocus();
     return true;
   }
+
+  bool _shouldUseRelaxedHorizontalDetailFallback(FocusNode current) {
+    return _isSettingsActionCardNode(current);
+  }
+
+  FocusNode? _findRelaxedHorizontalDetailCandidate({
+    required FocusNode current,
+    required TraversalDirection direction,
+    required List<FocusNode> nodes,
+  }) {
+    final candidates = nodes.where((node) {
+      if (identical(node, current) ||
+          !node.canRequestFocus ||
+          node.context == null) {
+        return false;
+      }
+      if (direction == TraversalDirection.left &&
+          node.rect.center.dx >= current.rect.center.dx) {
+        return false;
+      }
+      if (direction == TraversalDirection.right &&
+          node.rect.center.dx <= current.rect.center.dx) {
+        return false;
+      }
+      return _isWithinRelaxedHorizontalBand(current, node);
+    }).toList(growable: false);
+    if (candidates.isEmpty) {
+      return null;
+    }
+    final searcher = NodeSearcher(direction);
+    return searcher.findBestFocusNode(
+      toCandidateNodes(candidates),
+      current,
+    );
+  }
+
+  FocusNode? _findSequentialActionGridCandidate({
+    required FocusNode current,
+    required TraversalDirection direction,
+    required List<FocusNode> nodes,
+  }) {
+    final currentIndex = nodes.indexOf(current);
+    if (currentIndex < 0) {
+      return null;
+    }
+    final currentGrid = _settingsAdaptiveGridOf(current);
+    if (currentGrid == null) {
+      return null;
+    }
+    final step = direction == TraversalDirection.left ? -1 : 1;
+    for (var index = currentIndex + step;
+        index >= 0 && index < nodes.length;
+        index += step) {
+      final candidate = nodes[index];
+      if (!_isSettingsActionCardNode(candidate) ||
+          !candidate.canRequestFocus ||
+          candidate.context == null) {
+        continue;
+      }
+      if (identical(_settingsAdaptiveGridOf(candidate), currentGrid)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  bool _isWithinRelaxedHorizontalBand(FocusNode current, FocusNode candidate) {
+    final centerDistance =
+        (current.rect.center.dy - candidate.rect.center.dy).abs();
+    final sharedHeight = math.min(current.rect.height, candidate.rect.height);
+    final tolerance = math.max(10.0, sharedHeight * 0.45);
+    if (centerDistance <= tolerance) {
+      return true;
+    }
+    return current.rect.top < candidate.rect.bottom &&
+        current.rect.bottom > candidate.rect.top;
+  }
+
+  bool _isSettingsActionCardNode(FocusNode node) =>
+      node.context?.findAncestorWidgetOfExactType<SettingsActionCard>() != null;
+
+  SettingsAdaptiveGrid? _settingsAdaptiveGridOf(FocusNode node) =>
+      node.context?.findAncestorWidgetOfExactType<SettingsAdaptiveGrid>();
 
   void _requestDetailFocus({FocusNode? preferredNode}) {
     if (_tryRequestDetailFocusNode(preferredNode) ||

@@ -29,17 +29,20 @@ import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'flauncher_app.dart';
 
+const _bootstrapMethodChannel = MethodChannel('com.atv.launcher/method');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initializeDateFormatting();
 
-  final sharedPreferences = await SharedPreferences.getInstance();
+  final sharedPreferences = await _loadSharedPreferencesWithRecovery();
   final fLauncherChannel = FLauncherChannel();
   final fLauncherDatabase = FLauncherDatabase(connect());
 
@@ -61,4 +64,19 @@ Future<void> main() async {
       return WallpaperService(fLauncherChannel, settingsService);
     }),
   ], child: FLauncherApp()));
+}
+
+Future<SharedPreferences> _loadSharedPreferencesWithRecovery() async {
+  try {
+    return await SharedPreferences.getInstance();
+  } on PlatformException {
+    await _bootstrapMethodChannel.invokeMethod('repairSharedPreferences');
+    try {
+      return await SharedPreferences.getInstance();
+    } on PlatformException {
+      await _bootstrapMethodChannel
+          .invokeMethod('clearLauncherSharedPreferences');
+      return await SharedPreferences.getInstance();
+    }
+  }
 }

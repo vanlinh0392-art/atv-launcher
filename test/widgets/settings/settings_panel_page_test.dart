@@ -642,6 +642,175 @@ void main() {
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
       contains('Grant_media_access'),
     );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('Battery_access'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('Grant_media_access'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('Open_developer_options'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('permissions_primary_quick_grant'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('permissions_summary_header'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      anyOf(
+        contains('permissions_summary_metrics'),
+        contains('settings_metric_'),
+      ),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'permissions_primary_quick_grant',
+    );
+  });
+
+  testWidgets('accessibility managed apps stay reachable with vertical DPAD',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final primaryFocusNode =
+        FocusNode(debugLabel: 'accessibility_primary_toggle_apps');
+    addTearDown(primaryFocusNode.dispose);
+    final bridgeService = _mockBridgeService(
+      accessibilitySnapshot: const <String, dynamic>{
+        'writeSecureSettingsGranted': true,
+        'accessibilityMasterEnabled': true,
+        'managedPackageCount': 3,
+        'lastVerifyResult': 'ok',
+        'apps': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'label': 'Demo App 1',
+            'packageName': 'com.demo.one',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': true,
+            'managed': true,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 2',
+            'packageName': 'com.demo.two',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': false,
+            'managed': false,
+          },
+        ],
+      },
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: AccessibilityManagerPanelPage(
+              primaryFocusNode: primaryFocusNode,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    primaryFocusNode.requestFocus();
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'accessibility_primary_toggle_apps',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('accessibility_managed_app_com.demo.one'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('accessibility_managed_app_com.demo.two'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('accessibility_managed_app_com.demo.one'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Open_accessibility_settings'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Repair'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      anyOf(
+        contains('accessibility_summary_metrics'),
+        contains('settings_metric_'),
+      ),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'settings_action_Repair',
+    );
   });
 
   testWidgets('enters Backup & Restore with export action focused',
@@ -735,6 +904,150 @@ void main() {
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
       'wallpaper_primary_source_action',
+    );
+  });
+
+  testWidgets(
+      'wallpaper action grids keep LEFT and RIGHT inside the detail pane across wrapped rows',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(tester, 'Wallpaper & Media');
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'wallpaper_primary_source_action',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Single_video'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Pick_multiple_videos'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Single_video'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Pick_folder'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Browse_TV_storage'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_Pick_folder'),
+    );
+
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isTrue,
+    );
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      isNot(contains('settings_rail_')),
+    );
+  });
+
+  testWidgets(
+      'Vietnamese wallpaper source grid keeps LEFT and UP inside the detail pane',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      locale: const Locale('vi'),
+    );
+
+    await _enterRouteDetailByTap(tester, 'Hình nền & Media');
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'wallpaper_primary_source_action',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('Ảnh'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'wallpaper_primary_source_action',
+    );
+    expect(
+      tester
+          .widget<SettingsSurfaceCard>(
+            find.byKey(const Key('settings_detail_pane_card')),
+          )
+          .highlighted,
+      isTrue,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      anyOf(
+        contains('wallpaper_summary_metrics'),
+        contains('settings_metric_'),
+      ),
     );
   });
 
@@ -1017,6 +1330,7 @@ Future<void> _pumpSettingsPanel(
   required SystemBridgeService bridgeService,
   ProfileSecurityService? securityService,
   SearchService? searchService,
+  Locale locale = const Locale('en'),
 }) async {
   final effectiveSecurityService = securityService ??
       ProfileSecurityService(await SharedPreferences.getInstance());
@@ -1040,7 +1354,7 @@ Future<void> _pumpSettingsPanel(
         ),
       ],
       child: MaterialApp(
-        locale: const Locale('en'),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(body: SettingsPanelPage()),
@@ -1107,6 +1421,7 @@ MockWallpaperService _mockWallpaperService() {
 
 MockSystemBridgeService _mockBridgeService({
   Map<String, dynamic>? provisioningStatus,
+  Map<String, dynamic>? accessibilitySnapshot,
 }) {
   final bridgeService = MockSystemBridgeService();
   when(bridgeService.diagnosticsReport).thenReturn('bridge ok');
@@ -1134,13 +1449,16 @@ MockSystemBridgeService _mockBridgeService({
     'specifier': 'dns.adguard.com',
     'hasWriteSecureSettings': true,
   });
-  when(bridgeService.accessibilitySnapshot).thenReturn(const <String, dynamic>{
-    'writeSecureSettingsGranted': true,
-    'accessibilityMasterEnabled': true,
-    'managedPackageCount': 1,
-    'lastVerifyResult': 'ok',
-    'apps': <Map<String, dynamic>>[],
-  });
+  when(bridgeService.accessibilitySnapshot).thenReturn(
+    accessibilitySnapshot ??
+        const <String, dynamic>{
+          'writeSecureSettingsGranted': true,
+          'accessibilityMasterEnabled': true,
+          'managedPackageCount': 1,
+          'lastVerifyResult': 'ok',
+          'apps': <Map<String, dynamic>>[],
+        },
+  );
   when(bridgeService.refreshFull()).thenAnswer((_) async {});
   when(bridgeService.refreshAccessibilitySnapshot()).thenAnswer((_) async {});
   when(bridgeService.setVoiceInterceptEnabled(any)).thenAnswer(

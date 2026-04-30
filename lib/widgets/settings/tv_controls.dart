@@ -10,6 +10,8 @@ bool isSettingsActivateKey(LogicalKeyboardKey key) =>
     key == LogicalKeyboardKey.select ||
     key == LogicalKeyboardKey.space;
 
+typedef SettingsBoundaryMoveHandler = bool Function();
+
 class SettingsChoiceOption<T> {
   final T value;
   final String label;
@@ -28,6 +30,7 @@ class SettingsActionCard extends StatefulWidget {
   final Future<void> Function()? onPressed;
   final bool autofocus;
   final double focusEmphasis;
+  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
 
   const SettingsActionCard({
     super.key,
@@ -38,6 +41,7 @@ class SettingsActionCard extends StatefulWidget {
     this.onPressed,
     this.autofocus = false,
     this.focusEmphasis = 1.3,
+    this.onMoveUpAtBoundary,
   });
 
   @override
@@ -102,6 +106,25 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
         onKeyEvent: (_, event) {
           if (event is! KeyDownEvent) {
             return KeyEventResult.ignored;
+          }
+          final direction = _verticalDirectionForKey(event.logicalKey);
+          if (direction != null) {
+            if (direction == TraversalDirection.up &&
+                widget.onMoveUpAtBoundary != null &&
+                widget.onMoveUpAtBoundary!.call()) {
+              return KeyEventResult.handled;
+            }
+            if (!moveSettingsVerticalFocus(
+              direction: direction,
+              localNodes: <FocusNode>[_focusNode],
+            )) {
+              if (direction == TraversalDirection.up &&
+                  focusNearestSettingsSummaryAbove(_focusNode)) {
+                return KeyEventResult.handled;
+              }
+              _focusNode.focusInDirection(direction);
+            }
+            return KeyEventResult.handled;
           }
           if (isSettingsActivateKey(event.logicalKey) && enabled) {
             widget.onPressed?.call();
@@ -198,6 +221,7 @@ class SettingsChoiceCard<T> extends StatefulWidget {
   final List<SettingsChoiceOption<T>> options;
   final String Function(T value) valueLabelBuilder;
   final ValueChanged<T> onChanged;
+  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
 
   const SettingsChoiceCard({
     super.key,
@@ -211,6 +235,7 @@ class SettingsChoiceCard<T> extends StatefulWidget {
     required this.options,
     required this.valueLabelBuilder,
     required this.onChanged,
+    this.onMoveUpAtBoundary,
   });
 
   @override
@@ -402,7 +427,16 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
     }
     final direction = _verticalDirectionForKey(event.logicalKey);
     if (direction != null) {
+      if (direction == TraversalDirection.up &&
+          widget.onMoveUpAtBoundary != null &&
+          widget.onMoveUpAtBoundary!.call()) {
+        return KeyEventResult.handled;
+      }
       if (!_moveVerticalFocusDirectly(direction)) {
+        if (direction == TraversalDirection.up &&
+            focusNearestSettingsSummaryAbove(_rowFocusNode)) {
+          return KeyEventResult.handled;
+        }
         _moveFocusBetweenRows(direction);
       }
       return KeyEventResult.handled;
@@ -509,6 +543,7 @@ class SettingsStepperCard extends StatefulWidget {
   final int step;
   final String Function(int value) valueLabelBuilder;
   final ValueChanged<int>? onChanged;
+  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
 
   const SettingsStepperCard({
     super.key,
@@ -524,6 +559,7 @@ class SettingsStepperCard extends StatefulWidget {
     required this.step,
     required this.valueLabelBuilder,
     required this.onChanged,
+    this.onMoveUpAtBoundary,
   });
 
   @override
@@ -725,7 +761,16 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
     }
     final direction = _verticalDirectionForKey(event.logicalKey);
     if (direction != null) {
+      if (direction == TraversalDirection.up &&
+          widget.onMoveUpAtBoundary != null &&
+          widget.onMoveUpAtBoundary!.call()) {
+        return KeyEventResult.handled;
+      }
       if (!_moveVerticalFocusDirectly(direction)) {
+        if (direction == TraversalDirection.up &&
+            focusNearestSettingsSummaryAbove(_rowFocusNode)) {
+          return KeyEventResult.handled;
+        }
         _moveFocusBetweenRows(direction);
       }
       return KeyEventResult.handled;
@@ -857,12 +902,13 @@ TraversalDirection? _verticalDirectionForKey(LogicalKeyboardKey key) {
   return null;
 }
 
-bool _moveVerticalFocusOutsideCluster({
+bool moveSettingsVerticalFocus({
   required TraversalDirection direction,
-  required Set<FocusNode> localNodes,
+  required Iterable<FocusNode> localNodes,
 }) {
+  final localNodeSet = localNodes.toSet();
   final current = FocusManager.instance.primaryFocus;
-  if (current == null || !localNodes.contains(current)) {
+  if (current == null || !localNodeSet.contains(current)) {
     return false;
   }
 
@@ -874,7 +920,7 @@ bool _moveVerticalFocusOutsideCluster({
 
   final searcher = NodeSearcher(direction);
   final candidates = descendants.where((node) {
-    if (localNodes.contains(node)) {
+    if (localNodeSet.contains(node)) {
       return false;
     }
     if (!node.canRequestFocus) {
@@ -894,6 +940,74 @@ bool _moveVerticalFocusOutsideCluster({
   searcher.findBestFocusNode(matchingCandidates, current).requestFocus();
   return true;
 }
+
+bool focusNearestSettingsSummaryAbove(FocusNode currentNode) {
+  final scope = currentNode.nearestScope;
+  final descendants = scope?.traversalDescendants.toList();
+  if (descendants == null || descendants.isEmpty) {
+    return false;
+  }
+
+  final summaryCandidates = descendants.where((node) {
+    if (!node.canRequestFocus || node.context == null) {
+      return false;
+    }
+    final label = node.debugLabel?.trim() ?? '';
+    return label.contains('_summary_') || label.startsWith('settings_metric_');
+  }).toList(growable: false);
+  if (summaryCandidates.isEmpty) {
+    return false;
+  }
+
+  final searcher = NodeSearcher(TraversalDirection.up);
+  final matchingCandidates =
+      searcher.findCandidates(summaryCandidates, currentNode);
+  if (matchingCandidates.isEmpty) {
+    return false;
+  }
+
+  searcher.findBestFocusNode(matchingCandidates, currentNode).requestFocus();
+  return true;
+}
+
+bool focusSettingsNodeByDebugLabel(
+  FocusNode currentNode,
+  String debugLabel,
+) {
+  final scope = currentNode.nearestScope;
+  final descendants = scope?.traversalDescendants.toList();
+  if (descendants == null || descendants.isEmpty) {
+    return false;
+  }
+
+  for (final node in descendants) {
+    if (!node.canRequestFocus || node.context == null) {
+      continue;
+    }
+    if ((node.debugLabel?.trim() ?? '') == debugLabel) {
+      node.requestFocus();
+      return true;
+    }
+  }
+  return false;
+}
+
+bool focusCurrentSettingsNodeByDebugLabel(String debugLabel) {
+  final currentNode = FocusManager.instance.primaryFocus;
+  if (currentNode == null) {
+    return false;
+  }
+  return focusSettingsNodeByDebugLabel(currentNode, debugLabel);
+}
+
+bool _moveVerticalFocusOutsideCluster({
+  required TraversalDirection direction,
+  required Set<FocusNode> localNodes,
+}) =>
+    moveSettingsVerticalFocus(
+      direction: direction,
+      localNodes: localNodes,
+    );
 
 class SettingsControlButton extends StatefulWidget {
   final FocusNode focusNode;

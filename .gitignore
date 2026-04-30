@@ -51,3 +51,5 @@ coverage/
 tmp_verify/
 __pycache__/
 .code-review-graph/
+docs/tele-assets/
+docs/screenshots/test-current.png
