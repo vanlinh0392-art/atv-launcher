@@ -201,35 +201,96 @@ class AppsService extends ChangeNotifier {
         hidden: const Value.absent());
   }
 
-  Future<void> _initDefaultCategories() {
+  Future<void> _initDefaultCategories() async {
     final tvApplications = _applications.values
-        .where((application) => application.sideloaded == false);
+        .where((application) => application.sideloaded == false)
+        .toList(growable: false);
     final nonTvApplications = _applications.values
-        .where((application) => application.sideloaded == true);
+        .where((application) => application.sideloaded == true)
+        .toList(growable: false);
+    final createdCategories = <Category>[];
 
-    return _database.transaction(() async {
-      if (tvApplications.isNotEmpty) {
-        int categoryId = await addCategory(_tvFallbackCategoryName,
-            type: CategoryType.grid, shouldNotifyListeners: false);
+    await _database.transaction(() async {
+      Future<Category> createFallbackCategory({
+        required String name,
+        required int order,
+        required CategoryType type,
+      }) async {
+        final categoryId = await _database.insertCategory(
+          CategoriesCompanion.insert(
+            name: name,
+            order: order,
+            sort: const Value(CategorySort.manual),
+            type: Value(type),
+            rowHeight: const Value(Category.RowHeight),
+            columnsCount: const Value(Category.ColumnsCount),
+          ),
+        );
+        final category = Category(
+          id: categoryId,
+          name: name,
+          sort: CategorySort.manual,
+          type: type,
+          columnsCount: Category.ColumnsCount,
+          rowHeight: Category.RowHeight,
+          order: order,
+        );
+        createdCategories.add(category);
+        return category;
+      }
 
-        Category tvAppsCategory = _categoriesById[categoryId]!;
-        for (final app in tvApplications) {
-          await addToCategory(app, tvAppsCategory,
-              shouldNotifyListeners: false);
+      Future<void> persistFallbackApplications(
+        Category category,
+        List<App> applications,
+      ) async {
+        if (applications.isEmpty) {
+          return;
         }
+
+        await _database.insertAppsCategories(
+          List<AppsCategoriesCompanion>.generate(
+            applications.length,
+            (index) => AppsCategoriesCompanion.insert(
+              categoryId: category.id,
+              appPackageName: applications[index].packageName,
+              order: index,
+            ),
+            growable: false,
+          ),
+        );
+
+        for (var index = 0; index < applications.length; index += 1) {
+          final application = applications[index];
+          application.categoryOrders[category.id] = index;
+          category.applications.add(application);
+        }
+      }
+
+      var nextOrder = 0;
+      if (tvApplications.isNotEmpty) {
+        final tvAppsCategory = await createFallbackCategory(
+          name: _tvFallbackCategoryName,
+          order: nextOrder++,
+          type: CategoryType.grid,
+        );
+        await persistFallbackApplications(tvAppsCategory, tvApplications);
       }
       if (nonTvApplications.isNotEmpty) {
-        int categoryId = await addCategory(
-          _nonTvFallbackCategoryName,
-          shouldNotifyListeners: false,
+        final nonTvAppsCategory = await createFallbackCategory(
+          name: _nonTvFallbackCategoryName,
+          order: nextOrder++,
+          type: CategoryType.row,
         );
-        Category nonTvAppsCategory = _categoriesById[categoryId]!;
-        for (final app in nonTvApplications) {
-          await addToCategory(app, nonTvAppsCategory,
-              shouldNotifyListeners: false);
-        }
+        await persistFallbackApplications(nonTvAppsCategory, nonTvApplications);
       }
     });
+
+    _categoriesById = <int, Category>{
+      for (final category in createdCategories) category.id: category,
+    };
+    _launcherSections
+      ..clear()
+      ..addAll(createdCategories);
   }
 
   Future<void> _loadStateFromDatabase({

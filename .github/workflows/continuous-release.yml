@@ -100,12 +100,12 @@ jobs:
           tag_name: ${{ steps.official_release_meta.outputs.tag_name }}
           name: ${{ steps.official_release_meta.outputs.release_name }}
           body: |
-            Official ATV Launcher release APK.
-            Maintained by xfire0392-netizen.
+            Bản phát hành chính thức của ATV Launcher.
+            Duy trì bởi xfire0392-netizen.
             Updater-Channel: xfire0392-netizen-official
 
-            File: `atv-launcher-armeabi-v7a-release.apk`
+            Tệp phát hành: `atv-launcher-armeabi-v7a-release.apk`
 
-            This is the official release channel used by the in-app updater.
-            Debug releases are published separately and ignored by the updater.
+            Đây là kênh release chính thức mà trình cập nhật trong launcher sẽ sử dụng.
+            Các bản debug sẽ bị bỏ qua và không được updater hiển thị.
           files: ${{ steps.prepare_release_asset.outputs.asset_path }}

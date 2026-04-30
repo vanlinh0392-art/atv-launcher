@@ -34,17 +34,31 @@ void main() {
     expect(harness.service.initialized, isTrue);
     expect(
       harness.service.categories.map((category) => category.name).toList(),
-      ['Non-TV Applications', 'TV Applications'],
+      ['TV Applications', 'Non-TV Applications'],
     );
-    expect(harness.service.categories.last.type, CategoryType.grid);
     expect(
-      harness.service.categories.last.applications.single.packageName,
+      harness.service.launcherSections
+          .whereType<Category>()
+          .map((category) => category.name)
+          .toList(),
+      ['TV Applications', 'Non-TV Applications'],
+    );
+    expect(harness.service.categories.first.type, CategoryType.grid);
+    expect(
+      harness.service.categories.first.applications.single.packageName,
       'tv.app',
     );
     expect(
-      harness.service.categories.first.applications.single.packageName,
+      harness.service.categories.last.applications.single.packageName,
       'sideloaded.app',
     );
+
+    final storedCategories = await harness.database.getCategories();
+    expect(
+      storedCategories.map((category) => category.name).toList(),
+      ['TV Applications', 'Non-TV Applications'],
+    );
+    expect(storedCategories.first.type, CategoryType.grid);
   });
 
   test('hideApplication removes app from visible category and show restores it',
