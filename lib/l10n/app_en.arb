@@ -106,6 +106,8 @@
     "settingsDestinationPrivateDnsTitle": "Network / Private DNS",
     "settingsDestinationSystemCoreSubtitle": "ADB automation, battery whitelist and core health",
     "settingsDestinationSystemCoreTitle": "System Core",
+    "settingsDestinationUpdatesSubtitle": "Check GitHub releases, download APKs and install updates on the TV",
+    "settingsDestinationUpdatesTitle": "Updates",
     "settingsDestinationVoiceSubtitle": "Map remote voice keys and launch fallback search",
     "settingsDestinationVoiceTitle": "Voice & Search",
     "settingsDestinationWallpaperSubtitle": "Gradient, image, video wallpaper, folders and playlists",
@@ -166,10 +168,13 @@
     "iconSizeDescription": "Adjust only the banner or icon artwork inside each home card without changing the card layout.",
     "dateAndTimeScaleTitle": "Date & time size",
     "dateAndTimeScaleDescription": "Scale the HOME status bar clock and date without changing the rest of the layout.",
-    "ramChipLabel": "RAM {value} free",
+    "ramChipLabel": "RAM {freeValue} free / {totalValue} total",
     "@ramChipLabel": {
         "placeholders": {
-            "value": {
+            "freeValue": {
+                "type": "String"
+            },
+            "totalValue": {
                 "type": "String"
             }
         }
@@ -217,8 +222,93 @@
     "requirementAdbEnabledGuidance": "Needed for one-time local ADB fallback",
     "requirementAdbWifiEnabledLabel": "ADB Wi-Fi",
     "requirementAdbWifiEnabledGuidance": "Useful for local ADB density/DNS fallback",
+    "requirementInstallPackagesLabel": "Install unknown apps",
+    "requirementInstallPackagesGuidance": "Allow installs from this launcher or use local ADB fallback",
     "requirementMediaReadLabel": "Video library access",
     "requirementMediaReadGuidance": "Use the in-app prompt, local ADB wizard or PC ADB grant",
+    "launcherUpdateInstalledVersion": "Installed build",
+    "launcherUpdateLatestRelease": "Latest release",
+    "launcherUpdateInstallerPermission": "Install permission",
+    "launcherUpdateDownloadedBuild": "Downloaded APK",
+    "launcherUpdateNotChecked": "Not checked",
+    "launcherUpdatePermissionReady": "Ready",
+    "launcherUpdatePermissionMissing": "Needs approval",
+    "launcherUpdateNoDownloadedApk": "Nothing downloaded",
+    "checkLatestRelease": "Check latest release",
+    "launcherUpdateCheckSubtitle": "Query the newest GitHub release for this launcher.",
+    "downloadLatestApk": "Download latest APK",
+    "launcherUpdateCheckBeforeDownload": "Check GitHub first to pick the newest APK asset.",
+    "installDownloadedApk": "Install downloaded APK",
+    "launcherUpdatePermissionActionSubtitle": "Allow installs from this source if Android still blocks updates.",
+    "grantInstallPermissionViaLocalAdb": "Grant install via local ADB",
+    "launcherUpdateLocalAdbSubtitle": "Try the local ADB fallback before opening Android permission screens.",
+    "allowAppInstalls": "Allow app installs",
+    "launcherUpdateStatusTitle": "Update status",
+    "launcherUpdateEmptyState": "Check GitHub releases to see the latest ATV Launcher build and download it directly on this TV.",
+    "launcherUpdateChecking": "Checking the latest GitHub release...",
+    "launcherUpdateNoApkAsset": "The latest GitHub release does not contain an APK asset.",
+    "launcherUpdateLatestReleaseReady": "Latest release ready: {release}",
+    "@launcherUpdateLatestReleaseReady": {
+        "placeholders": {
+            "release": {}
+        }
+    },
+    "launcherUpdateCheckFailed": "GitHub release check failed: {error}",
+    "@launcherUpdateCheckFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateDownloadStarted": "Downloading {fileName}...",
+    "@launcherUpdateDownloadStarted": {
+        "placeholders": {
+            "fileName": {}
+        }
+    },
+    "launcherUpdateDownloadProgress": "Download progress: {percent}%",
+    "@launcherUpdateDownloadProgress": {
+        "placeholders": {
+            "percent": {
+                "type": "int"
+            }
+        }
+    },
+    "launcherUpdateDownloadComplete": "Downloaded {fileName}. You can install it now from this panel.",
+    "@launcherUpdateDownloadComplete": {
+        "placeholders": {
+            "fileName": {}
+        }
+    },
+    "launcherUpdateDownloadFailed": "APK download failed: {error}",
+    "@launcherUpdateDownloadFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateEnableAdbFirst": "Enable Developer options and ADB on the TV before using the local ADB update grant.",
+    "launcherUpdateLocalAdbFallbackResult": "Local ADB update grant finished.",
+    "launcherUpdatePermissionScreenOpened": "Android install permission screen opened. Allow installs from this launcher, then come back here.",
+    "launcherUpdatePermissionScreenFailed": "Android install permission screen could not be opened on this TV.",
+    "launcherUpdateInstallLaunched": "Package installer opened for {fileName}. Confirm the update there to install over the current build.",
+    "@launcherUpdateInstallLaunched": {
+        "placeholders": {
+            "fileName": {}
+        }
+    },
+    "launcherUpdateInstallFailed": "APK install could not be started: {error}",
+    "@launcherUpdateInstallFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateInstalledChip": "Installed",
+    "launcherUpdateLatestChip": "Latest available",
+    "launcherUpdateRepoLabel": "GitHub repo",
+    "launcherUpdateTagLabel": "Release tag",
+    "launcherUpdatePublishedAt": "Published",
+    "launcherUpdateAssetLabel": "APK asset",
+    "launcherUpdateDownloadsLabel": "Downloads",
+    "launcherUpdateReleaseNotes": "Release notes",
     "actionCompleted": "Action completed.",
     "actionDidNotComplete": "Action did not complete.",
     "healthHealthy": "Healthy",
@@ -314,6 +404,14 @@
     "restoreCompleted": "Restore completed.",
     "restoreCompletedWithMissingApps": "Restore completed with {count} missing app(s).",
     "@restoreCompletedWithMissingApps": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "restorePreservedCurrentApps": "Kept {count} app(s) already installed on this TV in fallback sections.",
+    "@restorePreservedCurrentApps": {
         "placeholders": {
             "count": {
                 "type": "int"

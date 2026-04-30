@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
@@ -84,6 +86,7 @@ class HomeLayoutPanelPage extends StatefulWidget {
 class _HomeLayoutPanelPageState extends State<HomeLayoutPanelPage> {
   late final FocusNode _appLocaleFocusNode;
   bool _showDeferredSections = false;
+  Timer? _deferredSectionsTimer;
   late final Map<_HomeLayoutQuickTarget, GlobalKey> _quickTargetKeys =
       <_HomeLayoutQuickTarget, GlobalKey>{
     for (final target in _HomeLayoutQuickTarget.values)
@@ -121,6 +124,7 @@ class _HomeLayoutPanelPageState extends State<HomeLayoutPanelPage> {
 
   @override
   void dispose() {
+    _deferredSectionsTimer?.cancel();
     for (final focusNode in _quickTargetFocusNodes.values) {
       if (identical(focusNode, widget.primaryFocusNode)) {
         continue;
@@ -689,14 +693,13 @@ class _HomeLayoutPanelPageState extends State<HomeLayoutPanelPage> {
   }
 
   void _scheduleDeferredSections() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _showDeferredSections) {
-          return;
-        }
-        setState(() {
-          _showDeferredSections = true;
-        });
+    _deferredSectionsTimer?.cancel();
+    _deferredSectionsTimer = Timer(const Duration(milliseconds: 260), () {
+      if (!mounted || _showDeferredSections) {
+        return;
+      }
+      setState(() {
+        _showDeferredSections = true;
       });
     });
   }

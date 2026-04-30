@@ -201,8 +201,8 @@ class CategoryRow extends StatelessWidget {
       await appsService.commitApplicationReorderSession(category);
     } else {
       await appsService.cancelApplicationReorderSession(category);
+      appsService.setHomeReorderModeEnabled(false);
     }
-    appsService.setHomeReorderModeEnabled(false);
     if (!context.mounted) {
       return;
     }

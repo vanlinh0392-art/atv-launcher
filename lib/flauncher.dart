@@ -473,6 +473,14 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   }
 
   void _handleHomeReentry() {
+    if (widget.homeReorderModeEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        context.read<AppsService>().setHomeReorderModeEnabled(false);
+      });
+    }
     if (_isAlreadyAtHomeTop()) {
       return;
     }

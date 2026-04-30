@@ -356,55 +356,49 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                         ),
                       ],
                     ),
-                    ExcludeFocus(
-                      excluding: !_hasFocus,
-                      child: Offstage(
-                        offstage: !_hasFocus,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 14),
-                          child: Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: List<Widget>.generate(
-                              widget.options.length,
-                              (index) {
-                                final option = widget.options[index];
-                                final buttonKeyPrefix = widget.optionKeyPrefix;
-                                final button = SettingsControlButton(
-                                  focusNode: _optionFocusNodes[index],
-                                  selected: option.value == widget.value,
-                                  onPressed: () =>
-                                      widget.onChanged(option.value),
-                                  onFocused: _ensureRowVisible,
-                                  onMovePreviousOnLeft: index > 0
-                                      ? () => _optionFocusNodes[index - 1]
-                                          .requestFocus()
-                                      : null,
-                                  onMoveBackOnLeft: index == 0
-                                      ? _focusRowWithoutAutoEnter
-                                      : null,
-                                  onMoveNextOnRight:
-                                      index < widget.options.length - 1
-                                          ? () => _optionFocusNodes[index + 1]
-                                              .requestFocus()
-                                          : null,
-                                  child: Text(option.label),
-                                );
-                                if (buttonKeyPrefix == null) {
-                                  return button;
-                                }
-                                return KeyedSubtree(
-                                  key: ValueKey<String>(
-                                    '${buttonKeyPrefix}_${option.value}',
-                                  ),
-                                  child: button,
-                                );
-                              },
-                            ),
+                    if (_hasFocus)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: List<Widget>.generate(
+                            widget.options.length,
+                            (index) {
+                              final option = widget.options[index];
+                              final buttonKeyPrefix = widget.optionKeyPrefix;
+                              final button = SettingsControlButton(
+                                focusNode: _optionFocusNodes[index],
+                                selected: option.value == widget.value,
+                                onPressed: () => widget.onChanged(option.value),
+                                onFocused: _ensureRowVisible,
+                                onMovePreviousOnLeft: index > 0
+                                    ? () => _optionFocusNodes[index - 1]
+                                        .requestFocus()
+                                    : null,
+                                onMoveBackOnLeft: index == 0
+                                    ? _focusRowWithoutAutoEnter
+                                    : null,
+                                onMoveNextOnRight:
+                                    index < widget.options.length - 1
+                                        ? () => _optionFocusNodes[index + 1]
+                                            .requestFocus()
+                                        : null,
+                                child: Text(option.label),
+                              );
+                              if (buttonKeyPrefix == null) {
+                                return button;
+                              }
+                              return KeyedSubtree(
+                                key: ValueKey<String>(
+                                  '${buttonKeyPrefix}_${option.value}',
+                                ),
+                                child: button,
+                              );
+                            },
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -673,79 +667,74 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                       ),
                     ],
                   ),
-                  ExcludeFocus(
-                    excluding: !_hasFocus,
-                    child: Offstage(
-                      offstage: !_hasFocus,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 14),
-                        child: Row(
-                          children: [
-                            _wrapStepperButton(
-                              suffix: 'decrease',
-                              child: SettingsControlButton(
-                                focusNode: _decreaseFocusNode,
-                                selected: false,
-                                enabled: canDecrease,
-                                onFocused: _ensureRowVisible,
-                                onPressed: canDecrease
-                                    ? () => _shiftValue(-widget.step)
-                                    : null,
-                                onMoveBackOnLeft: _focusRowWithoutAutoEnter,
-                                onMoveNextOnRight: () =>
-                                    _increaseFocusNode.requestFocus(),
-                                child: const Icon(Icons.remove),
-                              ),
+                  if (_hasFocus)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: Row(
+                        children: [
+                          _wrapStepperButton(
+                            suffix: 'decrease',
+                            child: SettingsControlButton(
+                              focusNode: _decreaseFocusNode,
+                              selected: false,
+                              enabled: canDecrease,
+                              onFocused: _ensureRowVisible,
+                              onPressed: canDecrease
+                                  ? () => _shiftValue(-widget.step)
+                                  : null,
+                              onMoveBackOnLeft: _focusRowWithoutAutoEnter,
+                              onMoveNextOnRight: () =>
+                                  _increaseFocusNode.requestFocus(),
+                              child: const Icon(Icons.remove),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.04),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.06),
-                                  ),
-                                ),
-                                child: Text(
-                                  widget.valueLabelBuilder(widget.value),
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.06),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            _wrapStepperButton(
-                              suffix: 'increase',
-                              child: SettingsControlButton(
-                                focusNode: _increaseFocusNode,
-                                selected: false,
-                                enabled: canIncrease,
-                                onFocused: _ensureRowVisible,
-                                onPressed: canIncrease
-                                    ? () => _shiftValue(widget.step)
-                                    : null,
-                                onMovePreviousOnLeft: canDecrease
-                                    ? () => _decreaseFocusNode.requestFocus()
-                                    : null,
-                                onMoveBackOnLeft: !canDecrease
-                                    ? _focusRowWithoutAutoEnter
-                                    : null,
-                                child: const Icon(Icons.add),
+                              child: Text(
+                                widget.valueLabelBuilder(widget.value),
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 12),
+                          _wrapStepperButton(
+                            suffix: 'increase',
+                            child: SettingsControlButton(
+                              focusNode: _increaseFocusNode,
+                              selected: false,
+                              enabled: canIncrease,
+                              onFocused: _ensureRowVisible,
+                              onPressed: canIncrease
+                                  ? () => _shiftValue(widget.step)
+                                  : null,
+                              onMovePreviousOnLeft: canDecrease
+                                  ? () => _decreaseFocusNode.requestFocus()
+                                  : null,
+                              onMoveBackOnLeft: !canDecrease
+                                  ? _focusRowWithoutAutoEnter
+                                  : null,
+                              child: const Icon(Icons.add),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

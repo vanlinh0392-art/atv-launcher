@@ -119,11 +119,10 @@ void main() {
 
     expect(result['success'], isTrue);
     expect(result['unresolvedPackages'], contains('missing.app'));
-    expect(harness.service.categories.single.name, 'Recovered');
+    final recovered = harness.service.categories
+        .singleWhere((category) => category.name == 'Recovered');
     expect(
-      harness.service.categories.single.applications
-          .map((app) => app.packageName)
-          .toList(),
+      recovered.applications.map((app) => app.packageName).toList(),
       ['tv.app'],
     );
     expect(
@@ -131,6 +130,127 @@ void main() {
           .firstWhere((app) => app.packageName == 'other.app')
           .hidden,
       isTrue,
+    );
+  });
+
+  test(
+      'restoreLayoutBackup keeps apps already installed on this TV in fallback categories',
+      () async {
+    final harness = await _createHarness([
+      {
+        'packageName': 'tv.app',
+        'name': 'TV App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'extra.tv.app',
+        'name': 'Extra TV App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'extra.side.app',
+        'name': 'Extra Sideloaded App',
+        'version': '1.0.0',
+        'sideloaded': true,
+      },
+    ]);
+    addTearDown(harness.dispose);
+
+    final result = await harness.service.restoreLayoutBackup({
+      'sections': [
+        {
+          'type': 'category',
+          'name': 'Recovered',
+          'sort': 'manual',
+          'categoryType': 'row',
+          'columnsCount': 6,
+          'rowHeight': 110,
+          'appPackageNames': ['tv.app'],
+        },
+      ],
+      'hiddenPackages': const <String>[],
+    });
+
+    expect(result['success'], isTrue);
+    expect(
+      result['preservedPackages'],
+      containsAll(<String>['extra.tv.app', 'extra.side.app']),
+    );
+
+    final recovered = harness.service.categories
+        .singleWhere((category) => category.name == 'Recovered');
+    expect(
+      recovered.applications.map((app) => app.packageName).toList(),
+      ['tv.app'],
+    );
+
+    final tvFallback = harness.service.categories
+        .singleWhere((category) => category.name == 'TV Applications');
+    expect(
+      tvFallback.applications.map((app) => app.packageName).toList(),
+      ['extra.tv.app'],
+    );
+
+    final nonTvFallback = harness.service.categories
+        .singleWhere((category) => category.name == 'Non-TV Applications');
+    expect(
+      nonTvFallback.applications.map((app) => app.packageName).toList(),
+      ['extra.side.app'],
+    );
+  });
+
+  test(
+      'exportLayoutBackup keeps hidden app positions so restore can re-show them in place',
+      () async {
+    final harness = await _createHarness([
+      {
+        'packageName': 'tv.app',
+        'name': 'TV App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'hidden.app',
+        'name': 'Hidden App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+    ]);
+    addTearDown(harness.dispose);
+
+    final hiddenApp = harness.service.applications
+        .firstWhere((app) => app.packageName == 'hidden.app');
+    await harness.service.hideApplication(hiddenApp);
+
+    final backup = harness.service.exportLayoutBackup();
+    final sections = (backup['sections'] as List).cast<Map<String, dynamic>>();
+    final categorySection =
+        sections.singleWhere((section) => section['type'] == 'category');
+
+    expect(
+      (categorySection['appPackageNames'] as List).cast<String>(),
+      ['tv.app', 'hidden.app'],
+    );
+    expect((backup['hiddenPackages'] as List).cast<String>(),
+        contains('hidden.app'));
+
+    await harness.service.restoreLayoutBackup(backup);
+
+    final restoredHiddenApp = harness.service.applications
+        .firstWhere((app) => app.packageName == 'hidden.app');
+    expect(restoredHiddenApp.hidden, isTrue);
+
+    await harness.service.showApplication(restoredHiddenApp);
+
+    final restoredCategory = harness.service.categories.singleWhere(
+      (category) =>
+          category.applications.any((app) => app.packageName == 'hidden.app'),
+    );
+    expect(
+      restoredCategory.applications.map((app) => app.packageName).toList(),
+      ['tv.app', 'hidden.app'],
     );
   });
 
@@ -347,6 +467,119 @@ void main() {
       ['beta.app', 'alpha.app', 'gamma.app'],
     );
   });
+
+  test('disabling home reorder mode restores any unconfirmed preview order',
+      () async {
+    final harness = await _createHarness([
+      {
+        'packageName': 'alpha.app',
+        'name': 'Alpha App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'beta.app',
+        'name': 'Beta App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'gamma.app',
+        'name': 'Gamma App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+    ]);
+    addTearDown(harness.dispose);
+
+    final category = harness.service.categories.single;
+    await harness.service.setCategorySort(category, CategorySort.alphabetical);
+    harness.service.setHomeReorderModeEnabled(true);
+
+    expect(harness.service.beginApplicationReorderSession(category), isTrue);
+    expect(harness.service.reorderApplication(category, 2, 0), isTrue);
+    expect(
+      harness.service.categories.single.applications
+          .map((app) => app.packageName)
+          .toList(),
+      ['gamma.app', 'alpha.app', 'beta.app'],
+    );
+
+    harness.service.setHomeReorderModeEnabled(false);
+
+    expect(harness.service.homeReorderModeEnabled, isFalse);
+    expect(harness.service.categories.single.sort, CategorySort.alphabetical);
+    expect(
+      harness.service.categories.single.applications
+          .map((app) => app.packageName)
+          .toList(),
+      ['alpha.app', 'beta.app', 'gamma.app'],
+    );
+  });
+
+  test('committed reorder survives AppsService reload from database', () async {
+    final systemApps = [
+      {
+        'packageName': 'alpha.app',
+        'name': 'Alpha App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'beta.app',
+        'name': 'Beta App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+      {
+        'packageName': 'gamma.app',
+        'name': 'Gamma App',
+        'version': '1.0.0',
+        'sideloaded': false,
+      },
+    ];
+    final channel = MockFLauncherChannel();
+    when(channel.getApplications()).thenAnswer((_) async => systemApps);
+    when(channel.applicationExists(any)).thenAnswer((_) async => false);
+    when(channel.addAppsChangedListener(any)).thenReturn(null);
+    final database = FLauncherDatabase.inMemory();
+    addTearDown(database.close);
+
+    Future<AppsService> createService() async {
+      final service = AppsService(
+        channel,
+        database,
+        liveSyncWarmDelay: const Duration(days: 1),
+      );
+      for (var attempt = 0;
+          attempt < 50 && !service.initialized;
+          attempt += 1) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(service.initialized, isTrue);
+      return service;
+    }
+
+    final firstService = await createService();
+
+    final category = firstService.categories.single;
+    await firstService.setCategorySort(category, CategorySort.alphabetical);
+    expect(firstService.beginApplicationReorderSession(category), isTrue);
+    expect(firstService.reorderApplication(category, 1, 0), isTrue);
+    await firstService.commitApplicationReorderSession(category);
+
+    firstService.dispose();
+
+    final reloadedService = await createService();
+    addTearDown(reloadedService.dispose);
+
+    final reloadedCategory = reloadedService.categories.single;
+    expect(reloadedCategory.sort, CategorySort.manual);
+    expect(
+      reloadedCategory.applications.map((app) => app.packageName).toList(),
+      ['beta.app', 'alpha.app', 'gamma.app'],
+    );
+  });
 }
 
 class _AppsHarness {
@@ -356,7 +589,10 @@ class _AppsHarness {
 
   _AppsHarness(this.channel, this.database, this.service);
 
-  Future<void> dispose() => database.close();
+  Future<void> dispose() async {
+    service.dispose();
+    await database.close();
+  }
 }
 
 Future<_AppsHarness> _createHarness(

@@ -54,6 +54,7 @@ void main() {
         .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
 
     await _pumpWidget(tester, wallpaperService, bridgeService);
+    await _pumpDeferredSections(tester);
 
     expect(find.textContaining('Switch interval'), findsOneWidget);
     expect(
@@ -77,6 +78,7 @@ void main() {
         .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
 
     await _pumpWidget(tester, wallpaperService, bridgeService);
+    await _pumpDeferredSections(tester);
 
     final stepperTopLeft = tester.getTopLeft(
       find.byKey(const Key('video_switch_interval_seconds_stepper')),
@@ -123,6 +125,7 @@ void main() {
         .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
 
     await _pumpWidget(tester, wallpaperService, bridgeService);
+    await _pumpDeferredSections(tester);
 
     expect(
         find.byKey(const Key('wallpaper_order_mode_selector')), findsOneWidget);
@@ -169,6 +172,11 @@ Future<void> _pumpWidget(
       ),
     ),
   );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpDeferredSections(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 350));
   await tester.pumpAndSettle();
 }
 

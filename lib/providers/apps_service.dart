@@ -35,6 +35,8 @@ class AppsService extends ChangeNotifier {
   static const String startupPhaseSyncingLive = 'syncing_live';
   static const String startupPhaseReady = 'ready';
   static const String startupPhaseDegradedCached = 'degraded_cached';
+  static const String _tvFallbackCategoryName = 'TV Applications';
+  static const String _nonTvFallbackCategoryName = 'Non-TV Applications';
   static const Duration _liveSyncRetryDelayDefault = Duration(seconds: 6);
   static const Duration _liveSyncWarmDelayDefault =
       Duration(milliseconds: 1800);
@@ -207,7 +209,7 @@ class AppsService extends ChangeNotifier {
 
     return _database.transaction(() async {
       if (tvApplications.isNotEmpty) {
-        int categoryId = await addCategory("TV Applications",
+        int categoryId = await addCategory(_tvFallbackCategoryName,
             type: CategoryType.grid, shouldNotifyListeners: false);
 
         Category tvAppsCategory = _categoriesById[categoryId]!;
@@ -218,7 +220,7 @@ class AppsService extends ChangeNotifier {
       }
       if (nonTvApplications.isNotEmpty) {
         int categoryId = await addCategory(
-          "Non-TV Applications",
+          _nonTvFallbackCategoryName,
           shouldNotifyListeners: false,
         );
         Category nonTvAppsCategory = _categoriesById[categoryId]!;
@@ -278,7 +280,7 @@ class AppsService extends ChangeNotifier {
         }
       }
 
-      if (appsCategories.isNotEmpty && !application.hidden) {
+      if (appsCategories.isNotEmpty) {
         final currentApplicationCategories = appsCategories.where(
           (appCategory) =>
               appCategory.appPackageName == application.packageName,
@@ -288,7 +290,9 @@ class AppsService extends ChangeNotifier {
           if (_categoriesById.containsKey(appCategory.categoryId)) {
             final category = _categoriesById[appCategory.categoryId]!;
             application.categoryOrders[category.id] = appCategory.order;
-            category.applications.add(application);
+            if (!application.hidden) {
+              category.applications.add(application);
+            }
           }
         }
       }
@@ -482,6 +486,13 @@ class AppsService extends ChangeNotifier {
     if (_homeReorderModeEnabled == value) {
       return;
     }
+    if (!value) {
+      final session = _applicationReorderSession;
+      if (session != null) {
+        _restoreApplicationReorderSession(session);
+        _applicationReorderSession = null;
+      }
+    }
     _homeReorderModeEnabled = value;
     notifyListeners();
   }
@@ -608,19 +619,25 @@ class AppsService extends ChangeNotifier {
     }
 
     final categoryFound = _categoriesById[category.id]!;
-    if (session.originalSort == CategorySort.alphabetical &&
-        categoryFound.sort == CategorySort.alphabetical) {
-      await _database.updateCategory(
-        categoryFound.id,
-        const CategoriesCompanion(sort: Value(CategorySort.manual)),
+    final shouldSwitchToManual =
+        session.originalSort == CategorySort.alphabetical &&
+            categoryFound.sort == CategorySort.alphabetical;
+    await _database.transaction(() async {
+      if (shouldSwitchToManual) {
+        await _database.updateCategory(
+          categoryFound.id,
+          const CategoriesCompanion(sort: Value(CategorySort.manual)),
+        );
+      }
+
+      await _saveApplicationOrderInCategory(
+        categoryFound,
+        shouldNotifyListeners: false,
       );
+    });
+    if (shouldSwitchToManual) {
       categoryFound.sort = CategorySort.manual;
     }
-
-    await _saveApplicationOrderInCategory(
-      categoryFound,
-      shouldNotifyListeners: false,
-    );
     _applicationReorderSession = null;
     notifyListeners();
   }
@@ -921,9 +938,9 @@ class AppsService extends ChangeNotifier {
         'categoryType': category.type.name,
         'columnsCount': category.columnsCount,
         'rowHeight': category.rowHeight,
-        'appPackageNames': category.applications
-            .map((app) => app.packageName)
-            .toList(growable: false),
+        // Keep both visible and hidden app positions so a restored backup can
+        // re-show hidden apps in their original slot instead of losing layout.
+        'appPackageNames': _orderedCategoryPackageNames(category.id),
       };
     }).toList(growable: false);
 
@@ -949,14 +966,47 @@ class AppsService extends ChangeNotifier {
       };
     }
 
+    final visibleSectionPackages = _readSectionPackageNames(sections);
     final unresolvedPackages = <String>{};
     final hiddenPackages = ((data['hiddenPackages'] as List?) ?? const [])
         .map((entry) => entry.toString())
         .where((entry) => entry.trim().isNotEmpty)
         .toSet();
+    final referencedPackages = <String>{
+      ...visibleSectionPackages,
+      ...hiddenPackages,
+    };
+    unresolvedPackages.addAll(
+      referencedPackages
+          .where((packageName) => !_applications.containsKey(packageName)),
+    );
+    final currentSectionOrders = _currentSectionOrderByCategoryId();
+    final fallbackPlacementApps = _applications.values
+        .where((application) =>
+            !visibleSectionPackages.contains(application.packageName))
+        .toList(growable: false)
+      ..sort((left, right) =>
+          _compareAppsByCurrentLayout(left, right, currentSectionOrders));
+    final preservedPackages = fallbackPlacementApps
+        .where(
+          (application) =>
+              !referencedPackages.contains(application.packageName),
+        )
+        .map((application) => application.packageName)
+        .toList(growable: false);
+    final restoredHiddenStatesByPackage = <String, bool>{
+      for (final application in fallbackPlacementApps)
+        application.packageName: application.hidden,
+      for (final packageName in visibleSectionPackages) packageName: false,
+      for (final packageName in hiddenPackages) packageName: true,
+    };
 
     await _database.transaction(() async {
       await _database.clearLauncherLayout();
+      final nextAppOrderByCategoryId = <int, int>{};
+      var nextSectionOrder = sections.length;
+      int? tvFallbackCategoryId;
+      int? nonTvFallbackCategoryId;
 
       for (var index = 0; index < sections.length; index += 1) {
         final rawSection = sections[index];
@@ -988,6 +1038,18 @@ class AppsService extends ChangeNotifier {
                 Value(_readInt(section, 'columnsCount', Category.ColumnsCount)),
           ),
         );
+        final categoryName = _readString(section, 'name', 'Category');
+        final categoryType =
+            _readCategoryType(section, 'categoryType', Category.Type);
+        if (tvFallbackCategoryId == null &&
+            categoryName == _tvFallbackCategoryName &&
+            categoryType == CategoryType.grid) {
+          tvFallbackCategoryId = newCategoryId;
+        }
+        if (nonTvFallbackCategoryId == null &&
+            categoryName == _nonTvFallbackCategoryName) {
+          nonTvFallbackCategoryId = newCategoryId;
+        }
         final packageNames = ((section['appPackageNames'] as List?) ?? const [])
             .map((entry) => entry.toString())
             .where((entry) => entry.trim().isNotEmpty)
@@ -1010,10 +1072,51 @@ class AppsService extends ChangeNotifier {
         if (appRows.isNotEmpty) {
           await _database.insertAppsCategories(appRows);
         }
+        nextAppOrderByCategoryId[newCategoryId] = packageNames.length;
+      }
+
+      final tvFallbackApps = fallbackPlacementApps
+          .where((application) => !application.sideloaded)
+          .toList(growable: false);
+      if (tvFallbackApps.isNotEmpty) {
+        tvFallbackCategoryId ??= await _createRestoreFallbackCategory(
+          name: _tvFallbackCategoryName,
+          type: CategoryType.grid,
+          order: nextSectionOrder++,
+        );
+        nextAppOrderByCategoryId[tvFallbackCategoryId] ??= 0;
+        await _database.insertAppsCategories(
+          _buildRestoreRows(
+            categoryId: tvFallbackCategoryId,
+            applications: tvFallbackApps,
+            startOrder: nextAppOrderByCategoryId[tvFallbackCategoryId]!,
+          ),
+        );
+      }
+
+      final nonTvFallbackApps = fallbackPlacementApps
+          .where((application) => application.sideloaded)
+          .toList(growable: false);
+      if (nonTvFallbackApps.isNotEmpty) {
+        nonTvFallbackCategoryId ??= await _createRestoreFallbackCategory(
+          name: _nonTvFallbackCategoryName,
+          type: CategoryType.row,
+          order: nextSectionOrder++,
+        );
+        nextAppOrderByCategoryId[nonTvFallbackCategoryId] ??= 0;
+        await _database.insertAppsCategories(
+          _buildRestoreRows(
+            categoryId: nonTvFallbackCategoryId,
+            applications: nonTvFallbackApps,
+            startOrder: nextAppOrderByCategoryId[nonTvFallbackCategoryId]!,
+          ),
+        );
       }
 
       for (final application in _applications.values) {
-        final shouldBeHidden = hiddenPackages.contains(application.packageName);
+        final shouldBeHidden =
+            restoredHiddenStatesByPackage[application.packageName] ??
+                application.hidden;
         if (application.hidden != shouldBeHidden) {
           await _database.updateApp(
             application.packageName,
@@ -1030,6 +1133,7 @@ class AppsService extends ChangeNotifier {
           ? 'Launcher layout restored.'
           : 'Launcher layout restored with missing apps skipped.',
       'unresolvedPackages': unresolvedPackages.toList(growable: false),
+      'preservedPackages': preservedPackages,
     };
   }
 
@@ -1071,6 +1175,131 @@ class AppsService extends ChangeNotifier {
     return CategoryType.values.firstWhere(
       (candidate) => candidate.name == value,
       orElse: () => fallback,
+    );
+  }
+
+  List<String> _orderedCategoryPackageNames(int categoryId) {
+    final packages = _applications.values
+        .where(
+            (application) => application.categoryOrders.containsKey(categoryId))
+        .toList(growable: false)
+      ..sort((left, right) {
+        final leftOrder = left.categoryOrders[categoryId] ?? 1 << 20;
+        final rightOrder = right.categoryOrders[categoryId] ?? 1 << 20;
+        final orderComparison = leftOrder.compareTo(rightOrder);
+        if (orderComparison != 0) {
+          return orderComparison;
+        }
+        final nameComparison =
+            left.name.toLowerCase().compareTo(right.name.toLowerCase());
+        if (nameComparison != 0) {
+          return nameComparison;
+        }
+        return left.packageName.compareTo(right.packageName);
+      });
+    return packages
+        .map((application) => application.packageName)
+        .toList(growable: false);
+  }
+
+  Set<String> _readSectionPackageNames(List<dynamic> sections) {
+    final packageNames = <String>{};
+    for (final rawSection in sections) {
+      if (rawSection is! Map) {
+        continue;
+      }
+      final section = rawSection.cast<String, dynamic>();
+      if (section['type']?.toString() != 'category') {
+        continue;
+      }
+      for (final rawPackageName
+          in ((section['appPackageNames'] as List?) ?? const [])) {
+        final packageName = rawPackageName.toString().trim();
+        if (packageName.isNotEmpty) {
+          packageNames.add(packageName);
+        }
+      }
+    }
+    return packageNames;
+  }
+
+  Map<int, int> _currentSectionOrderByCategoryId() => <int, int>{
+        for (final section in _launcherSections)
+          if (section is Category) section.id: section.order,
+      };
+
+  int _compareAppsByCurrentLayout(
+    App left,
+    App right,
+    Map<int, int> sectionOrdersByCategoryId,
+  ) {
+    final leftKey =
+        _primaryCurrentPlacementKey(left, sectionOrdersByCategoryId);
+    final rightKey =
+        _primaryCurrentPlacementKey(right, sectionOrdersByCategoryId);
+    final sectionComparison = leftKey.$1.compareTo(rightKey.$1);
+    if (sectionComparison != 0) {
+      return sectionComparison;
+    }
+    final appComparison = leftKey.$2.compareTo(rightKey.$2);
+    if (appComparison != 0) {
+      return appComparison;
+    }
+    final nameComparison =
+        left.name.toLowerCase().compareTo(right.name.toLowerCase());
+    if (nameComparison != 0) {
+      return nameComparison;
+    }
+    return left.packageName.compareTo(right.packageName);
+  }
+
+  (int, int) _primaryCurrentPlacementKey(
+    App application,
+    Map<int, int> sectionOrdersByCategoryId,
+  ) {
+    var bestSectionOrder = 1 << 20;
+    var bestAppOrder = 1 << 20;
+    for (final entry in application.categoryOrders.entries) {
+      final sectionOrder = sectionOrdersByCategoryId[entry.key] ?? 1 << 20;
+      if (sectionOrder < bestSectionOrder ||
+          (sectionOrder == bestSectionOrder && entry.value < bestAppOrder)) {
+        bestSectionOrder = sectionOrder;
+        bestAppOrder = entry.value;
+      }
+    }
+    return (bestSectionOrder, bestAppOrder);
+  }
+
+  Future<int> _createRestoreFallbackCategory({
+    required String name,
+    required CategoryType type,
+    required int order,
+  }) {
+    return _database.insertCategory(
+      CategoriesCompanion.insert(
+        name: name,
+        order: order,
+        sort: const Value(CategorySort.manual),
+        type: Value(type),
+        rowHeight: const Value(Category.RowHeight),
+        columnsCount: const Value(Category.ColumnsCount),
+      ),
+    );
+  }
+
+  List<AppsCategoriesCompanion> _buildRestoreRows({
+    required int categoryId,
+    required List<App> applications,
+    required int startOrder,
+  }) {
+    return List<AppsCategoriesCompanion>.generate(
+      applications.length,
+      (index) => AppsCategoriesCompanion.insert(
+        categoryId: categoryId,
+        appPackageName: applications[index].packageName,
+        order: startOrder + index,
+      ),
+      growable: false,
     );
   }
 

@@ -23,6 +23,8 @@ import 'package:flutter/rendering.dart';
 
 class EnsureVisible extends StatelessWidget {
   static const double settingsAlignment = 0.24;
+  static final Expando<_EnsureVisibleTracker> _trackers =
+      Expando<_EnsureVisibleTracker>('ensure_visible_tracker');
 
   final Widget child;
   final double alignment;
@@ -59,6 +61,32 @@ class EnsureVisible extends StatelessWidget {
     required int remainingPasses,
     bool preferImmediate = false,
   }) {
+    final scrollable = Scrollable.maybeOf(context);
+    final position = scrollable?.position;
+    final generation = position == null ? null : _nextGeneration(position);
+    _scheduleEnsureVisiblePass(
+      context,
+      alignment: alignment,
+      remainingPasses: remainingPasses,
+      preferImmediate: preferImmediate,
+      trackedPosition: position,
+      generation: generation,
+    );
+  }
+
+  static void _scheduleEnsureVisiblePass(
+    BuildContext context, {
+    required double alignment,
+    required int remainingPasses,
+    required bool preferImmediate,
+    required ScrollPosition? trackedPosition,
+    required int? generation,
+  }) {
+    if (trackedPosition != null &&
+        generation != null &&
+        _trackerFor(trackedPosition).generation != generation) {
+      return;
+    }
     ensureVisible(
       context,
       alignment: alignment,
@@ -71,11 +99,18 @@ class EnsureVisible extends StatelessWidget {
       if (!context.mounted) {
         return;
       }
-      scheduleEnsureVisible(
+      if (trackedPosition != null &&
+          generation != null &&
+          _trackerFor(trackedPosition).generation != generation) {
+        return;
+      }
+      _scheduleEnsureVisiblePass(
         context,
         alignment: alignment,
         remainingPasses: remainingPasses - 1,
         preferImmediate: preferImmediate,
+        trackedPosition: trackedPosition,
+        generation: generation,
       );
     });
   }
@@ -108,6 +143,7 @@ class EnsureVisible extends StatelessWidget {
 
     final position = scrollable.position;
     final currentOffset = position.pixels;
+    final tracker = _trackerFor(position);
 
     final targetOffset = viewport
         .getOffsetToReveal(renderObject, alignment.clamp(0.0, 1.0))
@@ -124,6 +160,14 @@ class EnsureVisible extends StatelessWidget {
     if (delta <= tolerance) {
       return;
     }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (tracker.lastTargetOffset != null &&
+        (tracker.lastTargetOffset! - targetOffset).abs() <= tolerance &&
+        now - tracker.lastIssuedAtMs <= 120) {
+      return;
+    }
+    tracker.lastTargetOffset = targetOffset;
+    tracker.lastIssuedAtMs = now;
     if (preferImmediate || delta < 18) {
       position.jumpTo(targetOffset);
       return;
@@ -137,4 +181,19 @@ class EnsureVisible extends StatelessWidget {
       curve: Curves.easeOutCubic,
     );
   }
+
+  static _EnsureVisibleTracker _trackerFor(ScrollPosition position) =>
+      _trackers[position] ??= _EnsureVisibleTracker();
+
+  static int _nextGeneration(ScrollPosition position) {
+    final tracker = _trackerFor(position);
+    tracker.generation += 1;
+    return tracker.generation;
+  }
+}
+
+class _EnsureVisibleTracker {
+  int generation = 0;
+  double? lastTargetOffset;
+  int lastIssuedAtMs = 0;
 }

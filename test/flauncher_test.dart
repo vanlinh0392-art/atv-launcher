@@ -791,6 +791,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 180));
 
     verify(appsService.commitApplicationReorderSession(any)).called(1);
+    verifyNever(appsService.setHomeReorderModeEnabled(false));
     expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
   });
 
@@ -887,6 +888,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 180));
 
     verify(appsService.commitApplicationReorderSession(any)).called(1);
+    verifyNever(appsService.setHomeReorderModeEnabled(false));
     expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
   });
 }

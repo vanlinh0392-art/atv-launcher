@@ -39,6 +39,7 @@ import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flauncher/widgets/settings/system_core_panel_page.dart';
 import 'package:flauncher/widgets/settings/voice_search_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
+import 'package:flauncher/widgets/settings/update_panel_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -217,6 +218,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         case DiagnosticsPanelPage.routeName:
                           return MaterialPageRoute(
                               builder: (_) => DiagnosticsPanelPage());
+                        case UpdatePanelPage.routeName:
+                          return MaterialPageRoute(
+                              builder: (_) => UpdatePanelPage());
                         case StatusBarPanelPage.routeName:
                           return MaterialPageRoute(
                               builder: (_) => StatusBarPanelPage());

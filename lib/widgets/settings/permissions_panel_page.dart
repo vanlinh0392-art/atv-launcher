@@ -505,6 +505,8 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
         return localizations.requirementAdbEnabledLabel;
       case 'adb_wifi_enabled':
         return localizations.requirementAdbWifiEnabledLabel;
+      case 'request_install_packages':
+        return localizations.requirementInstallPackagesLabel;
       case 'android.permission.READ_MEDIA_VIDEO':
       case 'android.permission.READ_EXTERNAL_STORAGE':
         return localizations.requirementMediaReadLabel;
@@ -535,6 +537,8 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
         return localizations.requirementAdbEnabledGuidance;
       case 'adb_wifi_enabled':
         return localizations.requirementAdbWifiEnabledGuidance;
+      case 'request_install_packages':
+        return localizations.requirementInstallPackagesGuidance;
       case 'android.permission.READ_MEDIA_VIDEO':
       case 'android.permission.READ_EXTERNAL_STORAGE':
         return localizations.requirementMediaReadGuidance;

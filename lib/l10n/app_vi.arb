@@ -242,6 +242,8 @@
     "settingsDestinationPrivateDnsTitle": "Mạng / Private DNS",
     "settingsDestinationSystemCoreSubtitle": "Tự động ADB, whitelist pin và tình trạng core",
     "settingsDestinationSystemCoreTitle": "System Core",
+    "settingsDestinationUpdatesSubtitle": "Kiểm tra GitHub release, tải APK và cài bản mới ngay trên TV",
+    "settingsDestinationUpdatesTitle": "Cập nhật",
     "settingsDestinationVoiceSubtitle": "Map nút giọng nói trên remote và fallback tìm kiếm",
     "settingsDestinationVoiceTitle": "Giọng nói & Tìm kiếm",
     "settingsDestinationWallpaperSubtitle": "Nền chuyển sắc, ảnh, video, thư mục và playlist",
@@ -277,10 +279,13 @@
     "settingsUiTransparencyDescription": "Điều chỉnh độ trong của toàn bộ bề mặt và khung cài đặt ATV Launcher mà không ảnh hưởng giao diện HOME.",
     "appCardLayoutSizeTitle": "Kích thước thẻ",
     "appCardLayoutSizeDescription": "Phóng to hoặc thu nhỏ toàn bộ thẻ ứng dụng trong từng ô cố định mà không đổi số hàng hay bố cục dock.",
-    "ramChipLabel": "RAM trống {value}",
+    "ramChipLabel": "RAM trống {freeValue} / tổng {totalValue}",
     "@ramChipLabel": {
         "placeholders": {
-            "value": {
+            "freeValue": {
+                "type": "String"
+            },
+            "totalValue": {
                 "type": "String"
             }
         }
@@ -328,8 +333,93 @@
     "requirementAdbEnabledGuidance": "Cần cho fallback local ADB một lần",
     "requirementAdbWifiEnabledLabel": "ADB Wi‑Fi",
     "requirementAdbWifiEnabledGuidance": "Hữu ích cho fallback DPI/DNS bằng local ADB",
+    "requirementInstallPackagesLabel": "Cho phép cài ứng dụng lạ",
+    "requirementInstallPackagesGuidance": "Cho phép cài từ launcher này hoặc dùng fallback local ADB",
     "requirementMediaReadLabel": "Quyền thư viện video",
     "requirementMediaReadGuidance": "Dùng hộp thoại trong app, wizard local ADB hoặc ADB từ PC để cấp",
+    "launcherUpdateInstalledVersion": "Bản đang cài",
+    "launcherUpdateLatestRelease": "Release mới nhất",
+    "launcherUpdateInstallerPermission": "Quyền cài đè",
+    "launcherUpdateDownloadedBuild": "APK đã tải",
+    "launcherUpdateNotChecked": "Chưa kiểm tra",
+    "launcherUpdatePermissionReady": "Sẵn sàng",
+    "launcherUpdatePermissionMissing": "Cần cấp quyền",
+    "launcherUpdateNoDownloadedApk": "Chưa tải APK",
+    "checkLatestRelease": "Kiểm tra release mới nhất",
+    "launcherUpdateCheckSubtitle": "Truy vấn GitHub release mới nhất của launcher này.",
+    "downloadLatestApk": "Tải APK mới nhất",
+    "launcherUpdateCheckBeforeDownload": "Hãy kiểm tra GitHub trước để chọn đúng APK mới nhất.",
+    "installDownloadedApk": "Cài APK đã tải",
+    "launcherUpdatePermissionActionSubtitle": "Cho phép cài từ nguồn này nếu Android vẫn đang chặn cập nhật.",
+    "grantInstallPermissionViaLocalAdb": "Cấp quyền cài qua local ADB",
+    "launcherUpdateLocalAdbSubtitle": "Thử fallback local ADB trước khi mở màn hình quyền của Android.",
+    "allowAppInstalls": "Cho phép cài ứng dụng",
+    "launcherUpdateStatusTitle": "Trạng thái cập nhật",
+    "launcherUpdateEmptyState": "Hãy kiểm tra GitHub release để xem bản ATV Launcher mới nhất và tải trực tiếp ngay trên TV này.",
+    "launcherUpdateChecking": "Đang kiểm tra GitHub release mới nhất...",
+    "launcherUpdateNoApkAsset": "GitHub release mới nhất không có tệp APK.",
+    "launcherUpdateLatestReleaseReady": "Đã sẵn sàng release mới: {release}",
+    "@launcherUpdateLatestReleaseReady": {
+        "placeholders": {
+            "release": {}
+        }
+    },
+    "launcherUpdateCheckFailed": "Kiểm tra GitHub release thất bại: {error}",
+    "@launcherUpdateCheckFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateDownloadStarted": "Đang tải {fileName}...",
+    "@launcherUpdateDownloadStarted": {
+        "placeholders": {
+            "fileName": {}
+        }
+    },
+    "launcherUpdateDownloadProgress": "Tiến độ tải: {percent}%",
+    "@launcherUpdateDownloadProgress": {
+        "placeholders": {
+            "percent": {
+                "type": "int"
+            }
+        }
+    },
+    "launcherUpdateDownloadComplete": "Đã tải xong {fileName}. Bây giờ bạn có thể cài ngay từ pane này.",
+    "@launcherUpdateDownloadComplete": {
+        "placeholders": {
+            "fileName": {}
+        }
+    },
+    "launcherUpdateDownloadFailed": "Tải APK thất bại: {error}",
+    "@launcherUpdateDownloadFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateEnableAdbFirst": "Hãy bật Tùy chọn nhà phát triển và ADB trên TV trước khi dùng cấp quyền cập nhật qua local ADB.",
+    "launcherUpdateLocalAdbFallbackResult": "Đã chạy xong local ADB grant cho cập nhật.",
+    "launcherUpdatePermissionScreenOpened": "Đã mở màn hình quyền cài đặt của Android. Hãy cho phép cài từ launcher này rồi quay lại đây.",
+    "launcherUpdatePermissionScreenFailed": "Không thể mở màn hình quyền cài đặt của Android trên TV này.",
+    "launcherUpdateInstallLaunched": "Đã mở trình cài đặt cho {fileName}. Hãy xác nhận ở đó để cài đè lên bản hiện tại.",
+    "@launcherUpdateInstallLaunched": {
+        "placeholders": {
+            "fileName": {}
+        }
+    },
+    "launcherUpdateInstallFailed": "Không thể bắt đầu cài APK: {error}",
+    "@launcherUpdateInstallFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "launcherUpdateInstalledChip": "Đang dùng",
+    "launcherUpdateLatestChip": "Bản mới nhất",
+    "launcherUpdateRepoLabel": "Repo GitHub",
+    "launcherUpdateTagLabel": "Tag release",
+    "launcherUpdatePublishedAt": "Phát hành",
+    "launcherUpdateAssetLabel": "Tệp APK",
+    "launcherUpdateDownloadsLabel": "Lượt tải",
+    "launcherUpdateReleaseNotes": "Ghi chú phát hành",
     "actionCompleted": "Đã thực hiện xong.",
     "actionDidNotComplete": "Chưa thực hiện xong.",
     "healthHealthy": "Ổn định",
@@ -425,6 +515,14 @@
     "restoreCompleted": "Khôi phục hoàn tất.",
     "restoreCompletedWithMissingApps": "Khôi phục hoàn tất, thiếu {count} ứng dụng.",
     "@restoreCompletedWithMissingApps": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "restorePreservedCurrentApps": "Đã giữ lại {count} ứng dụng đang có trên TV trong các mục fallback.",
+    "@restorePreservedCurrentApps": {
         "placeholders": {
             "count": {
                 "type": "int"

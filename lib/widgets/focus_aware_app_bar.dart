@@ -271,12 +271,19 @@ class _MemoryStatusChip extends StatelessWidget {
             ? memory.cast<String, dynamic>()
             : <String, dynamic>{};
         final num? availableBytes = map['availBytes'] as num?;
+        final num? totalBytes = map['totalBytes'] as num?;
         final bool lowMemory = map['lowMemory'] == true;
-        final String rawValue =
-            availableBytes == null ? '--' : _formatBytesAsGb(availableBytes);
-        final String semanticsLabel = availableBytes == null
+        final bool hasReadableMemory =
+            availableBytes != null && totalBytes != null && totalBytes > 0;
+        final String rawValue = hasReadableMemory
+            ? '${_formatBytesAsGb(availableBytes)} / ${_formatBytesAsGb(totalBytes)}'
+            : '-- / --';
+        final String semanticsLabel = !hasReadableMemory
             ? localizations.ramChipUnavailable
-            : localizations.ramChipLabel(rawValue);
+            : localizations.ramChipLabel(
+                _formatBytesAsGb(availableBytes),
+                _formatBytesAsGb(totalBytes),
+              );
         return Semantics(
           label: semanticsLabel,
           child: Text(

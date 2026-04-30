@@ -228,6 +228,7 @@ class _QueuedAppImageLoad {
 
 class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   bool _moving = false;
+  bool? _lastObservedHomeReorderModeEnabled;
   late final FocusNode _cardFocusNode =
       FocusNode(debugLabel: 'app_card_${widget.application.packageName}');
 
@@ -260,6 +261,19 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     if (oldWidget.application.packageName != widget.application.packageName) {
       _bindAppImage();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final homeReorderModeEnabled =
+        Provider.of<AppsService>(context).homeReorderModeEnabled;
+    if ((_lastObservedHomeReorderModeEnabled ?? homeReorderModeEnabled) &&
+        !homeReorderModeEnabled &&
+        _moving) {
+      _moving = false;
+    }
+    _lastObservedHomeReorderModeEnabled = homeReorderModeEnabled;
   }
 
   @override

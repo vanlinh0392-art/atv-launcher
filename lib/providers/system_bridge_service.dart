@@ -26,6 +26,7 @@ class SystemBridgeService extends ChangeNotifier {
   Map<String, dynamic> get wallpaperStatus => _nestedMap(_status['wallpaper']);
   Map<String, dynamic> get provisioningStatus =>
       _nestedMap(_status['provisioning']);
+  Map<String, dynamic> get updateStatus => _nestedMap(_status['updates']);
   Map<String, dynamic> get fileAccessStatus =>
       _nestedMap(_status['fileAccess']);
   Map<String, dynamic> get backupStatus => _nestedMap(_status['backup']);
@@ -43,35 +44,52 @@ class SystemBridgeService extends ChangeNotifier {
   Future<void> _init() async {
     await refreshLite();
     _systemSubscription = _channel.addSystemChangedListener((event) {
-      _applyStatusSnapshot(event);
-      notifyListeners();
+      if (_applyStatusSnapshot(event)) {
+        notifyListeners();
+      }
     });
   }
 
   Future<void> refresh() async => refreshLite();
 
   Future<void> refreshLite() async {
-    _applyStatusSnapshot(await _channel.getSystemBridgeStatusLite());
+    final changed =
+        _applyStatusSnapshot(await _channel.getSystemBridgeStatusLite());
+    final initializedChanged = !_initialized;
     _initialized = true;
-    notifyListeners();
+    if (changed || initializedChanged) {
+      notifyListeners();
+    }
   }
 
   Future<void> refreshFull() async {
-    _applyStatusSnapshot(await _channel.getSystemBridgeStatus());
+    final changed =
+        _applyStatusSnapshot(await _channel.getSystemBridgeStatus());
+    final initializedChanged = !_initialized;
     _initialized = true;
-    notifyListeners();
+    if (changed || initializedChanged) {
+      notifyListeners();
+    }
   }
 
   Future<void> refreshAccessibilitySnapshot() async {
-    _accessibilitySnapshot = await _channel.getAccessibilityManagerSnapshot();
+    final nextSnapshot = await _channel.getAccessibilityManagerSnapshot();
+    if (_deepEquals(_accessibilitySnapshot, nextSnapshot)) {
+      return;
+    }
+    _accessibilitySnapshot = nextSnapshot;
     notifyListeners();
   }
 
   Future<void> refreshDiagnostics() async {
-    _diagnosticsReport = await _channel.getDiagnosticsReport();
-    _applyStatusSnapshot(<String, dynamic>{
-      'diagnosticsReport': _diagnosticsReport,
+    final nextReport = await _channel.getDiagnosticsReport();
+    final statusChanged = _applyStatusSnapshot(<String, dynamic>{
+      'diagnosticsReport': nextReport,
     });
+    if (_diagnosticsReport == nextReport && !statusChanged) {
+      return;
+    }
+    _diagnosticsReport = nextReport;
     notifyListeners();
   }
 
@@ -208,6 +226,18 @@ class SystemBridgeService extends ChangeNotifier {
     return result;
   }
 
+  Future<Map<String, dynamic>> prepareLauncherUpdateInstall() async {
+    final result = await _channel.prepareLauncherUpdateInstall();
+    await refreshLite();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> installDownloadedApk(String filePath) async {
+    final result = await _channel.installDownloadedApk(filePath);
+    await refreshLite();
+    return result;
+  }
+
   Future<Map<String, dynamic>> browseLocalVideoLibrary({
     String? bucketId,
   }) =>
@@ -251,12 +281,18 @@ class SystemBridgeService extends ChangeNotifier {
   static Map<String, dynamic> _nestedMap(dynamic value) =>
       value is Map ? value.cast<String, dynamic>() : <String, dynamic>{};
 
-  void _applyStatusSnapshot(Map<String, dynamic> snapshot) {
-    _status = _mergeStatusMaps(_status, snapshot);
+  bool _applyStatusSnapshot(Map<String, dynamic> snapshot) {
+    final merged = _mergeStatusMaps(_status, snapshot);
+    final changed = !_deepEquals(_status, merged);
+    _status = merged;
     final diagnosticsReport = snapshot['diagnosticsReport']?.toString();
-    if (diagnosticsReport != null && diagnosticsReport.isNotEmpty) {
+    if (diagnosticsReport != null &&
+        diagnosticsReport.isNotEmpty &&
+        diagnosticsReport != _diagnosticsReport) {
       _diagnosticsReport = diagnosticsReport;
+      return true;
     }
+    return changed;
   }
 
   static Map<String, dynamic> _mergeStatusMaps(
@@ -280,6 +316,35 @@ class SystemBridgeService extends ChangeNotifier {
       }
     });
     return merged;
+  }
+
+  static bool _deepEquals(dynamic left, dynamic right) {
+    if (identical(left, right)) {
+      return true;
+    }
+    if (left is Map && right is Map) {
+      if (left.length != right.length) {
+        return false;
+      }
+      for (final key in left.keys) {
+        if (!right.containsKey(key) || !_deepEquals(left[key], right[key])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (left is List && right is List) {
+      if (left.length != right.length) {
+        return false;
+      }
+      for (var index = 0; index < left.length; index += 1) {
+        if (!_deepEquals(left[index], right[index])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return left == right;
   }
 
   @override

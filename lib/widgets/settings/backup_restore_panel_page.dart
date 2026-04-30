@@ -263,9 +263,14 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
       await search.applyBackupMap(searchMap);
       await wallpaper.restoreFromSettings();
 
-      final restoreNotes = <String>[layoutResult['message']?.toString() ?? ''];
+      final restoreNotes = <String>[];
       final unresolvedPackages =
           ((layoutResult['unresolvedPackages'] as List?) ?? const [])
+              .map((item) => item.toString())
+              .where((item) => item.isNotEmpty)
+              .toList(growable: false);
+      final preservedPackages =
+          ((layoutResult['preservedPackages'] as List?) ?? const [])
               .map((item) => item.toString())
               .where((item) => item.isNotEmpty)
               .toList(growable: false);
@@ -275,6 +280,11 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
       }
 
       final localizations = AppLocalizations.of(context)!;
+      if (preservedPackages.isNotEmpty) {
+        restoreNotes.add(
+          localizations.restorePreservedCurrentApps(preservedPackages.length),
+        );
+      }
       if (!hadOwnerPin && !security.hasPin && profileSecurity.isNotEmpty) {
         restoreNotes.add(localizations.backupOwnerPinNotRestoredNotice);
       }

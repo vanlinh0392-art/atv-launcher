@@ -58,6 +58,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.FileProvider;
 
 import com.atv.launcher.systembridge.accessmanager.model.AppEntry;
 import com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge;
@@ -423,6 +424,8 @@ public class MainActivity extends FlutterActivity {
             case "resetPrivateDns" -> result.success(PrivateDnsController.reset(this));
             case "getFileAccessStatus" -> result.success(VideoLibraryController.getFileAccessStatus(this));
             case "requestMediaReadPermission" -> requestMediaReadPermission(result);
+            case "prepareLauncherUpdateInstall" -> result.success(prepareLauncherUpdateInstall());
+            case "installDownloadedApk" -> result.success(installDownloadedApk(call));
             case "browseLocalVideoLibrary" -> result.success(browseLocalVideoLibrary(call));
             case "getTvInputs" -> result.success(getTvInputs());
             case "launchTvInput" -> result.success(launchTvInput(call));
@@ -877,6 +880,7 @@ public class MainActivity extends FlutterActivity {
                         : new LinkedHashMap<>()
         );
         map.put("provisioning", buildProvisioningSummary());
+        map.put("updates", buildUpdateStatus());
         map.put("memory", buildMemoryStatus());
         map.put("fileAccess", VideoLibraryController.getFileAccessStatus(this));
         map.put("backup", buildBackupStatus());
@@ -1043,6 +1047,11 @@ public class MainActivity extends FlutterActivity {
                 readGlobalInt(ADB_WIFI_KEY, 0) == 1,
                 "Useful for local ADB density/DNS fallback",
                 "optional"));
+        requirements.add(buildPermissionItem("request_install_packages",
+                isDeclaredPermission(android.Manifest.permission.REQUEST_INSTALL_PACKAGES),
+                canInstallPackageUpdates(),
+                "Allow installs from this launcher or use local ADB fallback",
+                "recommended"));
         requirements.add(buildPermissionItem(mediaReadPermissionName(),
                 isDeclaredPermission(mediaReadPermissionName()),
                 hasPermission(mediaReadPermissionName()),
@@ -1100,6 +1109,7 @@ public class MainActivity extends FlutterActivity {
         if (requiresNotificationRuntimePermission()) {
             commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
         }
+        commands.add("adb shell appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow");
         commands.add("adb shell appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
         commands.add("adb shell appops set " + getPackageName() + " WRITE_SETTINGS allow");
         commands.add("adb shell dumpsys deviceidle whitelist +" + getPackageName());
@@ -1121,6 +1131,38 @@ public class MainActivity extends FlutterActivity {
         map.put("missingRecommendedCount", evaluation.missingRecommendedCount);
         map.put("missingOptionalCount", evaluation.missingOptionalCount);
         map.put("health", evaluation.health);
+        return map;
+    }
+
+    private Map<String, Object> buildUpdateStatus() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("packageName", getPackageName());
+        map.put("requestInstallPackagesDeclared",
+                isDeclaredPermission(android.Manifest.permission.REQUEST_INSTALL_PACKAGES));
+        map.put("canRequestPackageInstalls", canInstallPackageUpdates());
+        map.put("adbEnabled", readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1);
+        map.put("adbWifiEnabled", readGlobalInt(ADB_WIFI_KEY, 0) == 1);
+        return map;
+    }
+
+    private Map<String, Object> prepareLauncherUpdateInstall() {
+        Map<String, Object> map = new LinkedHashMap<>(buildUpdateStatus());
+        List<String> log = new ArrayList<>();
+        boolean success = false;
+        String message;
+        if (readGlobalInt(Settings.Global.ADB_ENABLED, 0) != 1) {
+            message = "ADB is disabled. Enable Developer options first.";
+        } else {
+            log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
+            success = canInstallPackageUpdates();
+            message = success
+                    ? "Install permission granted for this launcher."
+                    : "Install permission still needs user approval from Android settings.";
+        }
+        map.put("success", success);
+        map.put("message", message);
+        map.put("log", log);
+        emitSystemSnapshot();
         return map;
     }
 
@@ -1270,6 +1312,7 @@ public class MainActivity extends FlutterActivity {
                 if (requiresNotificationRuntimePermission()) {
                     log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS));
                 }
+                log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
                 log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow"));
                 log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " WRITE_SETTINGS allow"));
                 log.add(runLocalAdbBestEffort("cmd deviceidle whitelist +" + getPackageName()));
@@ -1286,6 +1329,17 @@ public class MainActivity extends FlutterActivity {
             } else {
                 success = false;
                 message = grantResult.message;
+            }
+        } else if (TextUtils.equals(normalizedAction, "grant_update_install_local_adb")) {
+            if (readGlobalInt(Settings.Global.ADB_ENABLED, 0) != 1) {
+                success = false;
+                message = "ADB is disabled. Enable Developer options first.";
+            } else {
+                log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
+                success = canInstallPackageUpdates();
+                message = success
+                        ? "Install permission granted for this launcher."
+                        : "Install permission still needs user approval from Android settings.";
             }
         } else if (TextUtils.equals(normalizedAction, "open_development")) {
             success = openSpecificSettingsPage("development");
@@ -2050,6 +2104,48 @@ public class MainActivity extends FlutterActivity {
         return shellCommand + " -> " + (TextUtils.isEmpty(result.detail) ? "failed" : result.detail);
     }
 
+    private Map<String, Object> installDownloadedApk(MethodCall call) {
+        String filePath = call.argument("filePath");
+        Map<String, Object> map = new LinkedHashMap<>(buildUpdateStatus());
+        if (TextUtils.isEmpty(filePath)) {
+            map.put("success", false);
+            map.put("message", "Downloaded APK path is missing.");
+            return map;
+        }
+        File apkFile = new File(filePath);
+        if (!apkFile.exists() || !apkFile.isFile()) {
+            map.put("success", false);
+            map.put("message", "Downloaded APK file could not be found.");
+            return map;
+        }
+        if (!canInstallPackageUpdates()) {
+            map.put("success", false);
+            map.put("needsPermission", true);
+            map.put("message", "Allow installs from this launcher before installing the update.");
+            return map;
+        }
+        try {
+            Uri apkUri = FileProvider.getUriForFile(
+                    this,
+                    getPackageName() + ".fileprovider",
+                    apkFile
+            );
+            Intent intent = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            boolean success = tryStartActivity(intent);
+            map.put("success", success);
+            map.put("message", success
+                    ? "Package installer opened for the downloaded update."
+                    : "Package installer could not be opened.");
+            return map;
+        } catch (Exception exception) {
+            map.put("success", false);
+            map.put("message", exception.toString());
+            return map;
+        }
+    }
+
     private boolean openSpecificSettingsPage(String page) {
         Intent intent;
         String normalized = page == null ? "" : page.trim().toLowerCase(Locale.US);
@@ -2059,6 +2155,10 @@ public class MainActivity extends FlutterActivity {
                     .setData(Uri.parse("package:" + getPackageName()));
             case "overlay" -> intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                     .setData(Uri.parse("package:" + getPackageName()));
+            case "install_unknown_apps" -> intent = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                    ? new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                    .setData(Uri.parse("package:" + getPackageName()))
+                    : new Intent(Settings.ACTION_SECURITY_SETTINGS);
             case "battery" -> intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
             case "app_details" -> intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     .setData(Uri.parse("package:" + getPackageName()));
@@ -2413,6 +2513,16 @@ public class MainActivity extends FlutterActivity {
         android.app.NotificationManager notificationManager =
                 (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         return notificationManager == null || notificationManager.areNotificationsEnabled();
+    }
+
+    private boolean canInstallPackageUpdates() {
+        if (!isDeclaredPermission(Manifest.permission.REQUEST_INSTALL_PACKAGES)) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return true;
+        }
+        return getPackageManager().canRequestPackageInstalls();
     }
 
     private String mediaReadPermissionName() {

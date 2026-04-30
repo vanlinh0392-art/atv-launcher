@@ -171,6 +171,12 @@ class FLauncherChannel {
   Future<Map<String, dynamic>> requestMediaReadPermission() async =>
       _invokeMapMethod('requestMediaReadPermission');
 
+  Future<Map<String, dynamic>> prepareLauncherUpdateInstall() async =>
+      _invokeMapMethod('prepareLauncherUpdateInstall');
+
+  Future<Map<String, dynamic>> installDownloadedApk(String filePath) async =>
+      _invokeMapMethod('installDownloadedApk', {'filePath': filePath});
+
   Future<Map<String, dynamic>> browseLocalVideoLibrary({
     String? bucketId,
   }) async =>
