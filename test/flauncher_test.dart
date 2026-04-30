@@ -698,6 +698,197 @@ void main() {
     expect(find.byIcon(Icons.open_in_new), findsOneWidget);
     expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
   });
+
+  testWidgets(
+      'row reorder keeps move mode active across multiple DPAD moves until OK',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Row Reorder',
+      order: 0,
+      type: CategoryType.row,
+      columnsCount: 4,
+    );
+    category.applications.addAll([
+      fakeApp(packageName: 'move.row.0', name: 'Move Row 0'),
+      fakeApp(packageName: 'move.row.1', name: 'Move Row 1'),
+      fakeApp(packageName: 'move.row.2', name: 'Move Row 2'),
+    ]);
+
+    late void Function() rebuild;
+    when(appsService.homeReorderModeEnabled).thenReturn(true);
+    when(appsService.beginApplicationReorderSession(any)).thenReturn(true);
+    when(appsService.commitApplicationReorderSession(any))
+        .thenAnswer((_) async {});
+    when(appsService.cancelApplicationReorderSession(any))
+        .thenAnswer((_) async {});
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+    when(appsService.reorderApplication(any, any, any))
+        .thenAnswer((invocation) {
+      final targetCategory = invocation.positionalArguments[0] as Category;
+      final oldIndex = invocation.positionalArguments[1] as int;
+      final newIndex = invocation.positionalArguments[2] as int;
+      final moved = targetCategory.applications.removeAt(oldIndex);
+      targetCategory.applications.insert(newIndex, moved);
+      rebuild();
+      return true;
+    });
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ProfileSecurityService?>.value(value: null),
+          ListenableProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<SettingsService>.value(value: settingsService),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = () => setState(() {});
+                return SizedBox(
+                  width: 1280,
+                  child: CategoryRow(
+                    category: category,
+                    applications: category.applications,
+                    autofocusFirstItem: true,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byIcon(Icons.keyboard_arrow_right), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byIcon(Icons.keyboard_arrow_right), findsOneWidget);
+    expect(category.applications[1].packageName, 'move.row.0');
+    verifyNever(appsService.commitApplicationReorderSession(any));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byIcon(Icons.keyboard_arrow_right), findsOneWidget);
+    expect(category.applications[2].packageName, 'move.row.0');
+    verifyNever(appsService.commitApplicationReorderSession(any));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pump(const Duration(milliseconds: 180));
+
+    verify(appsService.commitApplicationReorderSession(any)).called(1);
+    expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
+  });
+
+  testWidgets(
+      'grid reorder keeps move mode active across vertical and horizontal DPAD moves until OK',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Grid Reorder',
+      order: 0,
+      type: CategoryType.grid,
+      columnsCount: 2,
+    );
+    category.applications.addAll([
+      fakeApp(packageName: 'move.grid.0', name: 'Move Grid 0'),
+      fakeApp(packageName: 'move.grid.1', name: 'Move Grid 1'),
+      fakeApp(packageName: 'move.grid.2', name: 'Move Grid 2'),
+      fakeApp(packageName: 'move.grid.3', name: 'Move Grid 3'),
+    ]);
+
+    late void Function() rebuild;
+    when(appsService.homeReorderModeEnabled).thenReturn(true);
+    when(appsService.beginApplicationReorderSession(any)).thenReturn(true);
+    when(appsService.commitApplicationReorderSession(any))
+        .thenAnswer((_) async {});
+    when(appsService.cancelApplicationReorderSession(any))
+        .thenAnswer((_) async {});
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+    when(appsService.reorderApplication(any, any, any))
+        .thenAnswer((invocation) {
+      final targetCategory = invocation.positionalArguments[0] as Category;
+      final oldIndex = invocation.positionalArguments[1] as int;
+      final newIndex = invocation.positionalArguments[2] as int;
+      final moved = targetCategory.applications.removeAt(oldIndex);
+      targetCategory.applications.insert(newIndex, moved);
+      rebuild();
+      return true;
+    });
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ProfileSecurityService?>.value(value: null),
+          ListenableProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<SettingsService>.value(value: settingsService),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = () => setState(() {});
+                return SizedBox(
+                  width: 1280,
+                  child: AppsGrid(
+                    category: category,
+                    applications: category.applications,
+                    autofocusFirstItem: true,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+    expect(category.applications[2].packageName, 'move.grid.0');
+    verifyNever(appsService.commitApplicationReorderSession(any));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byIcon(Icons.keyboard_arrow_right), findsOneWidget);
+    expect(category.applications[3].packageName, 'move.grid.0');
+    verifyNever(appsService.commitApplicationReorderSession(any));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pump(const Duration(milliseconds: 180));
+
+    verify(appsService.commitApplicationReorderSession(any)).called(1);
+    expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
+  });
 }
 
 void _expectCardNearDockCenter(WidgetTester tester, Key appKey) {

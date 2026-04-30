@@ -30,6 +30,8 @@ import '../models/app.dart';
 import '../models/category.dart';
 
 class CategoryRow extends StatelessWidget {
+  static const String _slotKeyPrefix = 'category_row_slot:';
+
   final Category category;
   final List<App> applications;
   final bool autofocusFirstItem;
@@ -83,6 +85,9 @@ class CategoryRow extends StatelessWidget {
                   childCount: applications.length,
                   findChildIndexCallback: _findChildIndex,
                   (context, index) => Align(
+                    key: ValueKey<String>(
+                      _slotKeyForPackage(applications[index].packageName),
+                    ),
                     alignment: Alignment.center,
                     child: AppCard(
                       key: Key(applications[index].packageName),
@@ -113,8 +118,14 @@ class CategoryRow extends StatelessWidget {
     return categoryContent;
   }
 
-  int _findChildIndex(Key key) => applications
-      .indexWhere((app) => app.packageName == (key as ValueKey<String>).value);
+  int _findChildIndex(Key key) => applications.indexWhere(
+        (app) =>
+            _slotKeyForPackage(app.packageName) ==
+            (key as ValueKey<String>).value,
+      );
+
+  static String _slotKeyForPackage(String packageName) =>
+      '$_slotKeyPrefix$packageName';
 
   bool _onMoveStart(BuildContext context, BuildContext itemContext) {
     final appsService = context.read<AppsService>();
