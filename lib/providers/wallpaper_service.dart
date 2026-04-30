@@ -66,6 +66,12 @@ class WallpaperService extends ChangeNotifier {
       HomePerformanceProfile.resolve(_settingsService.homeDockPerformanceMode)
           .wallpaperVideoWarmUpDelay;
 
+  bool get _prefersDeferredWeakModeWarmUp {
+    final mode = _settingsService.homeDockPerformanceMode;
+    return mode == SettingsService.homeDockPerformanceModeSmooth ||
+        mode == SettingsService.homeDockPerformanceModeOff;
+  }
+
   WallpaperService(this._fLauncherChannel, this._settingsService) {
     _init();
   }
@@ -90,7 +96,7 @@ class WallpaperService extends ChangeNotifier {
     await _reloadPreviewImage();
     await _fLauncherChannel.setWallpaperMode(wallpaperMode);
     if (isVideoMode) {
-      await _warmUpVideoController();
+      await _warmUpVideoControllerForCurrentMode(allowDeferred: true);
     } else {
       _videoWarmUpCompleted = false;
       _videoTextureId = null;
@@ -126,6 +132,16 @@ class WallpaperService extends ChangeNotifier {
       }
       await _warmUpVideoController();
     });
+  }
+
+  Future<void> _warmUpVideoControllerForCurrentMode({
+    required bool allowDeferred,
+  }) async {
+    if (allowDeferred && fastStartupEnabled && _prefersDeferredWeakModeWarmUp) {
+      _scheduleVideoWarmUp();
+      return;
+    }
+    await _warmUpVideoController();
   }
 
   Future<void> _warmUpVideoController() async {
@@ -249,7 +265,7 @@ class WallpaperService extends ChangeNotifier {
     await _fLauncherChannel.setWallpaperMode('video');
     await _reloadPreviewImage();
     _videoWarmUpCompleted = false;
-    await _warmUpVideoController();
+    await _warmUpVideoControllerForCurrentMode(allowDeferred: true);
   }
 
   Future<void> setGradient(FLauncherGradient fLauncherGradient) async {

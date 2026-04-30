@@ -153,6 +153,52 @@ void main() {
     expect(service.videoTextureId, 5);
   });
 
+  test('restoreFromSettings defers video warm-up for smooth mode', () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode': 'smooth',
+      'wallpaper_mode': 'image',
+      'wallpaper_asset_uri': 'content://image/1',
+    });
+    final channel = MockFLauncherChannel();
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 11);
+    when(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
+
+    await settings.setWallpaperMode('video');
+    await settings.setWallpaperAssetUri('content://video/restore');
+
+    await service.restoreFromSettings();
+
+    verify(channel.setWallpaperMode('video')).called(1);
+    verifyNever(channel.getVideoWallpaperTextureId());
+
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+
+    expect(service.videoTextureId, 11);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
+  });
+
   test('setVideoRepeatCountPerItem persists and syncs repeat count', () async {
     final settings = await _createSettingsService();
     final channel = MockFLauncherChannel();
@@ -251,6 +297,55 @@ void main() {
         reason: 'settings_panel_release',
       ),
     ).called(1);
+  });
+
+  test('pickVideoWallpaperFilesSaf defers warm-up for smooth mode', () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode': 'smooth',
+    });
+    final channel = MockFLauncherChannel();
+    when(channel.pickWallpaperFiles()).thenAnswer(
+      (_) async => <String, dynamic>{
+        'uris': ['content://video/21', 'content://video/22'],
+        'primaryUri': 'content://video/21',
+        'previewPath': 'C:/preview2.jpg',
+      },
+    );
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 19);
+    when(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+      ),
+    ).thenAnswer((_) async => <String, dynamic>{});
+    final service = WallpaperService(channel, settings);
+
+    await service.pickVideoWallpaperFilesSaf();
+
+    expect(settings.wallpaperMode, 'video');
+    expect(service.videoTextureId, isNull);
+    verifyNever(channel.getVideoWallpaperTextureId());
+
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+
+    expect(service.videoTextureId, 19);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
   });
 }
 

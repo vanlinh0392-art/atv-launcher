@@ -4,35 +4,65 @@ import 'dart:io';
 class LauncherUpdateClient {
   static const String githubOwner = 'xfire0392-netizen';
   static const String githubRepo = 'atv-launcher';
+  static const int releasePageSize = 50;
+  static const int maxReleasePages = 6;
 
   final HttpClient Function() _httpClientFactory;
+  final Uri? _releasesBaseUriOverride;
 
   LauncherUpdateClient({
     HttpClient Function()? httpClientFactory,
-  }) : _httpClientFactory = httpClientFactory ?? HttpClient.new;
+    Uri? releasesBaseUri,
+  })  : _httpClientFactory = httpClientFactory ?? HttpClient.new,
+        _releasesBaseUriOverride = releasesBaseUri;
 
-  static Uri get releasesUri => Uri.https(
+  static Uri _defaultReleasesUri(int page) => Uri.https(
         'api.github.com',
         '/repos/$githubOwner/$githubRepo/releases',
-        const <String, String>{
-          'per_page': '20',
+        <String, String>{
+          'per_page': '$releasePageSize',
+          'page': '$page',
         },
       );
 
-  Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async {
-    final decoded = await _fetchJson(releasesUri);
-    if (decoded is! List) {
-      throw const FormatException('GitHub releases response is invalid.');
+  Uri _releasePageUri(int page) {
+    final override = _releasesBaseUriOverride;
+    if (override == null) {
+      return _defaultReleasesUri(page);
     }
-    final releases = decoded
-        .whereType<Map>()
-        .map(
-          (release) => LauncherUpdateRelease.fromGitHubJson(
-            release.cast<String, dynamic>(),
-          ),
-        )
-        .toList(growable: false);
-    return LauncherUpdateRelease.pickLatestOfficialRelease(releases);
+    return override.replace(
+      queryParameters: <String, String>{
+        ...override.queryParameters,
+        'per_page': '$releasePageSize',
+        'page': '$page',
+      },
+    );
+  }
+
+  Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async {
+    for (var page = 1; page <= maxReleasePages; page += 1) {
+      final decoded = await _fetchJson(_releasePageUri(page));
+      if (decoded is! List) {
+        throw const FormatException('GitHub releases response is invalid.');
+      }
+      final releases = decoded
+          .whereType<Map>()
+          .map(
+            (release) => LauncherUpdateRelease.fromGitHubJson(
+              release.cast<String, dynamic>(),
+            ),
+          )
+          .toList(growable: false);
+      final selected =
+          LauncherUpdateRelease.pickLatestOfficialRelease(releases);
+      if (selected != null) {
+        return selected;
+      }
+      if (releases.length < releasePageSize) {
+        break;
+      }
+    }
+    return null;
   }
 
   Future<LauncherDownloadedApk> downloadApkAsset({
@@ -168,9 +198,7 @@ class LauncherUpdateRelease {
     if (apkAssets.isEmpty) {
       return null;
     }
-    apkAssets.sort(
-      (left, right) => _apkAssetScore(right).compareTo(_apkAssetScore(left)),
-    );
+    apkAssets.sort(_compareApkAssets);
     return apkAssets.first;
   }
 
@@ -230,25 +258,64 @@ class LauncherUpdateRelease {
     return DateTime.tryParse(value)?.toLocal();
   }
 
-  static int _apkAssetScore(LauncherUpdateAsset asset) {
+  static int _compareApkAssets(
+    LauncherUpdateAsset left,
+    LauncherUpdateAsset right,
+  ) {
+    final releasePriority =
+        _releaseAssetPriority(right).compareTo(_releaseAssetPriority(left));
+    if (releasePriority != 0) {
+      return releasePriority;
+    }
+
+    final architecturePriority =
+        _architecturePriority(right).compareTo(_architecturePriority(left));
+    if (architecturePriority != 0) {
+      return architecturePriority;
+    }
+
+    final universalPenalty =
+        _universalPenalty(left).compareTo(_universalPenalty(right));
+    if (universalPenalty != 0) {
+      return universalPenalty;
+    }
+
+    final downloadPriority = right.downloadCount.compareTo(left.downloadCount);
+    if (downloadPriority != 0) {
+      return downloadPriority;
+    }
+
+    return right.sizeBytes.compareTo(left.sizeBytes);
+  }
+
+  static int _releaseAssetPriority(LauncherUpdateAsset asset) {
     final name = asset.name.toLowerCase();
-    var score = 0;
-    if (name.endsWith('.apk')) {
-      score += 200;
-    }
     if (name.contains('release')) {
-      score += 90;
+      return 2;
     }
-    if (name.contains('armeabi') ||
-        name.contains('v7a') ||
-        name.contains('arm')) {
-      score += 18;
+    if (name.endsWith('.apk')) {
+      return 1;
     }
-    if (name.contains('universal')) {
-      score -= 8;
+    return 0;
+  }
+
+  static int _architecturePriority(LauncherUpdateAsset asset) {
+    final name = asset.name.toLowerCase();
+    if (name.contains('armeabi') || name.contains('v7a')) {
+      return 3;
     }
-    score += asset.downloadCount;
-    return score;
+    if (name.contains('arm64') || name.contains('aarch64')) {
+      return 2;
+    }
+    if (name.contains('arm')) {
+      return 1;
+    }
+    return 0;
+  }
+
+  static int _universalPenalty(LauncherUpdateAsset asset) {
+    final name = asset.name.toLowerCase();
+    return name.contains('universal') ? 1 : 0;
   }
 }
 

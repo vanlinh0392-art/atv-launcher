@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flauncher/launcher_update_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -77,6 +80,39 @@ void main() {
       );
     });
 
+    test(
+        'prefers armeabi release asset over more downloaded universal release asset',
+        () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.04.30-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-04-30T10:00:00Z',
+        'body': '',
+        'assets': [
+          {
+            'name': 'atv-launcher-universal-release.apk',
+            'browser_download_url': 'https://example.com/universal.apk',
+            'size': 999,
+            'download_count': 500,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/arm.apk',
+            'size': 456,
+            'download_count': 1,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(
+        release.preferredApkAsset?.name,
+        'atv-launcher-armeabi-v7a-release.apk',
+      );
+    });
+
     test('returns no preferred asset when only debug APKs exist', () {
       final release = LauncherUpdateRelease.fromGitHubJson({
         'tag_name': 'v2026.04.30-release',
@@ -119,6 +155,81 @@ void main() {
 
       expect(release.matchesInstalledVersion('2024.11.001+15'), isTrue);
       expect(release.matchesInstalledVersion('2025.01.002+1'), isFalse);
+    });
+  });
+
+  group('LauncherUpdateClient', () {
+    test(
+        'fetchLatestOfficialRelease paginates until it finds an official release',
+        () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final requestedPages = <String>[];
+      server.listen((request) async {
+        requestedPages.add(request.uri.queryParameters['page'] ?? '');
+        final page =
+            int.tryParse(request.uri.queryParameters['page'] ?? '1') ?? 1;
+        final response = request.response;
+        response.headers.contentType = ContentType.json;
+        if (page == 1) {
+          final debugReleases = List.generate(
+            LauncherUpdateClient.releasePageSize,
+            (index) => <String, dynamic>{
+              'tag_name': 'v2026.04.${index + 1}-debug',
+              'name': 'ATV Launcher Debug',
+              'html_url': 'https://example.com/debug/$index',
+              'published_at': '2026-04-30T10:00:00Z',
+              'body': '',
+              'assets': [
+                {
+                  'name': 'atv-launcher-armeabi-v7a-debug.apk',
+                  'browser_download_url': 'https://example.com/debug.apk',
+                  'size': 123,
+                  'download_count': 10,
+                  'content_type': 'application/vnd.android.package-archive',
+                },
+              ],
+            },
+          );
+          response.write(jsonEncode(debugReleases));
+        } else if (page == 2) {
+          response.write(jsonEncode([
+            {
+              'tag_name': 'v2024.11.001-release',
+              'name': 'ATV Launcher Release v2024.11.001',
+              'html_url': 'https://example.com/release',
+              'published_at': '2026-04-29T10:00:00Z',
+              'body': '',
+              'assets': [
+                {
+                  'name': 'atv-launcher-armeabi-v7a-release.apk',
+                  'browser_download_url': 'https://example.com/release.apk',
+                  'size': 456,
+                  'download_count': 2,
+                  'content_type': 'application/vnd.android.package-archive',
+                },
+              ],
+            },
+          ]));
+        } else {
+          response.write(jsonEncode(const <dynamic>[]));
+        }
+        await response.close();
+      });
+
+      final client = LauncherUpdateClient(
+        releasesBaseUri: Uri.parse(
+          'http://127.0.0.1:${server.port}/repos/xfire0392-netizen/atv-launcher/releases',
+        ),
+      );
+
+      final release = await client.fetchLatestOfficialRelease();
+
+      expect(release?.tagName, 'v2024.11.001-release');
+      expect(requestedPages, ['1', '2']);
     });
   });
 

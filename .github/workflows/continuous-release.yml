@@ -1,4 +1,4 @@
-name: Continuous Debug Release
+name: Continuous Releases
 
 on:
   push:
@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build-debug-release:
-    name: Build and Release Debug APK
+  build-releases:
+    name: Build and Publish APK Releases
     runs-on: ubuntu-latest
 
     steps:
@@ -86,3 +86,71 @@ jobs:
             This is a debug build intended for device testing and provisioning workflows.
             See `README.md` in the repository for TV installation, ADB grant and update steps.
           files: ${{ steps.prepare_asset.outputs.asset_path }}
+
+      - name: Build release APK
+        id: build_release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f build/app/outputs/flutter-apk/*release*.apk || true
+          rm -f build/app/outputs/apk/release/*release*.apk || true
+          set +e
+          flutter build apk --release --target-platform android-arm --no-pub
+          status=$?
+          set -e
+          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*release*.apk' | head -n 1)"
+          if [[ ${status} -ne 0 && -z "${apk_path}" ]]; then
+            echo "Release APK was not produced."
+            exit "${status}"
+          fi
+
+      - name: Prepare official release asset
+        id: prepare_release_asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*release*.apk' | head -n 1)"
+          if [[ -z "${apk_path}" ]]; then
+            echo "Release APK was not produced."
+            exit 1
+          fi
+          asset_path="build/app/outputs/flutter-apk/atv-launcher-armeabi-v7a-release.apk"
+          cp "${apk_path}" "${asset_path}"
+          echo "asset_path=${asset_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Compute official release metadata
+        id: official_release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw_version="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)"
+          if [[ -z "${raw_version}" ]]; then
+            echo "Unable to read version from pubspec.yaml"
+            exit 1
+          fi
+          version_name="${raw_version%%+*}"
+          tag_name="v${version_name}-release"
+          echo "version_name=${version_name}" >> "${GITHUB_OUTPUT}"
+          echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_name=ATV Launcher Release v${version_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload official APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atv-launcher-armeabi-v7a-release
+          path: ${{ steps.prepare_release_asset.outputs.asset_path }}
+          retention-days: 30
+
+      - name: Publish official GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.official_release_meta.outputs.tag_name }}
+          name: ${{ steps.official_release_meta.outputs.release_name }}
+          body: |
+            Official ATV Launcher release APK.
+
+            File: `atv-launcher-armeabi-v7a-release.apk`
+
+            This is the official release channel used by the in-app updater.
+            Debug releases are published separately and ignored by the updater.
+          files: ${{ steps.prepare_release_asset.outputs.asset_path }}
