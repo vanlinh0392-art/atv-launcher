@@ -353,6 +353,88 @@ void main() {
     expect(checkSize.height, equals(cleanupSize.height));
   });
 
+  testWidgets(
+      'failed re-check clears stale release details instead of keeping the old release card',
+      (tester) async {
+    _prepareView(tester);
+    final tempDirectory = await _createTempTestDirectory('update-panel');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+    PackageInfo.setMockInitialValues(
+      appName: 'ATV Launcher',
+      packageName: 'com.atv.launcher',
+      version: '2026.05.002',
+      buildNumber: '17',
+      buildSignature: 'release',
+      installerStore: 'adb',
+    );
+
+    final bridgeService = _createBridgeService(
+      canRequestPackageInstalls: true,
+      adbEnabled: true,
+    );
+    addTearDown(bridgeService.dispose);
+
+    final client = _SequencedFakeLauncherUpdateClient(
+      responses: [
+        LauncherUpdateRelease(
+          tagName: 'v2026.05.001-release',
+          name: 'Official Build 001',
+          htmlUrl: 'https://example.com/release-001',
+          publishedAt: DateTime(2026, 5, 1, 1, 20),
+          body: 'Release notes',
+          isDraft: false,
+          isPrerelease: false,
+          assets: [
+            LauncherUpdateAsset(
+              name: 'atv-launcher-armeabi-v7a-release.apk',
+              browserDownloadUrl: 'https://example.com/release-001.apk',
+              sizeBytes: 12582912,
+              downloadCount: 1,
+              contentType: 'application/vnd.android.package-archive',
+              uploadedAt: DateTime(2026, 5, 1, 1, 22),
+            ),
+          ],
+        ),
+        StateError('offline'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SystemBridgeService>.value(
+        value: bridgeService,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdatePanelPage(updateClient: client),
+          ),
+        ),
+      ),
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
+    expect(find.text('Official Build 001'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Check latest official release').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
+
+    expect(find.text('Official Build 001'), findsNothing);
+    expect(
+      find.textContaining('GitHub official release check failed: Bad state: offline'),
+      findsOneWidget,
+    );
+  });
+
 }
 
 class _FakeLauncherUpdateClient extends LauncherUpdateClient {
@@ -389,6 +471,32 @@ class _FakeLauncherUpdateClient extends LauncherUpdateClient {
       fileName: asset.name,
       filePath: destinationFile.path,
     );
+  }
+}
+
+class _SequencedFakeLauncherUpdateClient extends LauncherUpdateClient {
+  final List<Object?> responses;
+  int _callCount = 0;
+
+  _SequencedFakeLauncherUpdateClient({
+    required this.responses,
+  });
+
+  @override
+  Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async {
+    final index = _callCount < responses.length ? _callCount : responses.length - 1;
+    _callCount += 1;
+    final value = responses[index];
+    if (value is LauncherUpdateRelease?) {
+      return value;
+    }
+    if (value is Error) {
+      throw value;
+    }
+    if (value is Exception) {
+      throw value;
+    }
+    throw StateError(value.toString());
   }
 }
 

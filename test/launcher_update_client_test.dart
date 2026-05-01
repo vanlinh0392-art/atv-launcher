@@ -50,6 +50,49 @@ void main() {
       expect(selected?.tagName, 'v2026.04.29-release');
     });
 
+    test('sorts official releases by newest publish time and version', () {
+      final releases = <LauncherUpdateRelease>[
+        LauncherUpdateRelease.fromGitHubJson({
+          'tag_name': 'v2026.05.001-release',
+          'name': 'ATV Launcher xfire0392-netizen v2026.05.001',
+          'html_url': 'https://example.com/release-001',
+          'published_at': '2026-04-30T18:20:01Z',
+          'body': officialMarker,
+          'assets': [
+            {
+              'name': 'atv-launcher-armeabi-v7a-release.apk',
+              'browser_download_url': 'https://example.com/release-001.apk',
+              'size': 123,
+              'download_count': 1,
+              'content_type': 'application/vnd.android.package-archive',
+            },
+          ],
+        }),
+        LauncherUpdateRelease.fromGitHubJson({
+          'tag_name': 'v2026.05.002-release',
+          'name': 'ATV Launcher xfire0392-netizen v2026.05.002',
+          'html_url': 'https://example.com/release-002',
+          'published_at': '2026-04-30T23:18:39Z',
+          'body': officialMarker,
+          'assets': [
+            {
+              'name': 'atv-launcher-armeabi-v7a-release.apk',
+              'browser_download_url': 'https://example.com/release-002.apk',
+              'size': 456,
+              'download_count': 0,
+              'content_type': 'application/vnd.android.package-archive',
+            },
+          ],
+        }),
+      ];
+
+      final selected = LauncherUpdateRelease.pickLatestOfficialRelease(
+        releases.reversed,
+      );
+
+      expect(selected?.tagName, 'v2026.05.002-release');
+    });
+
     test('prefers release APK assets over debug assets', () {
       final release = LauncherUpdateRelease.fromGitHubJson({
         'tag_name': 'v2026.04.30-release',

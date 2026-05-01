@@ -288,6 +288,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     final localizations = AppLocalizations.of(context)!;
     setState(() {
       _busy = true;
+      _hasCheckedOfficialRelease = false;
+      _latestRelease = null;
       _lastMessage = localizations.launcherUpdateChecking;
     });
     try {

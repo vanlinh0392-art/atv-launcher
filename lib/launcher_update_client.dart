@@ -30,13 +30,19 @@ class LauncherUpdateClient {
   Uri _releasePageUri(int page) {
     final override = _releasesBaseUriOverride;
     if (override == null) {
-      return _defaultReleasesUri(page);
+      return _defaultReleasesUri(page).replace(
+        queryParameters: <String, String>{
+          ..._defaultReleasesUri(page).queryParameters,
+          '_': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
     }
     return override.replace(
       queryParameters: <String, String>{
         ...override.queryParameters,
         'per_page': '$releasePageSize',
         'page': '$page',
+        '_': DateTime.now().millisecondsSinceEpoch.toString(),
       },
     );
   }
@@ -136,6 +142,8 @@ class LauncherUpdateClient {
         HttpHeaders.userAgentHeader,
         'ATVLauncher/$githubOwner-$githubRepo',
       );
+      request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+      request.headers.set(HttpHeaders.pragmaHeader, 'no-cache');
       final response = await request.close();
       final body = await utf8.decodeStream(response);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -259,13 +267,83 @@ class LauncherUpdateRelease {
   static LauncherUpdateRelease? pickLatestOfficialRelease(
     Iterable<LauncherUpdateRelease> releases,
   ) {
-    for (final release in releases) {
-      if (release.isOfficialRelease) {
-        return release;
+    final officialReleases = releases
+        .where((release) => release.isOfficialRelease)
+        .toList(growable: false);
+    if (officialReleases.isEmpty) {
+      return null;
+    }
+    officialReleases.sort(_compareOfficialReleases);
+    return officialReleases.first;
+  }
+
+  String get _versionSortKey {
+    final candidates = <String>[
+      tagName,
+      name,
+      preferredApkAsset?.name ?? '',
+    ];
+    for (final candidate in candidates) {
+      final normalized = normalizeVersionToken(candidate);
+      if (normalized.isNotEmpty) {
+        return normalized;
       }
     }
-    return null;
+    return '';
   }
+
+  static int _compareOfficialReleases(
+    LauncherUpdateRelease left,
+    LauncherUpdateRelease right,
+  ) {
+    final publishedPriority = (right.publishedAt?.millisecondsSinceEpoch ?? -1)
+        .compareTo(left.publishedAt?.millisecondsSinceEpoch ?? -1);
+    if (publishedPriority != 0) {
+      return publishedPriority;
+    }
+
+    final versionPriority =
+        _compareVersionSortKeys(left._versionSortKey, right._versionSortKey);
+    if (versionPriority != 0) {
+      return versionPriority;
+    }
+
+    final uploadedPriority = (right.preferredApkAsset?.uploadedAt
+                ?.millisecondsSinceEpoch ??
+            -1)
+        .compareTo(
+      left.preferredApkAsset?.uploadedAt?.millisecondsSinceEpoch ?? -1,
+    );
+    if (uploadedPriority != 0) {
+      return uploadedPriority;
+    }
+
+    return right.tagName.toLowerCase().compareTo(left.tagName.toLowerCase());
+  }
+
+  static int _compareVersionSortKeys(String left, String right) {
+    if (left.isEmpty || right.isEmpty) {
+      return 0;
+    }
+    final leftParts = _parseVersionParts(left);
+    final rightParts = _parseVersionParts(right);
+    final maxLength =
+        leftParts.length > rightParts.length ? leftParts.length : rightParts.length;
+    for (var index = 0; index < maxLength; index += 1) {
+      final leftValue = index < leftParts.length ? leftParts[index] : 0;
+      final rightValue = index < rightParts.length ? rightParts[index] : 0;
+      if (leftValue != rightValue) {
+        return rightValue.compareTo(leftValue);
+      }
+    }
+    return 0;
+  }
+
+  static List<int> _parseVersionParts(String value) => value
+      .split(RegExp(r'[^0-9]+'))
+      .where((part) => part.isNotEmpty)
+      .map(int.parse)
+      .toList(growable: false);
 
   static DateTime? _parseDateTime(String? value) {
     if (value == null || value.trim().isEmpty) {
