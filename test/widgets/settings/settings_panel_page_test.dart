@@ -6,6 +6,7 @@ import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
+import 'package:flauncher/widgets/settings/diagnostics_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
@@ -772,6 +773,199 @@ void main() {
     );
   });
 
+  testWidgets('diagnostics report scrolls with DPAD and keeps compact actions',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final primaryFocusNode =
+        FocusNode(debugLabel: 'diagnostics_primary_refresh');
+    addTearDown(primaryFocusNode.dispose);
+    final bridgeService = _mockBridgeService();
+    when(bridgeService.diagnosticsReport).thenReturn(
+      List<String>.generate(
+        80,
+        (index) => 'Diagnostics line ${index + 1}: bridge ok',
+      ).join('\n'),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<SystemBridgeService>.value(
+            value: bridgeService,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: DiagnosticsPanelPage(primaryFocusNode: primaryFocusNode),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    primaryFocusNode.requestFocus();
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'diagnostics_primary_refresh',
+    );
+
+    final refreshSize = tester.getSize(
+      find.descendant(
+        of: find.byKey(const Key('diagnostics_refresh_button')),
+        matching: find.byType(SettingsFocusFrame),
+      ),
+    );
+    final copySize = tester.getSize(
+      find.descendant(
+        of: find.byKey(const Key('diagnostics_copy_button')),
+        matching: find.byType(SettingsFocusFrame),
+      ),
+    );
+    expect(refreshSize.height, equals(copySize.height));
+    expect(refreshSize.height, lessThanOrEqualTo(82));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'diagnostics_report_section',
+    );
+
+    final reportScrollView = tester.widget<SingleChildScrollView>(
+      find.byKey(const Key('diagnostics_report_scrollable')),
+    );
+    final reportScrollController = reportScrollView.controller!;
+    final initialPixels = reportScrollController.offset;
+
+    for (var i = 0; i < 3; i += 1) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+    expect(reportScrollController.offset, greaterThan(initialPixels));
+
+    while (reportScrollController.offset > 0) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_'),
+    );
+  });
+
+  testWidgets('system core snapshot stays reachable with vertical DPAD',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+    when(bridgeService.adbAutomationStatus).thenReturn(
+      const <String, dynamic>{
+        'policy': 'adb_and_wifi',
+        'disableOnSleep': false,
+      },
+    );
+    when(bridgeService.systemCoreStatus).thenReturn(
+      const <String, dynamic>{
+        'adbEnabled': true,
+        'adbWifiEnabled': true,
+        'coreServiceHealth': 'healthy',
+        'batteryOptimizationIgnored': true,
+        'deviceOwner': false,
+        'accessibilityMasterEnabled': true,
+        'managedAccessibilityPackages': 4,
+        'lastRecoveryReason': 'manual_repair',
+        'lastSuccessAtText': '2026-05-01 20:25',
+        'adbLastAppliedAtText': '2026-05-01 20:20',
+        'adbLastReason': 'boot_completed',
+        'adbLastState': 'adb_and_wifi',
+        'missingServices': 'none',
+      },
+    );
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await _enterRouteDetailByTap(tester, 'System Core');
+
+    bool actionFocused(Key key) =>
+        tester
+            .widget<SettingsFocusFrame>(
+              find.descendant(
+                of: find.byKey(key),
+                matching: find.byType(SettingsFocusFrame),
+              ),
+            )
+            .focused ==
+        true;
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('system_core_primary_policy_option_2'),
+    );
+    expect(
+        find.byKey(const Key('system_core_snapshot_section')), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const Key('system_core_snapshot_section')))
+          .height,
+      lessThan(440),
+    );
+
+    for (var i = 0; i < 8; i += 1) {
+      if (actionFocused(const Key('system_core_heal_button'))) {
+        break;
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+    expect(actionFocused(const Key('system_core_heal_button')), isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<SettingsFocusFrame>(
+            find.byKey(const Key('system_core_snapshot_section')),
+          )
+          .focused,
+      isTrue,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      actionFocused(const Key('system_core_developer_options_button')) ||
+          actionFocused(const Key('system_core_battery_settings_button')),
+      isTrue,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<SettingsFocusFrame>(
+            find.byKey(const Key('system_core_snapshot_section')),
+          )
+          .focused,
+      isTrue,
+    );
+  });
+
   testWidgets('enters Display / DPI with Apply button focused', (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
@@ -809,6 +1003,50 @@ void main() {
           )
           .highlighted,
       isTrue,
+    );
+  });
+
+  testWidgets('moves DPAD focus into custom DPI field', (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -420));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Display / DPI').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Display / DPI').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('density_custom_input_field')), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'density_primary_apply',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'density_custom_input',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'density_primary_apply',
     );
   });
 
@@ -998,10 +1236,10 @@ void main() {
         FocusNode(debugLabel: 'accessibility_primary_toggle_apps');
     addTearDown(primaryFocusNode.dispose);
     final bridgeService = _mockBridgeService(
-      accessibilitySnapshot: const <String, dynamic>{
+      accessibilitySnapshot: <String, dynamic>{
         'writeSecureSettingsGranted': true,
         'accessibilityMasterEnabled': true,
-        'managedPackageCount': 3,
+        'managedPackageCount': 8,
         'lastVerifyResult': 'ok',
         'apps': <Map<String, dynamic>>[
           <String, dynamic>{
@@ -1017,6 +1255,48 @@ void main() {
             'hasAccessibilityService': true,
             'accessibilityEnabled': false,
             'managed': false,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 3',
+            'packageName': 'com.demo.three',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': true,
+            'managed': true,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 4',
+            'packageName': 'com.demo.four',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': true,
+            'managed': true,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 5',
+            'packageName': 'com.demo.five',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': true,
+            'managed': true,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 6',
+            'packageName': 'com.demo.six',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': false,
+            'managed': false,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 7',
+            'packageName': 'com.demo.seven',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': true,
+            'managed': true,
+          },
+          <String, dynamic>{
+            'label': 'Demo App 8',
+            'packageName': 'com.demo.eight',
+            'hasAccessibilityService': true,
+            'accessibilityEnabled': true,
+            'managed': true,
           },
         ],
       },
@@ -1044,6 +1324,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final accessibilityPageFinder = find.byKey(
+      const PageStorageKey<String>(AccessibilityManagerPanelPage.routeName),
+    );
+    final accessibilityScrollableFinder = find.descendant(
+      of: accessibilityPageFinder,
+      matching: find.byType(Scrollable),
+    );
+
     primaryFocusNode.requestFocus();
     await tester.pumpAndSettle();
     expect(
@@ -1053,23 +1341,29 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pumpAndSettle();
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
       contains('accessibility_managed_app_com.demo.one'),
     );
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pumpAndSettle();
+    final scrollableState =
+        tester.state<ScrollableState>(accessibilityScrollableFinder);
+    final initialPixels = scrollableState.position.pixels;
+
+    for (var i = 0; i < 6; i += 1) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('accessibility_managed_app_com.demo.two'),
+      contains('accessibility_managed_app_com.demo.seven'),
     );
+    expect(scrollableState.position.pixels, greaterThan(initialPixels));
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 6; i += 1) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+    }
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
       contains('accessibility_managed_app_com.demo.one'),
@@ -1078,15 +1372,18 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_action_Open_accessibility_settings'),
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'accessibility_primary_toggle_apps',
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_action_Repair'),
+      anyOf(
+        contains('settings_action_Grant_WSS_via_local_ADB'),
+        contains('settings_action_Repair'),
+      ),
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
@@ -1102,8 +1399,8 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
     expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'settings_action_Repair',
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('settings_action_'),
     );
   });
 

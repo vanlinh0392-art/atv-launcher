@@ -123,7 +123,7 @@ class SettingsService extends ChangeNotifier {
   static const String homeDockPerformanceModeSmooth = "smooth";
   static const String homeDockPerformanceModeOff = "off";
   static const String homeDockPerformanceModeDefault =
-      homeDockPerformanceModeBalanced;
+      homeDockPerformanceModeSmooth;
   static const int homeDockAutoCollapseDelayMin = 5;
   static const int homeDockAutoCollapseDelayMax = 60;
   static const int homeDockAutoCollapseDelayDefault = 15;

@@ -4,6 +4,7 @@ import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 class DensityPanelPage extends StatefulWidget {
@@ -21,7 +22,10 @@ class DensityPanelPage extends StatefulWidget {
 
 class _DensityPanelPageState extends State<DensityPanelPage> {
   static const String _summaryDebugLabel = 'density_summary_metrics';
+  static const String _customInputDebugLabel = 'density_custom_input';
   late final TextEditingController _controller;
+  late final FocusNode _customDpiFocusNode;
+  bool _customDpiFocused = false;
 
   @override
   void initState() {
@@ -32,10 +36,15 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
             ?.toString() ??
         '';
     _controller = TextEditingController(text: density);
+    _customDpiFocusNode = FocusNode(debugLabel: _customInputDebugLabel);
+    _customDpiFocusNode.addListener(_handleCustomDpiFocusChanged);
   }
 
   @override
   void dispose() {
+    _customDpiFocusNode
+      ..removeListener(_handleCustomDpiFocusChanged)
+      ..dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -89,12 +98,43 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
               EnsureVisible(
                 alignment: EnsureVisible.settingsAlignment,
                 preferImmediate: true,
-                child: TextField(
-                  controller: _controller,
-                  autofocus: false,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: localizations.customDpiRange,
+                child: Focus(
+                  canRequestFocus: false,
+                  onKeyEvent: (_, event) {
+                    if (event is! KeyDownEvent ||
+                        !_customDpiFocusNode.hasFocus) {
+                      return KeyEventResult.ignored;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      if (focusCurrentSettingsNodeByDebugLabel(
+                        _summaryDebugLabel,
+                      )) {
+                        return KeyEventResult.handled;
+                      }
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                      if (_focusPrimaryAction()) {
+                        return KeyEventResult.handled;
+                      }
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: SettingsFocusFrame(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                    borderRadius: BorderRadius.circular(18),
+                    focusEmphasis: 1.12,
+                    variant: SettingsFocusFrameVariant.rowOnly,
+                    focused: _customDpiFocused,
+                    child: TextField(
+                      key: const Key('density_custom_input_field'),
+                      focusNode: _customDpiFocusNode,
+                      controller: _controller,
+                      autofocus: false,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: localizations.customDpiRange,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -106,9 +146,7 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                   SettingsActionCard(
                     key: const Key('density_apply_button'),
                     focusNode: widget.primaryFocusNode,
-                    onMoveUpAtBoundary: () => focusCurrentSettingsNodeByDebugLabel(
-                      _summaryDebugLabel,
-                    ),
+                    onMoveUpAtBoundary: _focusCustomDpiField,
                     title: localizations.applyLabel,
                     subtitle: localizations.customDpiRange,
                     icon: Icons.check_circle_outline,
@@ -127,9 +165,7 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
                     },
                   ),
                   SettingsActionCard(
-                    onMoveUpAtBoundary: () => focusCurrentSettingsNodeByDebugLabel(
-                      _summaryDebugLabel,
-                    ),
+                    onMoveUpAtBoundary: _focusCustomDpiField,
                     title: localizations.reset,
                     subtitle: localizations.factoryDpi,
                     icon: Icons.restart_alt,
@@ -147,6 +183,36 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
         ),
       ],
     );
+  }
+
+  void _handleCustomDpiFocusChanged() {
+    if (_customDpiFocused == _customDpiFocusNode.hasFocus) {
+      return;
+    }
+    if (!mounted) {
+      _customDpiFocused = _customDpiFocusNode.hasFocus;
+      return;
+    }
+    setState(() {
+      _customDpiFocused = _customDpiFocusNode.hasFocus;
+    });
+  }
+
+  bool _focusCustomDpiField() {
+    if (!_customDpiFocusNode.canRequestFocus) {
+      return false;
+    }
+    _customDpiFocusNode.requestFocus();
+    return true;
+  }
+
+  bool _focusPrimaryAction() {
+    final primaryFocusNode = widget.primaryFocusNode;
+    if (primaryFocusNode != null && primaryFocusNode.canRequestFocus) {
+      primaryFocusNode.requestFocus();
+      return true;
+    }
+    return focusCurrentSettingsNodeByDebugLabel('density_primary_apply');
   }
 
   void _showMessage(BuildContext context, String message) {

@@ -48,11 +48,11 @@ class _AccessibilityManagerPanelPageState
     return Selector<SystemBridgeService, Map<String, dynamic>>(
       selector: (_, service) => service.accessibilitySnapshot,
       builder: (context, snapshot, _) {
-        final apps = _showManagedApps
-            ? (((snapshot['apps'] as List?) ?? const [])
-                .map((item) => (item as Map).cast<String, dynamic>())
-                .toList(growable: false))
-            : const <Map<String, dynamic>>[];
+        final managedApps = (((snapshot['apps'] as List?) ?? const [])
+            .map((item) => (item as Map).cast<String, dynamic>())
+            .toList(growable: false));
+        final apps =
+            _showManagedApps ? managedApps : const <Map<String, dynamic>>[];
 
         return SingleChildScrollView(
           key: const PageStorageKey<String>(
@@ -165,9 +165,10 @@ class _AccessibilityManagerPanelPageState
                             key: const Key('accessibility_toggle_apps_button'),
                             focusNode: widget.primaryFocusNode,
                             onPressed: () async {
-                              setState(() {
-                                _showManagedApps = !_showManagedApps;
-                              });
+                              _setShowManagedApps(
+                                !_showManagedApps,
+                                managedApps: managedApps,
+                              );
                             },
                             icon: _showManagedApps
                                 ? Icons.visibility_off_outlined
@@ -207,44 +208,52 @@ class _AccessibilityManagerPanelPageState
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 12),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        primary: false,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: apps.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final app = apps[index];
-                          final packageName =
-                              app['packageName']?.toString() ?? '';
-                          final canManage =
-                              app['hasAccessibilityService'] == true;
-                          final enabled = app['accessibilityEnabled'] == true;
-                          final managed = app['managed'] == true;
+                      Column(
+                        children: [
+                          for (var index = 0;
+                              index < apps.length;
+                              index += 1) ...[
+                            if (index > 0) const SizedBox(height: 10),
+                            Builder(
+                              builder: (context) {
+                                final app = apps[index];
+                                final packageName =
+                                    app['packageName']?.toString() ?? '';
+                                final canManage =
+                                    app['hasAccessibilityService'] == true;
+                                final enabled =
+                                    app['accessibilityEnabled'] == true;
+                                final managed = app['managed'] == true;
 
-                          return _ManagedAccessibilityAppTile(
-                            title: app['label']?.toString() ??
-                                (packageName.isEmpty ? '-' : packageName),
-                            subtitle: packageName,
-                            enabled: enabled,
-                            canManage: canManage,
-                            actionLabel: canManage
-                                ? managed && enabled
-                                    ? localizations.removeLabel
-                                    : localizations.manageLabel
-                                : localizations.noService,
-                            onPressed: !canManage || packageName.isEmpty
-                                ? null
-                                : () async => _showResult(
-                                      context,
-                                      await bridgeService
-                                          .setManagedAccessibility(
-                                        packageName,
-                                        !managed || !enabled,
-                                      ),
-                                    ),
-                          );
-                        },
+                                return _ManagedAccessibilityAppTile(
+                                  title: app['label']?.toString() ??
+                                      (packageName.isEmpty ? '-' : packageName),
+                                  subtitle: packageName,
+                                  enabled: enabled,
+                                  canManage: canManage,
+                                  onMoveUpAtBoundary: index == 0
+                                      ? _focusManagedAppsToggle
+                                      : null,
+                                  actionLabel: canManage
+                                      ? managed && enabled
+                                          ? localizations.removeLabel
+                                          : localizations.manageLabel
+                                      : localizations.noService,
+                                  onPressed: !canManage || packageName.isEmpty
+                                      ? null
+                                      : () async => _showResult(
+                                            context,
+                                            await bridgeService
+                                                .setManagedAccessibility(
+                                              packageName,
+                                              !managed || !enabled,
+                                            ),
+                                          ),
+                                );
+                              },
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -265,6 +274,43 @@ class _AccessibilityManagerPanelPageState
         AppLocalizations.of(context)!.actionCompleted;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _setShowManagedApps(
+    bool value, {
+    required List<Map<String, dynamic>> managedApps,
+  }) {
+    if (_showManagedApps == value) {
+      return;
+    }
+    setState(() {
+      _showManagedApps = value;
+    });
+    if (!value || managedApps.isEmpty) {
+      return;
+    }
+    final firstApp = managedApps.first;
+    final debugLabel = buildManagedAccessibilityAppDebugLabel(
+      title: firstApp['label']?.toString() ??
+          ((firstApp['packageName']?.toString() ?? '').isEmpty
+              ? '-'
+              : firstApp['packageName'].toString()),
+      subtitle: firstApp['packageName']?.toString() ?? '',
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      focusCurrentSettingsNodeByDebugLabel(debugLabel);
+    });
+  }
+
+  bool _focusManagedAppsToggle() {
+    final debugLabel = widget.primaryFocusNode?.debugLabel?.trim();
+    if (debugLabel == null || debugLabel.isEmpty) {
+      return false;
+    }
+    return focusCurrentSettingsNodeByDebugLabel(debugLabel);
   }
 }
 
@@ -321,6 +367,7 @@ class _ManagedAccessibilityAppTile extends StatefulWidget {
   final String subtitle;
   final bool enabled;
   final bool canManage;
+  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
   final String actionLabel;
   final Future<void> Function()? onPressed;
 
@@ -329,6 +376,7 @@ class _ManagedAccessibilityAppTile extends StatefulWidget {
     required this.subtitle,
     required this.enabled,
     required this.canManage,
+    this.onMoveUpAtBoundary,
     required this.actionLabel,
     required this.onPressed,
   });
@@ -346,11 +394,11 @@ class _ManagedAccessibilityAppTileState
   @override
   void initState() {
     super.initState();
-    final debugToken =
-        widget.subtitle.isNotEmpty ? widget.subtitle : widget.title;
     _focusNode = FocusNode(
-      debugLabel:
-          'accessibility_managed_app_${debugToken.replaceAll(' ', '_')}',
+      debugLabel: buildManagedAccessibilityAppDebugLabel(
+        title: widget.title,
+        subtitle: widget.subtitle,
+      ),
     );
   }
 
@@ -392,6 +440,10 @@ class _ManagedAccessibilityAppTileState
                   ? TraversalDirection.down
                   : null;
           if (direction != null) {
+            if (direction == TraversalDirection.up &&
+                widget.onMoveUpAtBoundary?.call() == true) {
+              return KeyEventResult.handled;
+            }
             if (!moveSettingsVerticalFocus(
               direction: direction,
               localNodes: <FocusNode>[_focusNode],
@@ -471,4 +523,12 @@ class _ManagedAccessibilityAppTileState
       ),
     );
   }
+}
+
+String buildManagedAccessibilityAppDebugLabel({
+  required String title,
+  required String subtitle,
+}) {
+  final debugToken = subtitle.isNotEmpty ? subtitle : title;
+  return 'accessibility_managed_app_${debugToken.replaceAll(' ', '_')}';
 }

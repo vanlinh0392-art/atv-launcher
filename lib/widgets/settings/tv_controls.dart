@@ -34,6 +34,12 @@ class SettingsActionCard extends StatefulWidget {
   final bool autofocus;
   final double focusEmphasis;
   final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
+  final EdgeInsetsGeometry contentPadding;
+  final int titleMaxLines;
+  final int subtitleMaxLines;
+  final double titleSubtitleSpacing;
+  final double iconSize;
+  final double trailingIconSize;
 
   const SettingsActionCard({
     super.key,
@@ -45,6 +51,15 @@ class SettingsActionCard extends StatefulWidget {
     this.autofocus = false,
     this.focusEmphasis = 1.3,
     this.onMoveUpAtBoundary,
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 14,
+    ),
+    this.titleMaxLines = 2,
+    this.subtitleMaxLines = 2,
+    this.titleSubtitleSpacing = 3,
+    this.iconSize = 24,
+    this.trailingIconSize = 24,
   });
 
   @override
@@ -147,16 +162,13 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
               duration: const Duration(milliseconds: 120),
               opacity: enabled ? (_focused ? 1 : 0.97) : 0.46,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+                padding: widget.contentPadding,
                 child: Row(
                   crossAxisAlignment: widget.subtitle == null
                       ? CrossAxisAlignment.center
                       : CrossAxisAlignment.start,
                   children: [
-                    Icon(widget.icon, color: iconColor),
+                    Icon(widget.icon, color: iconColor, size: widget.iconSize),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -167,7 +179,7 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
                         children: [
                           Text(
                             widget.title,
-                            maxLines: 2,
+                            maxLines: widget.titleMaxLines,
                             overflow: TextOverflow.ellipsis,
                             style:
                                 Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -178,10 +190,10 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
                                     ),
                           ),
                           if (widget.subtitle != null) ...[
-                            const SizedBox(height: 3),
+                            SizedBox(height: widget.titleSubtitleSpacing),
                             Text(
                               widget.subtitle!,
-                              maxLines: 2,
+                              maxLines: widget.subtitleMaxLines,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
                                   .textTheme
@@ -193,7 +205,11 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Icon(Icons.chevron_right, color: iconColor),
+                    Icon(
+                      Icons.chevron_right,
+                      color: iconColor,
+                      size: widget.trailingIconSize,
+                    ),
                   ],
                 ),
               ),
