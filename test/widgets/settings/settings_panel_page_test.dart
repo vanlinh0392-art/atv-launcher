@@ -142,6 +142,65 @@ void main() {
     expect(find.text('Open developer options'), findsWidgets);
   });
 
+  testWidgets(
+      'quick grant shows local ADB authorization guidance when auth is pending',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService(
+      provisioningStatus: const <String, dynamic>{
+        'requirements': <Map<String, dynamic>>[
+          <String, dynamic>{'name': 'adb_enabled', 'granted': true},
+        ],
+        'commands': <String>[],
+      },
+    );
+    when(
+      bridgeService.runProvisioningAction(
+        action: anyNamed('action'),
+        suggestedPolicy: anyNamed('suggestedPolicy'),
+      ),
+    ).thenAnswer((_) async => const <String, dynamic>{
+          'success': false,
+          'requiresAdbAuthorization': true,
+          'message':
+              'Local ADB is waiting for authorization. If the TV shows an ADB prompt for unknown@unknown, allow it and try again.',
+        });
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permissions & Provisioning').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('permissions_quick_grant_button')));
+    await tester.pumpAndSettle();
+
+    verify(
+      bridgeService.runProvisioningAction(
+        action: 'grant_all_local_adb',
+        suggestedPolicy: 'adb_and_wifi',
+      ),
+    ).called(1);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Approve local ADB on TV'), findsOneWidget);
+    expect(
+      find.text(
+        'If the TV shows an ADB prompt for unknown@unknown, choose Allow and run Grant via local ADB again.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('quick grant runs local ADB provisioning when ADB is enabled',
       (tester) async {
     _prepareView(tester);

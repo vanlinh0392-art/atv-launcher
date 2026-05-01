@@ -91,6 +91,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -141,6 +142,7 @@ public class MainActivity extends FlutterActivity {
     private static final Object FLUTTER_ENGINE_LOCK = new Object();
     private static final Object APPLICATIONS_CACHE_LOCK = new Object();
     private static final Handler SHARED_SYSTEM_EVENT_HANDLER = new Handler(Looper.getMainLooper());
+    private static final ExecutorService BACKGROUND_METHOD_EXECUTOR = Executors.newSingleThreadExecutor();
     private static final LinkedHashMap<String, byte[]> APP_IMAGE_CACHE = new LinkedHashMap<>(16, 0.75f, true);
     private static FlutterEngine sharedFlutterEngine;
     private static EventChannel.EventSink sharedSystemEventSink;
@@ -412,17 +414,26 @@ public class MainActivity extends FlutterActivity {
             case "openAccessibilitySettings" -> result.success(openSpecificSettingsPage("accessibility"));
             case "openSpecificAndroidSettingsPage" -> result.success(openSpecificSettingsPage((String) call.arguments));
             case "repairAccessibility" -> result.success(repairAccessibility());
-            case "grantWriteSecureSettingsWithLocalAdb" -> result.success(grantWriteSecureSettingsWithLocalAdb());
-            case "setAdbAutomationPolicy" -> result.success(setAdbAutomationPolicy(call));
-            case "setAdbEnabledNow" -> result.success(setAdbEnabledNow(call));
-            case "runProvisioningAction" -> result.success(runProvisioningAction(call));
+            case "grantWriteSecureSettingsWithLocalAdb" ->
+                    runMethodCallAsync(result, this::grantWriteSecureSettingsWithLocalAdb);
+            case "setAdbAutomationPolicy" ->
+                    runMethodCallAsync(result, () -> setAdbAutomationPolicy(call));
+            case "setAdbEnabledNow" ->
+                    runMethodCallAsync(result, () -> setAdbEnabledNow(call));
+            case "runProvisioningAction" -> {
+                if (shouldRunProvisioningActionAsync(call)) {
+                    runMethodCallAsync(result, () -> runProvisioningAction(call));
+                } else {
+                    result.success(runProvisioningAction(call));
+                }
+            }
             case "setManagedAccessibility" -> result.success(setManagedAccessibility(call));
             case "getDensityStatus" -> result.success(DensityBridge.getStatus(this));
-            case "applyDensity" -> result.success(applyDensity(call));
-            case "resetDensity" -> result.success(DensityBridge.resetDensity(this));
+            case "applyDensity" -> runMethodCallAsync(result, () -> applyDensity(call));
+            case "resetDensity" -> runMethodCallAsync(result, () -> DensityBridge.resetDensity(this));
             case "getPrivateDnsStatus" -> result.success(PrivateDnsController.getStatus(this));
-            case "applyPrivateDns" -> result.success(applyPrivateDns(call));
-            case "resetPrivateDns" -> result.success(PrivateDnsController.reset(this));
+            case "applyPrivateDns" -> runMethodCallAsync(result, () -> applyPrivateDns(call));
+            case "resetPrivateDns" -> runMethodCallAsync(result, () -> PrivateDnsController.reset(this));
             case "getFileAccessStatus" -> result.success(VideoLibraryController.getFileAccessStatus(this));
             case "requestMediaReadPermission" -> requestMediaReadPermission(result);
             case "prepareLauncherUpdateInstall" -> result.success(prepareLauncherUpdateInstall());
@@ -452,6 +463,25 @@ public class MainActivity extends FlutterActivity {
             case "clearLauncherSharedPreferences" -> result.success(clearLauncherSharedPreferences());
             default -> throw new IllegalArgumentException("Unsupported method: " + call.method);
         }
+    }
+
+    private boolean shouldRunProvisioningActionAsync(MethodCall call) {
+        String action = call.argument("action");
+        String normalizedAction = action == null ? "" : action.trim().toLowerCase(Locale.US);
+        return TextUtils.equals(normalizedAction, "grant_all_local_adb")
+                || TextUtils.equals(normalizedAction, "grant_update_install_local_adb");
+    }
+
+    private void runMethodCallAsync(MethodChannel.Result result, Callable<Object> task) {
+        BACKGROUND_METHOD_EXECUTOR.execute(() -> {
+            try {
+                Object value = task.call();
+                runOnUiThread(() -> result.success(value));
+            } catch (Exception exception) {
+                Log.e(TAG, "Async method call failed", exception);
+                runOnUiThread(() -> result.error("native_error", exception.toString(), null));
+            }
+        });
     }
 
     private Map<String, Serializable> repairSharedPreferences() {
@@ -1319,29 +1349,33 @@ public class MainActivity extends FlutterActivity {
             ProvisioningEvaluation beforeEvaluation = evaluateProvisioning();
             boolean hadActionableGaps = hasActionableProvisioningGaps(beforeEvaluation);
             boolean adbEnabledBefore = readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1;
-            AccessibilityGrantCoordinator.LocalGrantResult grantResult =
-                    AccessibilityGrantCoordinator.tryGrantWriteSecureSettingsWithLocalAdb(this);
-            log.add(grantResult.message);
-            if (grantResult.success) {
-                if (adbEnabledBefore) {
-                    log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + mediaReadPermissionName()));
-                    if (requiresNotificationRuntimePermission()) {
-                        log.add(runLocalAdbBestEffort("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS));
-                    }
-                    log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow"));
-                    log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow"));
-                    log.add(runLocalAdbBestEffort("appops set " + getPackageName() + " WRITE_SETTINGS allow"));
-                    log.add(runLocalAdbBestEffort("cmd deviceidle whitelist +" + getPackageName()));
-                    if (!TextUtils.isEmpty(suggestedPolicy)) {
-                        Map<String, Object> policyResult = SystemBridgeCoordinator.setAdbAutomationPolicy(
-                                this,
-                                suggestedPolicy,
-                                false
-                        );
-                        log.add(policyResult.get("message") == null ? "" : policyResult.get("message").toString());
-                    }
-                } else if (hadActionableGaps) {
-                    log.add("Local ADB commands skipped because ADB is still disabled.");
+            LocalAdbBridge.Result grantResult = null;
+            String grantMessage = "";
+            boolean requiresAdbAuthorization = false;
+            if (adbEnabledBefore && hadActionableGaps) {
+                grantResult = runLocalAdbGrantBatch(buildProvisioningGrantCommands());
+                grantMessage = grantResult.success
+                        ? "Local ADB provisioning batch executed."
+                        : (grantResult.detail == null ? "" : grantResult.detail.trim());
+                requiresAdbAuthorization = looksLikeLocalAdbAuthorizationIssue(grantMessage);
+                log.add(grantMessage);
+            } else if (hadActionableGaps) {
+                log.add("Local ADB commands skipped because ADB is still disabled.");
+            }
+            boolean writeSecureSettingsGranted = checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
+                    == PackageManager.PERMISSION_GRANTED;
+            if (writeSecureSettingsGranted && !TextUtils.isEmpty(suggestedPolicy)) {
+                Map<String, Object> policyResult = SystemBridgeCoordinator.setAdbAutomationPolicy(
+                        this,
+                        suggestedPolicy,
+                        false
+                );
+                log.add(policyResult.get("message") == null ? "" : policyResult.get("message").toString());
+                if (!requiresAdbAuthorization && grantResult == null) {
+                    String policyMessage = policyResult.get("message") == null
+                            ? ""
+                            : policyResult.get("message").toString().trim();
+                    requiresAdbAuthorization = looksLikeLocalAdbAuthorizationIssue(policyMessage);
                 }
             }
             ProvisioningEvaluation afterEvaluation = evaluateProvisioning();
@@ -1350,6 +1384,8 @@ public class MainActivity extends FlutterActivity {
             BridgeStateStore.setLastProvisioningVerifyAt(this, System.currentTimeMillis());
             map = buildProvisioningChecklist();
             map.put("requiresAdbSetup", requiresAdbSetup);
+            map.put("requiresAdbAuthorization", requiresAdbAuthorization);
+            map.put("localAdbGrantMessage", grantMessage);
             map.put("remainingRequiredCount", afterEvaluation.missingRequiredCount);
             map.put("remainingRecommendedCount", afterEvaluation.missingRecommendedCount);
             if (!hadActionableGaps && !hasActionableGapsAfter) {
@@ -1361,6 +1397,12 @@ public class MainActivity extends FlutterActivity {
             } else if (requiresAdbSetup) {
                 success = false;
                 message = "ADB is disabled. Enable Developer options and retry the local ADB grant.";
+            } else if (requiresAdbAuthorization && !TextUtils.isEmpty(grantMessage)) {
+                success = false;
+                message = grantMessage;
+            } else if (grantResult != null && !grantResult.success && !TextUtils.isEmpty(grantMessage)) {
+                success = false;
+                message = grantMessage;
             } else if (afterEvaluation.missingRequiredCount > 0) {
                 success = false;
                 message = "Local ADB grant finished, but required permissions are still missing.";
@@ -1368,6 +1410,20 @@ public class MainActivity extends FlutterActivity {
                 success = false;
                 message = "Local ADB grant finished, but some recommended permissions still need approval.";
             }
+            for (String entry : log) {
+                if (!TextUtils.isEmpty(entry)) {
+                    Log.i(TAG, "grant_all_local_adb detail=" + entry);
+                }
+            }
+            Log.i(
+                    TAG,
+                    "grant_all_local_adb success=" + success
+                            + " requiresAdbSetup=" + requiresAdbSetup
+                            + " requiresAdbAuthorization=" + requiresAdbAuthorization
+                            + " missingRequired=" + afterEvaluation.missingRequiredCount
+                            + " missingRecommended=" + afterEvaluation.missingRecommendedCount
+                            + " message=" + message
+            );
         } else if (TextUtils.equals(normalizedAction, "grant_update_install_local_adb")) {
             if (readGlobalInt(Settings.Global.ADB_ENABLED, 0) != 1) {
                 success = false;
@@ -1391,6 +1447,23 @@ public class MainActivity extends FlutterActivity {
         map.put("log", log);
         emitSystemSnapshot();
         return map;
+    }
+
+    private boolean looksLikeLocalAdbAuthorizationIssue(String detail) {
+        if (TextUtils.isEmpty(detail)) {
+            return false;
+        }
+        String normalized = detail.trim().toLowerCase(Locale.US);
+        return normalized.contains("unknown@unknown")
+                || normalized.contains("authorization")
+                || normalized.contains("127.0.0.1:5555")
+                || normalized.contains("localhost:5555")
+                || normalized.contains("connection failed")
+                || normalized.contains("timed out")
+                || normalized.contains("actively rejected")
+                || normalized.contains("stream closed")
+                || normalized.contains("broken pipe")
+                || normalized.contains("connection reset");
     }
 
     private Map<String, Object> setManagedAccessibility(MethodCall call) {
@@ -2138,10 +2211,36 @@ public class MainActivity extends FlutterActivity {
 
     private String runLocalAdbBestEffort(String shellCommand) {
         LocalAdbBridge.Result result = LocalAdbBridge.executeShell(this, shellCommand);
-        if (result.success) {
-            return shellCommand + " -> ok";
+        String detail = result.success
+                ? shellCommand + " -> ok"
+                : shellCommand + " -> " + (TextUtils.isEmpty(result.detail) ? "failed" : result.detail);
+        Log.i(TAG, "local_adb_shell " + detail);
+        return detail;
+    }
+
+    private List<String> buildProvisioningGrantCommands() {
+        List<String> commands = new ArrayList<>();
+        commands.add("pm grant " + getPackageName() + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
+        commands.add("pm grant " + getPackageName() + " " + mediaReadPermissionName());
+        if (requiresNotificationRuntimePermission()) {
+            commands.add("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
         }
-        return shellCommand + " -> " + (TextUtils.isEmpty(result.detail) ? "failed" : result.detail);
+        commands.add("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow");
+        commands.add("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
+        commands.add("appops set " + getPackageName() + " WRITE_SETTINGS allow");
+        commands.add("cmd deviceidle whitelist +" + getPackageName());
+        return commands;
+    }
+
+    private LocalAdbBridge.Result runLocalAdbGrantBatch(List<String> shellCommands) {
+        String joinedCommand = TextUtils.join(" ; ", shellCommands);
+        LocalAdbBridge.Result result = LocalAdbBridge.executeShell(this, joinedCommand);
+        String detail = result.success
+                ? "commands=" + shellCommands.size() + " -> ok"
+                : "commands=" + shellCommands.size() + " -> "
+                + (TextUtils.isEmpty(result.detail) ? "failed" : result.detail);
+        Log.i(TAG, "local_adb_batch " + detail);
+        return result;
     }
 
     private Map<String, Object> installDownloadedApk(MethodCall call) {
@@ -2515,15 +2614,33 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void emitSystemSnapshot() {
-        if (sharedSystemEventSink != null) {
-            sharedSystemEventSink.success(buildSystemBridgeStatusLite());
+        if (sharedSystemEventSink == null) {
+            return;
         }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            sharedSystemEventSink.success(buildSystemBridgeStatusLite());
+            return;
+        }
+        SHARED_SYSTEM_EVENT_HANDLER.post(() -> {
+            if (sharedSystemEventSink != null) {
+                sharedSystemEventSink.success(buildSystemBridgeStatusLite());
+            }
+        });
     }
 
     private void emitSystemSnapshotDelta(Map<String, Object> delta) {
-        if (sharedSystemEventSink != null) {
-            sharedSystemEventSink.success(delta);
+        if (sharedSystemEventSink == null) {
+            return;
         }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            sharedSystemEventSink.success(delta);
+            return;
+        }
+        SHARED_SYSTEM_EVENT_HANDLER.post(() -> {
+            if (sharedSystemEventSink != null) {
+                sharedSystemEventSink.success(delta);
+            }
+        });
     }
 
     private void emitWallpaperStatusDelta() {

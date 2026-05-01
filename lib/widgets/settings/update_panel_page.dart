@@ -33,6 +33,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
   static const String _statusDebugLabel = 'update_panel_status_section';
   static const String _releaseDetailsDebugLabel =
       'update_panel_release_details';
+  static const double _actionCardHeight = 120;
   static const Color _statusOkColor = Color(0xFF7BE0A5);
   static const Color _statusNeedsActionColor = Color(0xFFFFC970);
 
@@ -120,6 +121,30 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         final permissionColor =
             permissionReady ? _statusOkColor : _statusNeedsActionColor;
         final downloadedLabel = _resolveDownloadedLabel(localizations);
+        final checkCardSubtitle = _resolveCheckCardSubtitle(
+          localizations,
+          latestReleaseLabel,
+        );
+        final downloadCardSubtitle = _resolveDownloadCardSubtitle(
+          context,
+          localizations,
+          latestAsset,
+        );
+        final installCardSubtitle = _resolveInstallCardSubtitle(
+          localizations,
+          permissionReady,
+          downloadedLabel,
+        );
+        final localAdbCardSubtitle = _resolveLocalAdbCardSubtitle(
+          localizations,
+          adbEnabled,
+        );
+        final installsCardSubtitle = permissionReady
+            ? localizations.launcherUpdatePermissionReady
+            : localizations.launcherUpdatePermissionMissing;
+        final cleanupCardSubtitle = _resolveCleanupCardSubtitle(
+          localizations,
+        );
 
         return ListView(
           key: const PageStorageKey<String>(UpdatePanelPage.routeName),
@@ -169,38 +194,35 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
             ),
             const SizedBox(height: 18),
             SettingsSurfaceCard(
+              padding: const EdgeInsets.all(12),
               child: SettingsAdaptiveGrid(
-                minChildWidth: 220,
+                spacing: 10,
+                runSpacing: 10,
+                minChildWidth: 240,
                 maxColumns: 2,
                 children: [
-                  SettingsActionCard(
+                  _buildUniformActionCard(
                     focusNode: widget.primaryFocusNode,
                     onMoveUpAtBoundary: () =>
                         focusCurrentSettingsNodeByDebugLabel(
-                            _summaryDebugLabel),
+                      _summaryDebugLabel,
+                    ),
                     title: localizations.checkLatestRelease,
-                    subtitle: !_hasCheckedOfficialRelease
-                        ? localizations.launcherUpdateCheckSubtitle
-                        : latestReleaseLabel,
+                    subtitle: checkCardSubtitle,
                     icon: Icons.system_update_alt_outlined,
                     onPressed: _busy ? null : () => _checkLatestRelease(),
                   ),
-                  SettingsActionCard(
+                  _buildUniformActionCard(
                     title: localizations.downloadLatestApk,
-                    subtitle: latestAsset?.name ??
-                        (_hasCheckedOfficialRelease
-                            ? localizations.launcherUpdateNoOfficialRelease
-                            : localizations.launcherUpdateCheckBeforeDownload),
+                    subtitle: downloadCardSubtitle,
                     icon: Icons.download_for_offline_outlined,
                     onPressed: _busy || latestAsset == null
                         ? null
                         : () => _downloadLatestApk(latestAsset),
                   ),
-                  SettingsActionCard(
+                  _buildUniformActionCard(
                     title: localizations.installDownloadedApk,
-                    subtitle: permissionReady
-                        ? downloadedLabel
-                        : localizations.launcherUpdatePermissionActionSubtitle,
+                    subtitle: installCardSubtitle,
                     icon: Icons.system_update_alt_outlined,
                     onPressed: _busy || _downloadedApkPath == null
                         ? null
@@ -209,11 +231,9 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                               openPermissionIfNeeded: true,
                             ),
                   ),
-                  SettingsActionCard(
+                  _buildUniformActionCard(
                     title: localizations.grantInstallPermissionViaLocalAdb,
-                    subtitle: adbEnabled
-                        ? localizations.launcherUpdateLocalAdbSubtitle
-                        : localizations.launcherUpdateEnableAdbFirst,
+                    subtitle: localAdbCardSubtitle,
                     icon: Icons.adb_outlined,
                     onPressed: _busy
                         ? null
@@ -222,11 +242,9 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                               adbEnabled: adbEnabled,
                             ),
                   ),
-                  SettingsActionCard(
+                  _buildUniformActionCard(
                     title: localizations.allowAppInstalls,
-                    subtitle: permissionReady
-                        ? localizations.launcherUpdatePermissionReady
-                        : localizations.launcherUpdatePermissionActionSubtitle,
+                    subtitle: installsCardSubtitle,
                     icon: Icons.admin_panel_settings_outlined,
                     onPressed: _busy
                         ? null
@@ -235,13 +253,9 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                               resumeInstallAfterPermission: false,
                             ),
                   ),
-                  SettingsActionCard(
+                  _buildUniformActionCard(
                     title: localizations.cleanupDownloadedApks,
-                    subtitle: _downloadedApkCount > 0
-                        ? localizations.launcherUpdateCleanupSubtitle(
-                            _downloadedApkCount,
-                          )
-                        : localizations.launcherUpdateCleanupEmpty,
+                    subtitle: cleanupCardSubtitle,
                     icon: Icons.delete_sweep_outlined,
                     onPressed: _busy || _downloadedApkCount == 0
                         ? null
@@ -689,6 +703,28 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     );
   }
 
+  Widget _buildUniformActionCard({
+    FocusNode? focusNode,
+    SettingsBoundaryMoveHandler? onMoveUpAtBoundary,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Future<void> Function()? onPressed,
+  }) {
+    return SizedBox(
+      height: _actionCardHeight,
+      child: SettingsActionCard(
+        focusNode: focusNode,
+        onMoveUpAtBoundary: onMoveUpAtBoundary,
+        title: title,
+        subtitle: subtitle,
+        icon: icon,
+        focusEmphasis: 1.18,
+        onPressed: onPressed,
+      ),
+    );
+  }
+
   bool get _showDownloadProgress =>
       (_downloadFileName ?? '').trim().isNotEmpty && _busy;
 
@@ -765,6 +801,54 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     return localizations.launcherUpdateNotChecked;
   }
 
+  String _resolveCheckCardSubtitle(
+    AppLocalizations localizations,
+    String latestReleaseLabel,
+  ) {
+    if (!_hasCheckedOfficialRelease) {
+      return localizations.launcherUpdateNotChecked;
+    }
+    return latestReleaseLabel;
+  }
+
+  String _resolveDownloadCardSubtitle(
+    BuildContext context,
+    AppLocalizations localizations,
+    LauncherUpdateAsset? asset,
+  ) {
+    if (!_hasCheckedOfficialRelease) {
+      return localizations.launcherUpdateNotChecked;
+    }
+    if (_latestRelease == null || asset == null) {
+      return localizations.launcherUpdateNoOfficialRelease;
+    }
+    return '${formatUpdateFileSize(asset.sizeBytes)} | ${_formatUpdateDateTime(context, asset.uploadedAt, includeTime: false)}';
+  }
+
+  String _resolveInstallCardSubtitle(
+    AppLocalizations localizations,
+    bool permissionReady,
+    String downloadedLabel,
+  ) {
+    if (_downloadedApkPath == null) {
+      return localizations.launcherUpdateNoDownloadedApk;
+    }
+    if (!permissionReady) {
+      return localizations.launcherUpdatePermissionMissing;
+    }
+    return downloadedLabel;
+  }
+
+  String _resolveLocalAdbCardSubtitle(
+    AppLocalizations localizations,
+    bool adbEnabled,
+  ) {
+    if (!adbEnabled) {
+      return localizations.launcherUpdateEnableAdbFirst;
+    }
+    return '127.0.0.1:5555';
+  }
+
   String _resolveDownloadBytesLabel(AppLocalizations localizations) {
     final downloaded = formatUpdateFileSize(_downloadedBytes);
     if (_downloadTotalBytes > 0) {
@@ -782,6 +866,13 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     }
     if (_downloadedApkCount == 1 && (_downloadedAssetName ?? '').isNotEmpty) {
       return _downloadedAssetName!;
+    }
+    return localizations.launcherUpdateDownloadedCount(_downloadedApkCount);
+  }
+
+  String _resolveCleanupCardSubtitle(AppLocalizations localizations) {
+    if (_downloadedApkCount <= 0) {
+      return localizations.launcherUpdateNoDownloadedApk;
     }
     return localizations.launcherUpdateDownloadedCount(_downloadedApkCount);
   }

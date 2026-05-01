@@ -533,6 +533,14 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
       );
       return;
     }
+    if (result['requiresAdbAuthorization'] == true) {
+      await _showLocalAdbAuthorizationGuidance(
+        context,
+        bridgeService,
+        detailMessage: result['message']?.toString(),
+      );
+      return;
+    }
     _showActionResult(context, result);
   }
 
@@ -556,6 +564,50 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
             Text(localizations.wizardStepOpenDeveloperOptions),
             const SizedBox(height: 10),
             Text(localizations.wizardStepGrantWss),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(localizations.closeAction),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              _showActionResult(
+                context,
+                await bridgeService.runProvisioningAction(
+                  action: 'open_development',
+                ),
+              );
+            },
+            child: Text(localizations.openDeveloperOptions),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showLocalAdbAuthorizationGuidance(
+      BuildContext context, SystemBridgeService bridgeService,
+      {String? detailMessage}) async {
+    final localizations = AppLocalizations.of(context)!;
+    final trimmedDetail = detailMessage?.trim() ?? '';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(localizations.localAdbAuthorizationTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (trimmedDetail.isNotEmpty) ...[
+              Text(trimmedDetail),
+              const SizedBox(height: 10),
+            ],
+            Text(localizations.localAdbAuthorizationHint),
+            const SizedBox(height: 10),
+            Text(localizations.localAdbAuthorizationOpenDeveloperOptionsHint),
           ],
         ),
         actions: [
@@ -785,6 +837,7 @@ class _PermissionsAdvancedToggleTileState
       ),
     );
   }
+
 }
 
 class _PermissionRequirementTile extends StatelessWidget {

@@ -254,6 +254,8 @@ void main() {
 
     await tester.tap(find.text('Check latest official release'));
     await _pumpUi(tester);
+    await tester.ensureVisible(find.text('Download latest official APK'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Download latest official APK'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -267,6 +269,88 @@ void main() {
 
     completer.complete();
     await _pumpUi(tester);
+  });
+
+  testWidgets('update action cards keep uniform size for a compact grid',
+      (tester) async {
+    _prepareView(tester);
+    final tempDirectory = await _createTempTestDirectory('update-panel');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+    PackageInfo.setMockInitialValues(
+      appName: 'ATV Launcher',
+      packageName: 'com.atv.launcher',
+      version: '2024.11.001',
+      buildNumber: '15',
+      buildSignature: 'debug',
+      installerStore: 'adb',
+    );
+
+    final bridgeService = _createBridgeService(
+      canRequestPackageInstalls: true,
+      adbEnabled: true,
+    );
+    addTearDown(bridgeService.dispose);
+
+    final release = LauncherUpdateRelease(
+      tagName: 'v2026.04.12-release',
+      name: 'ATV Launcher Release',
+      htmlUrl: 'https://example.com/release',
+      publishedAt: DateTime(2026, 4, 29, 20, 0),
+      body: '',
+      isDraft: false,
+      isPrerelease: false,
+      assets: [
+        LauncherUpdateAsset(
+          name: 'atv-launcher-release.apk',
+          browserDownloadUrl: 'https://example.com/atv-launcher-release.apk',
+          sizeBytes: 12582912,
+          downloadCount: 42,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 4, 29, 21, 30),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SystemBridgeService>.value(
+        value: bridgeService,
+        child: MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdatePanelPage(
+              updateClient: _FakeLauncherUpdateClient(release: release),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _pumpUi(tester);
+
+    Size sizeForTitle(String title) => tester.getSize(
+          find.ancestor(
+            of: find.text(title),
+            matching: find.byType(SettingsFocusFrame),
+          ),
+        );
+
+    final checkSize = sizeForTitle('Kiểm tra bản chính thức mới nhất');
+    final downloadSize = sizeForTitle('Tải APK chính thức mới nhất');
+    final installSize = sizeForTitle('Cài APK đã tải');
+    final cleanupSize = sizeForTitle('Dọn APK đã tải');
+
+    expect(checkSize.width, equals(downloadSize.width));
+    expect(checkSize.width, equals(installSize.width));
+    expect(checkSize.width, equals(cleanupSize.width));
+    expect(checkSize.height, equals(downloadSize.height));
+    expect(checkSize.height, equals(installSize.height));
+    expect(checkSize.height, equals(cleanupSize.height));
   });
 
 }

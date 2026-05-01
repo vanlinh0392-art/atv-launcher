@@ -87,6 +87,43 @@ jobs:
           echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
           echo "release_name=ATV Launcher xfire0392-netizen v${version_name}" >> "${GITHUB_OUTPUT}"
 
+      - name: Build release notes from changelog
+        id: release_notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          lines = changelog.splitlines()
+          current_section = []
+          capture = False
+
+          for line in lines:
+              if line.startswith("## "):
+                  if capture:
+                      break
+                  capture = True
+              if capture:
+                  current_section.append(line)
+
+          if not current_section:
+              raise SystemExit("Could not extract latest changelog section.")
+
+          footer = [
+              "",
+              "Tep phat hanh: `atv-launcher-armeabi-v7a-release.apk`",
+              "",
+              "Updater-Channel: `xfire0392-netizen-official`",
+              "Launcher updater chi nhan official release va bo qua debug build.",
+          ]
+          Path("build/release_notes.md").write_text(
+              "\n".join(current_section + footer).strip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
       - name: Upload official APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -99,13 +136,5 @@ jobs:
         with:
           tag_name: ${{ steps.official_release_meta.outputs.tag_name }}
           name: ${{ steps.official_release_meta.outputs.release_name }}
-          body: |
-            Bản phát hành chính thức của ATV Launcher.
-            Duy trì bởi xfire0392-netizen.
-            Updater-Channel: xfire0392-netizen-official
-
-            Tệp phát hành: `atv-launcher-armeabi-v7a-release.apk`
-
-            Đây là kênh release chính thức mà trình cập nhật trong launcher sẽ sử dụng.
-            Các bản debug sẽ bị bỏ qua và không được updater hiển thị.
+          body_path: build/release_notes.md
           files: ${{ steps.prepare_release_asset.outputs.asset_path }}

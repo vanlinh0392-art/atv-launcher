@@ -97,7 +97,7 @@ final class LocalAdbBridge {
         } catch (SocketTimeoutException exception) {
             String detail = generatedNewKey
                     ? "Local ADB dang cho authorize. Neu TV hien prompt ADB cho unknown@unknown, hay bam Allow roi thu lai."
-                    : "Local ADB timeout. Co the prompt authorize chua duoc chap nhan hoac localhost:5555 khong phan hoi.";
+                    : "Local ADB timeout. Co the prompt authorize chua duoc chap nhan hoac 127.0.0.1:5555 khong phan hoi.";
             return Result.failure(detail);
         } catch (Exception exception) {
             String detail = exception.toString();
