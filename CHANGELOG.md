@@ -13,12 +13,22 @@ Các thay đổi dưới đây mô tả riêng bản fork hiện tại, không l
 
 - Fixed `Check latest official release` so the launcher always picks the newest official GitHub release instead of getting stuck on an older one
 - Added `no-cache` handling for GitHub release requests to reduce stale release responses on TV devices
+- Accepted `Updater-Channel` markers even when older release notes wrapped the channel value in Markdown backticks
+- Updated the GitHub release workflow footer to emit the updater channel as plain text for future releases
 - When a fresh release check fails, the `Update` panel now clears stale release details instead of leaving the previous successful result on screen
+
+### Settings UI
+
+- Tightened the `summary / metrics header` layout used across right-side settings panes so metric cards keep a more even grid
+- Added a minimum tile height plus anti-singleton wrapping in shared metrics grids to avoid one small orphan card on a trailing row
+- Compacted the `Update` detail card and kept focus on the status region after checking releases so the pane no longer jumps and clips the top section on TV
 
 ### Verification
 
 - Added coverage for latest-official-release sorting when GitHub returns releases in an unexpected order
+- Added coverage for Markdown-formatted updater-channel markers in release bodies
 - Added a regression test for failed re-checks so the UI does not keep showing an outdated release card
+- Added a shared layout test so four summary cards do not collapse into an uneven 3+1 arrangement
 
 ## 2026-05-01 - Official updater + local ADB grant polish
 

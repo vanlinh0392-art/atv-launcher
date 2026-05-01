@@ -115,7 +115,7 @@ jobs:
               "",
               "Tep phat hanh: `atv-launcher-armeabi-v7a-release.apk`",
               "",
-              "Updater-Channel: `xfire0392-netizen-official`",
+              "Updater-Channel: xfire0392-netizen-official",
               "Launcher updater chi nhan official release va bo qua debug build.",
           ]
           Path("build/release_notes.md").write_text(

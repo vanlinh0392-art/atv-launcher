@@ -308,9 +308,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                     : release.displayName,
               );
       });
-      _requestSectionFocus(
-        release == null ? _statusFocusNode : _releaseDetailsFocusNode,
-      );
+      _requestSectionFocus(_statusFocusNode);
     } catch (error) {
       if (!mounted) {
         return;
@@ -1023,16 +1021,18 @@ class _ReleaseDetailsCard extends StatelessWidget {
                     release.displayName.isEmpty
                         ? release.tagName
                         : release.displayName,
-                    style: Theme.of(context).textTheme.titleLarge,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 2),
                   Text(
-                    '${LauncherUpdateClient.githubOwner}/${LauncherUpdateClient.githubRepo}',
+                    release.tagName.isEmpty ? '-' : release.tagName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context)
                         .textTheme
-                        .bodySmall
+                        .labelLarge
                         ?.copyWith(color: Colors.white70),
                   ),
                 ],
@@ -1055,10 +1055,10 @@ class _ReleaseDetailsCard extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 6,
+          runSpacing: 6,
           children: [
             _ReleaseMetaChip(
               label: localizations.launcherUpdateTagLabel,
@@ -1084,7 +1084,7 @@ class _ReleaseDetailsCard extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _ReleaseInfoRow(
           label: localizations.launcherUpdateAssetLabel,
           value: asset == null
@@ -1092,17 +1092,19 @@ class _ReleaseDetailsCard extends StatelessWidget {
               : '${asset.name} | ${formatUpdateFileSize(asset.sizeBytes)}',
         ),
         if (release.body.trim().isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            localizations.launcherUpdateReleaseNotes,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
           const SizedBox(height: 8),
           Text(
+            localizations.launcherUpdateReleaseNotes,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
             release.body.trim(),
+            maxLines: 7,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context)
                 .textTheme
-                .bodyMedium
+                .bodySmall
                 ?.copyWith(color: Colors.white70),
           ),
         ],
@@ -1123,8 +1125,8 @@ class _ReleaseMetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 180),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      constraints: const BoxConstraints(minWidth: 156),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(18),
@@ -1141,12 +1143,12 @@ class _ReleaseMetaChip extends StatelessWidget {
                 .labelMedium
                 ?.copyWith(color: Colors.white60),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             value,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),

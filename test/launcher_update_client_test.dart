@@ -222,6 +222,28 @@ void main() {
 
       expect(release.isOfficialRelease, isFalse);
     });
+
+    test('accepts markdown formatted updater-channel markers', () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.05.003-release',
+        'name': 'ATV Launcher xfire0392-netizen v2026.05.003',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-05-01T03:57:16Z',
+        'body':
+            'Updater-Channel: `xfire0392-netizen-official`\nOfficial release',
+        'assets': [
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/release.apk',
+            'size': 456,
+            'download_count': 10,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(release.isOfficialRelease, isTrue);
+    });
   });
 
   group('LauncherUpdateClient', () {

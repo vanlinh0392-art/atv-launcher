@@ -4,8 +4,9 @@ import 'dart:io';
 class LauncherUpdateClient {
   static const String githubOwner = 'xfire0392-netizen';
   static const String githubRepo = 'atv-launcher';
+  static const String officialChannelSlug = 'xfire0392-netizen-official';
   static const String officialChannelMarker =
-      'Updater-Channel: xfire0392-netizen-official';
+      'Updater-Channel: $officialChannelSlug';
   static const int releasePageSize = 50;
   static const int maxReleasePages = 6;
 
@@ -229,9 +230,15 @@ class LauncherUpdateRelease {
   }
 
   bool get _hasOfficialChannelMarker =>
-      body.toLowerCase().contains(
+      _normalizedBody.contains(
             LauncherUpdateClient.officialChannelMarker.toLowerCase(),
-          );
+          ) ||
+      (_normalizedBody.contains('updater-channel:') &&
+          _normalizedBody.contains(
+            LauncherUpdateClient.officialChannelSlug.toLowerCase(),
+          ));
+
+  String get _normalizedBody => body.toLowerCase().replaceAll('`', '');
 
   bool get _looksLikeManagedRelease {
     final normalizedTag = tagName.trim().toLowerCase();

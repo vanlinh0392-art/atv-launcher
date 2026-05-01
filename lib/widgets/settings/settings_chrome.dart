@@ -387,6 +387,7 @@ class SettingsAdaptiveGrid extends StatelessWidget {
   final double runSpacing;
   final double minChildWidth;
   final int? maxColumns;
+  final bool avoidTrailingSingleton;
 
   const SettingsAdaptiveGrid({
     super.key,
@@ -395,6 +396,7 @@ class SettingsAdaptiveGrid extends StatelessWidget {
     this.runSpacing = 12,
     this.minChildWidth = 260,
     this.maxColumns,
+    this.avoidTrailingSingleton = false,
   });
 
   @override
@@ -415,10 +417,17 @@ class SettingsAdaptiveGrid extends StatelessWidget {
             children.length,
           ),
         );
-        final calculatedColumns =
+        var calculatedColumns =
             ((availableWidth + spacing) / (minChildWidth + spacing))
                 .floor()
                 .clamp(1, resolvedMaxColumns);
+        if (avoidTrailingSingleton &&
+            calculatedColumns > 2 &&
+            children.length > calculatedColumns &&
+            children.length <= ((calculatedColumns * 2) - 1) &&
+            children.length % calculatedColumns == 1) {
+          calculatedColumns = math.max(2, calculatedColumns - 1);
+        }
         final itemWidth =
             (availableWidth - (spacing * math.max(0, calculatedColumns - 1))) /
                 calculatedColumns;
@@ -446,6 +455,7 @@ class SettingsMetricsGrid extends StatelessWidget {
   final double runSpacing;
   final double minChildWidth;
   final int maxColumns;
+  final bool avoidTrailingSingleton;
 
   const SettingsMetricsGrid({
     super.key,
@@ -454,6 +464,7 @@ class SettingsMetricsGrid extends StatelessWidget {
     this.runSpacing = 8,
     this.minChildWidth = 168,
     this.maxColumns = 4,
+    this.avoidTrailingSingleton = true,
   });
 
   @override
@@ -463,6 +474,7 @@ class SettingsMetricsGrid extends StatelessWidget {
       runSpacing: runSpacing,
       minChildWidth: minChildWidth,
       maxColumns: maxColumns,
+      avoidTrailingSingleton: avoidTrailingSingleton,
       children: children,
     );
   }
@@ -594,6 +606,7 @@ class SettingsMetricTile extends StatefulWidget {
   final IconData icon;
   final double? width;
   final Color? accentColor;
+  final double minHeight;
 
   const SettingsMetricTile({
     super.key,
@@ -605,6 +618,7 @@ class SettingsMetricTile extends StatefulWidget {
     required this.icon,
     this.width,
     this.accentColor,
+    this.minHeight = 92,
   });
 
   @override
@@ -688,43 +702,48 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
             focusEmphasis: 1.08,
             variant: SettingsFocusFrameVariant.rowOnly,
             focused: _focused,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: subtitleColor,
-                                  height: 1.15,
-                                  fontWeight: FontWeight.w600,
-                                ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: widget.minHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(
+                                color: subtitleColor,
+                                height: 1.15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(widget.icon, size: 18, color: iconColor),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.value,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: titleColor,
-                        fontWeight:
-                            _focused ? FontWeight.w700 : FontWeight.w600,
-                        height: 1.12,
-                      ),
-                ),
-              ],
+                      const SizedBox(width: 10),
+                      Icon(widget.icon, size: 18, color: iconColor),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: titleColor,
+                          fontWeight:
+                              _focused ? FontWeight.w700 : FontWeight.w600,
+                          height: 1.12,
+                        ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

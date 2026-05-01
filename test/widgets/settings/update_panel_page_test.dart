@@ -102,7 +102,7 @@ void main() {
     expect(find.text('4/29/2026 21:30'), findsOneWidget);
     expect(find.text('12 MB'), findsWidgets);
     expect(FocusManager.instance.primaryFocus?.debugLabel,
-        contains('update_panel_release_details'));
+        contains('update_panel_status_section'));
   });
 
   testWidgets('shows no suitable official release when only debug builds exist',

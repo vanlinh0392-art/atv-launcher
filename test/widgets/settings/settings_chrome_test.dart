@@ -153,6 +153,44 @@ void main() {
     expect(focusNode.canRequestFocus, isFalse);
   });
 
+  testWidgets(
+      'settings metrics grid avoids a trailing single card for four summary tiles',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          color: Colors.black,
+          child: Center(
+            child: SizedBox(
+              width: 620,
+              child: SettingsMetricsGrid(
+                children: List.generate(
+                  4,
+                  (index) => SettingsMetricTile(
+                    label: 'Metric ${index + 1}',
+                    value: 'Value ${index + 1}',
+                    icon: Icons.info_outline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final metric1 = tester.getTopLeft(find.text('Metric 1'));
+    final metric2 = tester.getTopLeft(find.text('Metric 2'));
+    final metric3 = tester.getTopLeft(find.text('Metric 3'));
+    final metric4 = tester.getTopLeft(find.text('Metric 4'));
+
+    expect(metric1.dy, equals(metric2.dy));
+    expect(metric3.dy, greaterThan(metric2.dy));
+    expect(metric3.dy, equals(metric4.dy));
+  });
+
   testWidgets('explicit row-only focus binding produces a visible focus frame',
       (tester) async {
     await tester.pumpWidget(
