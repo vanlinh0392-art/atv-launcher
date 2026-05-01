@@ -250,6 +250,19 @@
     "launcherUpdateNotChecked": "Not checked",
     "launcherUpdatePermissionReady": "Ready",
     "launcherUpdatePermissionMissing": "Needs approval",
+    "launcherUpdateAbiResolving": "Resolving device ABI",
+    "launcherUpdateAbiFallbackChip": "ABI fallback",
+    "launcherUpdateAbiFallbackMessage": "Device ABI could not be refreshed. This check is using the generic APK fallback, so verify the selected asset before installing on arm64 TVs.",
+    "launcherUpdateAbiUnavailable": "ABI unavailable",
+    "launcherUpdateAbiChip": "ABI {abiList}",
+    "@launcherUpdateAbiChip": {
+        "placeholders": {
+            "abiList": {
+                "type": "String"
+            }
+        }
+    },
+    "launcherUpdateDeviceAbiLabel": "Device ABI",
     "launcherUpdateNoDownloadedApk": "Nothing downloaded",
     "checkLatestRelease": "Check latest official release",
     "launcherUpdateCheckSubtitle": "Query the newest official GitHub release for this launcher.",

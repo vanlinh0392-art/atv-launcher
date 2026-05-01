@@ -355,6 +355,19 @@
     "launcherUpdateNotChecked": "Chưa kiểm tra",
     "launcherUpdatePermissionReady": "Sẵn sàng",
     "launcherUpdatePermissionMissing": "Cần cấp quyền",
+    "launcherUpdateAbiResolving": "Đang nhận diện ABI thiết bị",
+    "launcherUpdateAbiFallbackChip": "Đang dùng ABI fallback",
+    "launcherUpdateAbiFallbackMessage": "Không làm mới được ABI thiết bị. Lần kiểm tra này đang dùng cơ chế chọn APK fallback chung, nên hãy kiểm tra lại asset trước khi cài trên TV arm64.",
+    "launcherUpdateAbiUnavailable": "Không đọc được ABI",
+    "launcherUpdateAbiChip": "ABI {abiList}",
+    "@launcherUpdateAbiChip": {
+        "placeholders": {
+            "abiList": {
+                "type": "String"
+            }
+        }
+    },
+    "launcherUpdateDeviceAbiLabel": "ABI thiết bị",
     "launcherUpdateNoDownloadedApk": "Chưa tải APK",
     "checkLatestRelease": "Kiểm tra bản chính thức mới nhất",
     "launcherUpdateCheckSubtitle": "Kiểm tra GitHub để lấy bản phát hành chính thức mới nhất của launcher này.",

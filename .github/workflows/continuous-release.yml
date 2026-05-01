@@ -68,6 +68,15 @@ jobs:
           cp "${apk_path}" "${asset_path}"
           echo "asset_path=${asset_path}" >> "${GITHUB_OUTPUT}"
 
+      - name: Verify armeabi-v7a release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_release_apk.py \
+            --apk "${{ steps.build_release_v7a.outputs.asset_path }}" \
+            --expected-abi armeabi-v7a \
+            --report build/release-assets/verify-armeabi-v7a.json
+
       - name: Build arm64-v8a release APK
         id: build_release_v8a
         shell: bash
@@ -95,6 +104,23 @@ jobs:
           asset_path="build/release-assets/atv-launcher-arm64-v8a-release.apk"
           cp "${apk_path}" "${asset_path}"
           echo "asset_path=${asset_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify arm64-v8a release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_release_apk.py \
+            --apk "${{ steps.build_release_v8a.outputs.asset_path }}" \
+            --expected-abi arm64-v8a \
+            --report build/release-assets/verify-arm64-v8a.json
+
+      - name: Verify official release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_release_apk.py \
+            --scan-dir build/release-assets \
+            --report build/release-assets/verify-official-assets.json
 
       - name: Compute official release metadata
         id: official_release_meta
@@ -158,6 +184,9 @@ jobs:
           path: |
             ${{ steps.build_release_v7a.outputs.asset_path }}
             ${{ steps.build_release_v8a.outputs.asset_path }}
+            build/release-assets/verify-armeabi-v7a.json
+            build/release-assets/verify-arm64-v8a.json
+            build/release-assets/verify-official-assets.json
           retention-days: 30
 
       - name: Publish official GitHub release

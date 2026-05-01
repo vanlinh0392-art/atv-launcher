@@ -488,7 +488,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       scheduleHomeVisibleVideoStart();
       return;
     }
-    await _resumeVideoAfterForegroundReturnIfNeeded();
+    await _resumeVideoAfterForegroundReturnIfNeeded(
+      reason: 'settings_release',
+    );
   }
 
   void notifyHomeVisibleAndUsable() {
@@ -497,7 +499,11 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     if (_videoNeedsForegroundRearm) {
-      unawaited(_resumeVideoAfterForegroundReturnIfNeeded());
+      unawaited(
+        _resumeVideoAfterForegroundReturnIfNeeded(
+          reason: 'home_visible',
+        ),
+      );
       return;
     }
     if (_shouldDelayVideoUntilHomeSettles) {
@@ -607,7 +613,11 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       if (!_canActivateVideoWallpaper || _shouldDelayVideoAfterReturningHome) {
         return;
       }
-      unawaited(_resumeVideoAfterForegroundReturnIfNeeded());
+      unawaited(
+        _resumeVideoAfterForegroundReturnIfNeeded(
+          reason: 'app_resumed',
+        ),
+      );
       return;
     }
     _handleAppBackgrounded();
@@ -626,6 +636,10 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     debugPrint('FLauncherPerf $label elapsedMs=$elapsedMs');
+  }
+
+  void _logRuntimeEvent(String event) {
+    debugPrint('FLauncherRuntime $event');
   }
 
   Future<void> _applyPerformanceModePolicyChange() async {
@@ -730,7 +744,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _warmUpVideoController();
   }
 
-  Future<void> _resumeVideoAfterForegroundReturnIfNeeded() async {
+  Future<void> _resumeVideoAfterForegroundReturnIfNeeded({
+    required String reason,
+  }) async {
     if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
       return;
     }
@@ -738,6 +754,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       if (_videoWarmUpScheduled) {
         return;
       }
+      _logRuntimeEvent(
+        'wallpaper_rearm reason=$reason mode=${_settingsService.homeDockPerformanceMode}',
+      );
       await _warmUpVideoController();
       return;
     }

@@ -68,6 +68,14 @@ void main() {
         ),
       ],
     );
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(release: release),
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['armeabi-v7a'],
+      ),
+    );
+    addTearDown(session.dispose);
 
     await tester.pumpWidget(
       ChangeNotifierProvider<SystemBridgeService>.value(
@@ -77,9 +85,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: UpdatePanelPage(
-              updateClient: _FakeLauncherUpdateClient(release: release),
-            ),
+            body: UpdatePanelPage(updateSession: session),
           ),
         ),
       ),
@@ -98,10 +104,14 @@ void main() {
 
     await tester.tap(find.text('Check latest official release'));
     await _pumpUi(tester);
-    expect(find.text('Official release ready: ATV Launcher Release'),
+    expect(
+        find.text(
+          'Official release ready: ATV Launcher Release',
+          skipOffstage: false,
+        ),
         findsOneWidget);
-    expect(find.text('4/29/2026 21:30'), findsOneWidget);
-    expect(find.text('12 MB'), findsWidgets);
+    expect(find.text('4/29/2026 21:30', skipOffstage: false), findsOneWidget);
+    expect(find.text('12 MB', skipOffstage: false), findsWidgets);
     expect(FocusManager.instance.primaryFocus?.debugLabel,
         contains('update_panel_status_section'));
   });
@@ -130,6 +140,14 @@ void main() {
       adbEnabled: true,
     );
     addTearDown(bridgeService.dispose);
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(release: null),
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['armeabi-v7a'],
+      ),
+    );
+    addTearDown(session.dispose);
 
     await tester.pumpWidget(
       ChangeNotifierProvider<SystemBridgeService>.value(
@@ -139,9 +157,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: UpdatePanelPage(
-              updateClient: _FakeLauncherUpdateClient(release: null),
-            ),
+            body: UpdatePanelPage(updateSession: session),
           ),
         ),
       ),
@@ -152,7 +168,10 @@ void main() {
     await _pumpUi(tester);
 
     expect(
-      find.text('No suitable official release is available right now.'),
+      find.text(
+        'No suitable official release is available right now.',
+        skipOffstage: false,
+      ),
       findsWidgets,
     );
     expect(
@@ -214,6 +233,35 @@ void main() {
       ],
     );
     final completer = Completer<void>();
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(
+        release: release,
+        onDownload: ({
+          required asset,
+          required destinationFile,
+          required onProgress,
+        }) async {
+          onProgress(
+            LauncherUpdateDownloadProgress(
+              fileName: asset.name,
+              receivedBytes: 512,
+              totalBytes: 1024,
+            ),
+          );
+          await completer.future;
+          await destinationFile.writeAsString('apk');
+          return LauncherDownloadedApk(
+            fileName: asset.name,
+            filePath: destinationFile.path,
+          );
+        },
+      ),
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['armeabi-v7a'],
+      ),
+    );
+    addTearDown(session.dispose);
 
     await tester.pumpWidget(
       ChangeNotifierProvider<SystemBridgeService>.value(
@@ -223,30 +271,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: UpdatePanelPage(
-              updateClient: _FakeLauncherUpdateClient(
-                release: release,
-                onDownload: ({
-                  required asset,
-                  required destinationFile,
-                  required onProgress,
-                }) async {
-                  onProgress(
-                    LauncherUpdateDownloadProgress(
-                      fileName: asset.name,
-                      receivedBytes: 512,
-                      totalBytes: 1024,
-                    ),
-                  );
-                  await completer.future;
-                  await destinationFile.writeAsString('apk');
-                  return LauncherDownloadedApk(
-                    fileName: asset.name,
-                    filePath: destinationFile.path,
-                  );
-                },
-              ),
-            ),
+            body: UpdatePanelPage(updateSession: session),
           ),
         ),
       ),
@@ -261,7 +286,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('atv-launcher-release.apk'), findsWidgets);
+    expect(
+      find.text('atv-launcher-release.apk', skipOffstage: false),
+      findsWidgets,
+    );
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(
       FocusManager.instance.primaryFocus?.debugLabel,
@@ -475,6 +503,99 @@ void main() {
     );
   });
 
+  testWidgets('degraded ABI lookup shows a fallback warning in update panel',
+      (tester) async {
+    _prepareView(tester);
+    final tempDirectory =
+        await _createTempTestDirectory('update-panel-abi-fallback');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+    PackageInfo.setMockInitialValues(
+      appName: 'ATV Launcher',
+      packageName: 'com.atv.launcher',
+      version: '2026.05.006',
+      buildNumber: '21',
+      buildSignature: 'release',
+      installerStore: 'adb',
+    );
+
+    final bridgeService = _createBridgeService(
+      canRequestPackageInstalls: true,
+      adbEnabled: true,
+    );
+    addTearDown(bridgeService.dispose);
+
+    final release = LauncherUpdateRelease(
+      tagName: 'v2026.05.007-release',
+      name: 'ATV Launcher Release',
+      htmlUrl: 'https://example.com/release',
+      publishedAt: DateTime(2026, 5, 1, 8, 0),
+      body: '',
+      isDraft: false,
+      isPrerelease: false,
+      assets: [
+        LauncherUpdateAsset(
+          name: 'atv-launcher-armeabi-v7a-release.apk',
+          browserDownloadUrl: 'https://example.com/v7a.apk',
+          sizeBytes: 12 * 1024 * 1024,
+          downloadCount: 40,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 5),
+        ),
+        LauncherUpdateAsset(
+          name: 'atv-launcher-arm64-v8a-release.apk',
+          browserDownloadUrl: 'https://example.com/v8a.apk',
+          sizeBytes: 13 * 1024 * 1024,
+          downloadCount: 20,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 10),
+        ),
+      ],
+    );
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(release: release),
+      launcherChannel: _SequencedAbiLookupChannel(
+        responses: [StateError('unsupported platform'), StateError('retry')],
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SystemBridgeService>.value(
+        value: bridgeService,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdatePanelPage(updateSession: session),
+          ),
+        ),
+      ),
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
+
+    expect(find.text('ABI fallback', skipOffstage: false), findsWidgets);
+    expect(
+      find.textContaining('generic APK fallback', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'atv-launcher-armeabi-v7a-release.apk',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+  });
+
   test('arm64 session downloads the arm64 asset selected for the device',
       () async {
     final tempDirectory =
@@ -683,6 +804,14 @@ void main() {
         StateError('offline'),
       ],
     );
+    final session = LauncherUpdateSession(
+      updateClient: client,
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['armeabi-v7a'],
+      ),
+    );
+    addTearDown(session.dispose);
 
     await tester.pumpWidget(
       ChangeNotifierProvider<SystemBridgeService>.value(
@@ -692,7 +821,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: UpdatePanelPage(updateClient: client),
+            body: UpdatePanelPage(updateSession: session),
           ),
         ),
       ),
@@ -701,7 +830,10 @@ void main() {
 
     await tester.tap(find.text('Check latest official release'));
     await _pumpUi(tester);
-    expect(find.text('Official Build 001'), findsWidgets);
+    expect(
+      find.text('Official Build 001', skipOffstage: false),
+      findsWidgets,
+    );
 
     await tester
         .ensureVisible(find.text('Check latest official release').first);
@@ -819,6 +951,31 @@ class _FakeFLauncherChannel extends FLauncherChannel {
       const Stream<dynamic>.empty().listen((_) {});
 }
 
+class _SequencedAbiLookupChannel extends FLauncherChannel {
+  final List<Object> responses;
+  int _callCount = 0;
+
+  _SequencedAbiLookupChannel({required this.responses});
+
+  @override
+  Future<List<String>> getSupportedAbis() async {
+    final index =
+        _callCount < responses.length ? _callCount : responses.length - 1;
+    _callCount += 1;
+    final response = responses[index];
+    if (response is List<String>) {
+      return response;
+    }
+    if (response is Error) {
+      throw response;
+    }
+    if (response is Exception) {
+      throw response;
+    }
+    throw StateError(response.toString());
+  }
+}
+
 void _prepareView(WidgetTester tester) {
   tester.view.physicalSize = const Size(1280, 720);
   tester.view.devicePixelRatio = 1.0;
@@ -828,7 +985,7 @@ void _prepareView(WidgetTester tester) {
 
 Future<void> _pumpUi(WidgetTester tester) async {
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 250));
+  await tester.pumpAndSettle(const Duration(milliseconds: 50));
 }
 
 void _installFakeTempPath(String path) {

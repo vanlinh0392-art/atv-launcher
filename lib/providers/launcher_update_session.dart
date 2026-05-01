@@ -6,6 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:path_provider/path_provider.dart';
 
+enum LauncherUpdateAbiResolutionState {
+  unresolved,
+  resolving,
+  resolved,
+  degraded,
+}
+
 class LauncherUpdateSession extends ChangeNotifier {
   LauncherUpdateSession({
     LauncherUpdateClient? updateClient,
@@ -34,6 +41,10 @@ class LauncherUpdateSession extends ChangeNotifier {
   bool _busy = false;
   bool _resumeInstallAfterPermission = false;
   List<String> _deviceAbis = const <String>[];
+  List<String> _lastKnownResolvedAbis = const <String>[];
+  LauncherUpdateAbiResolutionState _abiResolutionState =
+      LauncherUpdateAbiResolutionState.unresolved;
+  Future<void>? _supportedAbisLoad;
 
   LauncherUpdateRelease? get latestRelease => _latestRelease;
   LauncherUpdateAsset? get latestReleaseAsset {
@@ -41,10 +52,12 @@ class LauncherUpdateSession extends ChangeNotifier {
     if (release == null) {
       return null;
     }
-    if (_deviceAbis.isEmpty) {
+    final effectiveDeviceAbis = _effectiveDeviceAbis;
+    if (effectiveDeviceAbis.isEmpty) {
       return release.preferredApkAsset;
     }
-    return release.preferredApkAssetFor(_deviceAbis);
+    return release.preferredApkAssetFor(effectiveDeviceAbis) ??
+        release.preferredApkAsset;
   }
 
   bool get hasCheckedOfficialRelease => _hasCheckedOfficialRelease;
@@ -58,10 +71,23 @@ class LauncherUpdateSession extends ChangeNotifier {
   int get downloadedApkCount => _downloadedApkCount;
   bool get busy => _busy;
   bool get resumeInstallAfterPermission => _resumeInstallAfterPermission;
-  List<String> get deviceAbis => List<String>.unmodifiable(_deviceAbis);
+  List<String> get deviceAbis =>
+      List<String>.unmodifiable(_effectiveDeviceAbis);
+  LauncherUpdateAbiResolutionState get abiResolutionState =>
+      _abiResolutionState;
+  bool get abiResolutionPending =>
+      _abiResolutionState == LauncherUpdateAbiResolutionState.unresolved ||
+      _abiResolutionState == LauncherUpdateAbiResolutionState.resolving;
+  bool get abiResolutionDegraded =>
+      _abiResolutionState == LauncherUpdateAbiResolutionState.degraded;
+  bool get abiResolved =>
+      _abiResolutionState == LauncherUpdateAbiResolutionState.resolved;
 
   bool get showDownloadProgress =>
       (_downloadFileName ?? '').trim().isNotEmpty && _busy;
+
+  List<String> get _effectiveDeviceAbis =>
+      _deviceAbis.isNotEmpty ? _deviceAbis : _lastKnownResolvedAbis;
 
   Future<void> initialize() {
     if (_initialized) {
@@ -69,7 +95,7 @@ class LauncherUpdateSession extends ChangeNotifier {
     }
     return _initializing ??= Future.wait<void>([
       _refreshDownloadedArtifactsInternal(),
-      _loadSupportedAbisInternal(),
+      _ensureSupportedAbisResolved(forceRetryOnFailure: true),
     ]).whenComplete(() {
       _initialized = true;
       _initializing = null;
@@ -83,6 +109,7 @@ class LauncherUpdateSession extends ChangeNotifier {
     _lastMessage = localizations.launcherUpdateChecking;
     notifyListeners();
     try {
+      await _ensureSupportedAbisResolved(forceRetryOnFailure: !abiResolved);
       final release = await _updateClient.fetchLatestOfficialRelease();
       _hasCheckedOfficialRelease = true;
       _latestRelease = release;
@@ -232,21 +259,80 @@ class LauncherUpdateSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadSupportedAbisInternal() async {
-    try {
-      final supportedAbis = await _launcherChannel.getSupportedAbis();
-      if (listEquals(_deviceAbis, supportedAbis)) {
-        return;
-      }
-      _deviceAbis = supportedAbis;
-      notifyListeners();
-    } catch (_) {
-      if (_deviceAbis.isEmpty) {
-        return;
-      }
-      _deviceAbis = const <String>[];
+  Future<void> _ensureSupportedAbisResolved({
+    required bool forceRetryOnFailure,
+  }) {
+    final activeLoad = _supportedAbisLoad;
+    if (activeLoad != null) {
+      return activeLoad;
+    }
+    if (!forceRetryOnFailure && abiResolved) {
+      return Future<void>.value();
+    }
+    _supportedAbisLoad = _loadSupportedAbisWithRetry(
+      attempts: forceRetryOnFailure ? 2 : 1,
+    ).whenComplete(() {
+      _supportedAbisLoad = null;
+    });
+    return _supportedAbisLoad!;
+  }
+
+  Future<void> _loadSupportedAbisWithRetry({
+    required int attempts,
+  }) async {
+    final normalizedAttempts = attempts < 1 ? 1 : attempts;
+    if (_abiResolutionState != LauncherUpdateAbiResolutionState.resolving) {
+      _abiResolutionState = LauncherUpdateAbiResolutionState.resolving;
       notifyListeners();
     }
+
+    for (var attempt = 0; attempt < normalizedAttempts; attempt += 1) {
+      try {
+        final supportedAbis =
+            _normalizeSupportedAbis(await _launcherChannel.getSupportedAbis());
+        if (supportedAbis.isNotEmpty) {
+          final deviceChanged = !listEquals(_deviceAbis, supportedAbis);
+          final cacheChanged =
+              !listEquals(_lastKnownResolvedAbis, supportedAbis);
+          final stateChanged =
+              _abiResolutionState != LauncherUpdateAbiResolutionState.resolved;
+          _deviceAbis = supportedAbis;
+          _lastKnownResolvedAbis = supportedAbis;
+          _abiResolutionState = LauncherUpdateAbiResolutionState.resolved;
+          if (deviceChanged || cacheChanged || stateChanged) {
+            notifyListeners();
+          }
+          return;
+        }
+      } catch (_) {
+        // Retry below. Keep the last good ABI selection if we had one.
+      }
+      if (attempt + 1 < normalizedAttempts) {
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+      }
+    }
+
+    final fallbackAbis = _lastKnownResolvedAbis;
+    final deviceChanged = !listEquals(_deviceAbis, fallbackAbis);
+    final stateChanged =
+        _abiResolutionState != LauncherUpdateAbiResolutionState.degraded;
+    _deviceAbis = fallbackAbis;
+    _abiResolutionState = LauncherUpdateAbiResolutionState.degraded;
+    if (deviceChanged || stateChanged) {
+      notifyListeners();
+    }
+  }
+
+  List<String> _normalizeSupportedAbis(List<String> supportedAbis) {
+    final normalized = <String>[];
+    for (final abi in supportedAbis) {
+      final trimmed = abi.trim().toLowerCase();
+      if (trimmed.isEmpty || normalized.contains(trimmed)) {
+        continue;
+      }
+      normalized.add(trimmed);
+    }
+    return normalized;
   }
 
   Future<Directory> _getUpdateDirectory() async => Directory(

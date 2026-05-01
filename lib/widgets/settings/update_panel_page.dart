@@ -483,6 +483,10 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         color: _resolveOverviewChipColor(),
       ),
       SettingsStatusChip(
+        label: _resolveAbiChipLabel(localizations),
+        color: _resolveAbiChipColor(),
+      ),
+      SettingsStatusChip(
         label: installerLabel,
         color: permissionReady ? _statusOkColor : _statusNeedsActionColor,
       ),
@@ -668,6 +672,48 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     return localizations.launcherUpdateNotChecked;
   }
 
+  String _resolveAbiChipLabel(AppLocalizations localizations) {
+    if (_updateSession.abiResolutionPending) {
+      return localizations.launcherUpdateAbiResolving;
+    }
+    if (_updateSession.abiResolutionDegraded) {
+      return localizations.launcherUpdateAbiFallbackChip;
+    }
+    final deviceAbis = _updateSession.deviceAbis;
+    if (deviceAbis.isEmpty) {
+      return localizations.launcherUpdateAbiUnavailable;
+    }
+    return localizations.launcherUpdateAbiChip(deviceAbis.join(', '));
+  }
+
+  Color _resolveAbiChipColor() {
+    if (_updateSession.abiResolutionPending) {
+      return _statusInfoColor;
+    }
+    if (_updateSession.abiResolutionDegraded) {
+      return _statusNeedsActionColor;
+    }
+    return _statusOkColor;
+  }
+
+  String _resolveDeviceAbiSummary(AppLocalizations localizations) {
+    final deviceAbis = _updateSession.deviceAbis;
+    if (deviceAbis.isEmpty) {
+      return localizations.launcherUpdateAbiUnavailable;
+    }
+    return deviceAbis.join(', ');
+  }
+
+  String? _resolveAbiWarningMessage(AppLocalizations localizations) {
+    if (_updateSession.abiResolutionDegraded) {
+      return localizations.launcherUpdateAbiFallbackMessage;
+    }
+    if (_updateSession.abiResolutionPending) {
+      return localizations.launcherUpdateAbiResolving;
+    }
+    return null;
+  }
+
   String _resolveOverviewChipLabel(AppLocalizations localizations) {
     if (!_updateSession.hasCheckedOfficialRelease) {
       return localizations.launcherUpdateNotChecked;
@@ -802,6 +848,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       asset: _updateSession.latestReleaseAsset,
       installedVersionLabel: _installedVersionLabel,
       permissionReady: permissionReady,
+      deviceAbiSummary: _resolveDeviceAbiSummary(localizations),
+      abiWarningMessage: _resolveAbiWarningMessage(localizations),
     );
   }
 }
@@ -811,12 +859,16 @@ class _ReleaseDetailsCard extends StatelessWidget {
   final LauncherUpdateAsset? asset;
   final String installedVersionLabel;
   final bool permissionReady;
+  final String deviceAbiSummary;
+  final String? abiWarningMessage;
 
   const _ReleaseDetailsCard({
     required this.release,
     required this.asset,
     required this.installedVersionLabel,
     required this.permissionReady,
+    required this.deviceAbiSummary,
+    required this.abiWarningMessage,
   });
 
   @override
@@ -896,6 +948,10 @@ class _ReleaseDetailsCard extends StatelessWidget {
               label: localizations.launcherUpdateUploadedAt,
               value: _formatUpdateDateTime(context, uploadedAt),
             ),
+            _ReleaseMetaChip(
+              label: localizations.launcherUpdateDeviceAbiLabel,
+              value: deviceAbiSummary,
+            ),
             if (selectedAsset != null)
               _ReleaseMetaChip(
                 label: localizations.launcherUpdateSizeLabel,
@@ -915,6 +971,16 @@ class _ReleaseDetailsCard extends StatelessWidget {
               ? localizations.launcherUpdateNoApkAsset
               : '${selectedAsset.name} | ${formatUpdateFileSize(selectedAsset.sizeBytes)}',
         ),
+        if ((abiWarningMessage ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            abiWarningMessage!,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: const Color(0xFFFFD17A)),
+          ),
+        ],
         if (release.body.trim().isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
