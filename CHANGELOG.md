@@ -11,14 +11,14 @@ Các thay đổi dưới đây mô tả riêng bản fork hiện tại, không l
 
 ### Updater
 
-- S?a lu?ng `Check latest official release` d? luon ch?n dung official release m?i nh?t thay vi bi k?t ? release cu
-- Them `no-cache` cho GitHub releases request d? giam kha nang nh?n d? li?u cache cu tren TV
-- Neu l?n ki?m tra release m?i bi l?i, panel `Cap nhat` se xoa stale release details thay vi gi? thong tin c?a l?n check tru?c
+- Fixed `Check latest official release` so the launcher always picks the newest official GitHub release instead of getting stuck on an older one
+- Added `no-cache` handling for GitHub release requests to reduce stale release responses on TV devices
+- When a fresh release check fails, the `Update` panel now clears stale release details instead of leaving the previous successful result on screen
 
 ### Verification
 
-- B? sung test cho sorting official release m?i nh?t khi danh sach tra v? khong nh?t quan
-- B? sung regression test cho case re-check th?t b?i d? dam bao UI khong con hi?n release cu
+- Added coverage for latest-official-release sorting when GitHub returns releases in an unexpected order
+- Added a regression test for failed re-checks so the UI does not keep showing an outdated release card
 
 ## 2026-05-01 - Official updater + local ADB grant polish
 
