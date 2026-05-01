@@ -223,7 +223,7 @@ class SettingsChoiceCard<T> extends StatefulWidget {
   final T value;
   final List<SettingsChoiceOption<T>> options;
   final String Function(T value) valueLabelBuilder;
-  final ValueChanged<T> onChanged;
+  final ValueChanged<T>? onChanged;
   final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
 
   const SettingsChoiceCard({
@@ -301,6 +301,7 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
           onKeyEvent: (_, event) => _handleContainerKeyEvent(event),
           child: Focus(
             focusNode: _rowFocusNode,
+            canRequestFocus: widget.onChanged != null,
             onFocusChange: _handleRowFocusChange,
             child: SettingsFocusFrame(
               key: widget.selectorKey,
@@ -308,7 +309,8 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
               focused: _hasFocus,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 120),
-                opacity: _hasFocus ? 1 : 0.96,
+                opacity:
+                    widget.onChanged == null ? 0.46 : (_hasFocus ? 1 : 0.96),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -317,7 +319,9 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                       children: [
                         Icon(
                           widget.icon,
-                          color: _hasFocus ? Colors.white : Colors.white70,
+                          color: widget.onChanged == null
+                              ? Colors.white38
+                              : (_hasFocus ? Colors.white : Colors.white70),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -330,6 +334,9 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                                     .textTheme
                                     .bodyLarge
                                     ?.copyWith(
+                                      color: widget.onChanged == null
+                                          ? Colors.white38
+                                          : Colors.white,
                                       fontWeight: _hasFocus
                                           ? FontWeight.w600
                                           : FontWeight.w500,
@@ -341,7 +348,11 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
-                                    ?.copyWith(color: Colors.white70),
+                                    ?.copyWith(
+                                      color: widget.onChanged == null
+                                          ? Colors.white38
+                                          : Colors.white70,
+                                    ),
                               ),
                             ],
                           ),
@@ -351,9 +362,11 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                           widget.valueLabelBuilder(widget.value),
                           style:
                               Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: _hasFocus
-                                        ? Colors.white
-                                        : Colors.white.withOpacity(0.92),
+                                    color: widget.onChanged == null
+                                        ? Colors.white38
+                                        : (_hasFocus
+                                            ? Colors.white
+                                            : Colors.white.withOpacity(0.92)),
                                     fontWeight: FontWeight.w700,
                                   ),
                         ),
@@ -373,7 +386,10 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                               final button = SettingsControlButton(
                                 focusNode: _optionFocusNodes[index],
                                 selected: option.value == widget.value,
-                                onPressed: () => widget.onChanged(option.value),
+                                enabled: widget.onChanged != null,
+                                onPressed: widget.onChanged == null
+                                    ? null
+                                    : () => widget.onChanged!(option.value),
                                 onFocused: _ensureRowVisible,
                                 onMovePreviousOnLeft: index > 0
                                     ? () => _optionFocusNodes[index - 1]
@@ -450,7 +466,7 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
   }
 
   void _handleRowFocusChange(bool hasFocus) {
-    if (!hasFocus) {
+    if (!hasFocus || widget.onChanged == null) {
       return;
     }
     if (_skipAutoEnterOnNextRowFocus) {
@@ -473,7 +489,7 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
   }
 
   void _focusSelectedOption() {
-    if (_optionFocusNodes.isEmpty) {
+    if (widget.onChanged == null || _optionFocusNodes.isEmpty) {
       return;
     }
     final selectedIndex = widget.options.indexWhere(
@@ -612,6 +628,7 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
         onKeyEvent: (_, event) => _handleContainerKeyEvent(event),
         child: Focus(
           focusNode: _rowFocusNode,
+          canRequestFocus: widget.onChanged != null,
           onFocusChange: _handleRowFocusChange,
           child: SettingsFocusFrame(
             key: widget.selectorKey,
@@ -619,7 +636,7 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
             focused: _hasFocus,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 120),
-              opacity: _hasFocus ? 1 : 0.96,
+              opacity: widget.onChanged == null ? 0.46 : (_hasFocus ? 1 : 0.96),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -628,7 +645,9 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                     children: [
                       Icon(
                         widget.icon,
-                        color: _hasFocus ? Colors.white : Colors.white70,
+                        color: widget.onChanged == null
+                            ? Colors.white38
+                            : (_hasFocus ? Colors.white : Colors.white70),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -641,6 +660,9 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                                   .textTheme
                                   .bodyLarge
                                   ?.copyWith(
+                                    color: widget.onChanged == null
+                                        ? Colors.white38
+                                        : Colors.white,
                                     fontWeight: _hasFocus
                                         ? FontWeight.w600
                                         : FontWeight.w500,
@@ -652,7 +674,11 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
-                                  ?.copyWith(color: Colors.white70),
+                                  ?.copyWith(
+                                    color: widget.onChanged == null
+                                        ? Colors.white38
+                                        : Colors.white70,
+                                  ),
                             ),
                           ],
                         ),
@@ -662,9 +688,11 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                         widget.valueLabelBuilder(widget.value),
                         style:
                             Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: _hasFocus
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(0.92),
+                                  color: widget.onChanged == null
+                                      ? Colors.white38
+                                      : (_hasFocus
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.92)),
                                   fontWeight: FontWeight.w700,
                                 ),
                       ),
@@ -779,7 +807,7 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
   }
 
   void _handleRowFocusChange(bool hasFocus) {
-    if (!hasFocus) {
+    if (!hasFocus || widget.onChanged == null) {
       return;
     }
     if (_skipAutoEnterOnNextRowFocus) {
@@ -802,6 +830,9 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
   }
 
   void _focusActiveAction() {
+    if (widget.onChanged == null) {
+      return;
+    }
     if (widget.value > widget.minimum) {
       _decreaseFocusNode.requestFocus();
       return;

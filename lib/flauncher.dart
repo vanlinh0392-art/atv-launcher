@@ -148,8 +148,31 @@ class _WallpaperLayer extends StatelessWidget {
   }
 }
 
-class _HomeContent extends StatelessWidget {
+class _HomeContent extends StatefulWidget {
   const _HomeContent();
+
+  @override
+  State<_HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<_HomeContent> {
+  String? _lastScheduledHomeUsableKey;
+  String? _pendingHomeUsableKey;
+
+  void _scheduleHomeUsableSignal(BuildContext context, String key) {
+    if (_lastScheduledHomeUsableKey == key || _pendingHomeUsableKey == key) {
+      return;
+    }
+    _pendingHomeUsableKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pendingHomeUsableKey != key) {
+        return;
+      }
+      _pendingHomeUsableKey = null;
+      _lastScheduledHomeUsableKey = key;
+      context.read<WallpaperService>().notifyHomeVisibleAndUsable();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,6 +207,9 @@ class _HomeContent extends StatelessWidget {
         reason: map['reason']?.toString() ?? '',
       );
     });
+    final launcherVisible = context.select<LauncherState, bool>(
+      (state) => state.launcherVisible,
+    );
 
     return Selector2<AppsService, ProfileSecurityService?,
         _HomeSectionsSnapshot>(
@@ -210,6 +236,13 @@ class _HomeContent extends StatelessWidget {
       builder: (context, homeSections, _) {
         if (!homeSections.initialized) {
           return const _HomeLoadingState();
+        }
+
+        if (launcherVisible) {
+          _scheduleHomeUsableSignal(
+            context,
+            '${homeSections.signature}|${navigation.homeSequence}',
+          );
         }
 
         return LayoutBuilder(

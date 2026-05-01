@@ -36,6 +36,7 @@ void main() {
     final searchService = await _createSearchService(channel);
 
     when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
     when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
     when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
     when(wallpaperService.wallpaperMode).thenReturn('gradient');
@@ -107,6 +108,7 @@ void main() {
     final channel = MockFLauncherChannel();
 
     when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
     when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
     when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
     when(wallpaperService.wallpaperMode).thenReturn('gradient');
@@ -219,6 +221,7 @@ void main() {
     };
 
     when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
     when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
     when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
     when(wallpaperService.wallpaperMode).thenReturn('gradient');
@@ -312,6 +315,7 @@ void main() {
     final searchService = await _createSearchService(channel);
 
     when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
     when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
     when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
     when(wallpaperService.wallpaperMode).thenReturn('gradient');
@@ -404,6 +408,7 @@ void _stubWallpaperService(MockWallpaperService wallpaperService) {
   when(wallpaperService.wallpaper).thenReturn(null);
   when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
   when(wallpaperService.isVideoMode).thenReturn(false);
+  when(wallpaperService.videoBlockedByPerformanceMode).thenReturn(false);
   when(wallpaperService.videoTextureId).thenReturn(null);
   when(wallpaperService.videoFit).thenReturn('center-crop');
   when(wallpaperService.videoBlur).thenReturn('off');

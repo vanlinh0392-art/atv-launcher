@@ -21,6 +21,7 @@ import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flutter/material.dart';
@@ -167,6 +168,8 @@ class _FLauncherAppState extends State<FLauncherApp>
           !benchmark.bypassSettingsSecurity) {
         return;
       }
+      final wallpaperService = rootContext.read<WallpaperService>();
+      wallpaperService.cancelPendingHomeVideoStart();
       Future<void>.microtask(() {
         if (!mounted) {
           return;
@@ -181,7 +184,12 @@ class _FLauncherAppState extends State<FLauncherApp>
             autoFocusDetailOnOpen: benchmark.autoFocusDetail,
             benchmarkSessionId: benchmark.sessionId,
           ),
-        );
+        ).whenComplete(() {
+          if (!mounted || !rootContext.mounted) {
+            return;
+          }
+          wallpaperService.notifyHomeVisibleAndUsable();
+        });
       });
     });
   }

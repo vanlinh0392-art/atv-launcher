@@ -131,9 +131,10 @@ public class MainActivity extends FlutterActivity {
             "com.google.android.tv.settings.MainSettings";
     private static final String AOSP_SETTINGS_PACKAGE = "com.android.settings";
     private static final String AOSP_SETTINGS_ACTIVITY = "com.android.settings.Settings";
-    private static final long SYSTEM_EVENT_INTERVAL_MS = 3000L;
+    private static final long SYSTEM_EVENT_INTERVAL_MS = 8000L;
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
-    private static final long APPLICATIONS_CACHE_TTL_MS = 20_000L;
+    private static final long APPLICATIONS_CACHE_TTL_MS = 60_000L;
+    private static final long LITE_STATUS_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
     private static final int MAX_IMAGE_CACHE_ENTRIES = 128;
     private static final int MAX_IMAGE_CACHE_BYTES = 16 * 1024 * 1024;
     private static final int MAX_BANNER_WIDTH = 640;
@@ -156,8 +157,10 @@ public class MainActivity extends FlutterActivity {
 
     private static final Object FLUTTER_ENGINE_LOCK = new Object();
     private static final Object APPLICATIONS_CACHE_LOCK = new Object();
+    private static final Object LITE_STATUS_CACHE_LOCK = new Object();
     private static final Handler SHARED_SYSTEM_EVENT_HANDLER = new Handler(Looper.getMainLooper());
     private static final ExecutorService BACKGROUND_METHOD_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final ExecutorService APPLICATIONS_QUERY_EXECUTOR = Executors.newFixedThreadPool(4);
     private static final LinkedHashMap<String, byte[]> APP_IMAGE_CACHE = new LinkedHashMap<>(16, 0.75f, true);
     private static FlutterEngine sharedFlutterEngine;
     private static EventChannel.EventSink sharedSystemEventSink;
@@ -167,6 +170,14 @@ public class MainActivity extends FlutterActivity {
     private static boolean sharedDartStarted;
     private static List<Map<String, Serializable>> cachedApplications;
     private static long cachedApplicationsAtElapsedMs;
+    private static Map<String, Object> cachedLiteAdbAutomationStatus;
+    private static long cachedLiteAdbAutomationAtElapsedMs;
+    private static Map<String, Object> cachedLiteHomeGuardStatus;
+    private static long cachedLiteHomeGuardAtElapsedMs;
+    private static Map<String, Object> cachedLiteProvisioningSummary;
+    private static long cachedLiteProvisioningSummaryAtElapsedMs;
+    private static Map<String, Object> cachedLiteMemoryStatus;
+    private static long cachedLiteMemoryStatusAtElapsedMs;
     private static int appImageCacheBytes = 0;
     private static long homeNavigationSequence;
     private static String lastNavigationReason = "";
@@ -189,7 +200,7 @@ public class MainActivity extends FlutterActivity {
             }
             MainActivity activity = activeActivity;
             if (activity != null) {
-                sharedSystemEventSink.success(activity.buildSystemBridgeStatusLite());
+                sharedSystemEventSink.success(activity.buildSystemBridgeStatusLite(true));
             }
             SHARED_SYSTEM_EVENT_HANDLER.postDelayed(this, SYSTEM_EVENT_INTERVAL_MS);
         }
@@ -535,9 +546,8 @@ public class MainActivity extends FlutterActivity {
             return cached;
         }
 
-        ExecutorService executor = Executors.newFixedThreadPool(4);
         CompletionService<Pair<Boolean, List<ResolveInfo>>> queryIntentActivitiesCompletionService =
-                new ExecutorCompletionService<>(executor);
+                new ExecutorCompletionService<>(APPLICATIONS_QUERY_EXECUTOR);
         queryIntentActivitiesCompletionService.submit(() ->
                 Pair.create(false, queryIntentActivities(false)));
         queryIntentActivitiesCompletionService.submit(() ->
@@ -560,13 +570,16 @@ public class MainActivity extends FlutterActivity {
             }
         }
 
-        CompletionService<Map<String, Serializable>> completionService = new ExecutorCompletionService<>(executor);
+        CompletionService<Map<String, Serializable>> completionService =
+                new ExecutorCompletionService<>(APPLICATIONS_QUERY_EXECUTOR);
         List<Map<String, Serializable>> applications = new ArrayList<>(
                 tvActivitiesInfo.size() + nonTvActivitiesInfo.size());
 
         boolean settingsPresent = false;
+        Set<String> tvPackageNames = new LinkedHashSet<>();
         int appCount = 0;
         for (ResolveInfo tvActivityInfo : tvActivitiesInfo) {
+            tvPackageNames.add(tvActivityInfo.activityInfo.packageName);
             if (!settingsPresent) {
                 settingsPresent = tvActivityInfo.activityInfo.packageName.equals("com.android.tv.settings");
             }
@@ -575,17 +588,10 @@ public class MainActivity extends FlutterActivity {
         }
 
         for (ResolveInfo nonTvActivityInfo : nonTvActivitiesInfo) {
-            boolean nonDuplicate = true;
             if (!settingsPresent) {
                 settingsPresent = nonTvActivityInfo.activityInfo.packageName.equals("com.android.settings");
             }
-            for (ResolveInfo tvActivityInfo : tvActivitiesInfo) {
-                if (tvActivityInfo.activityInfo.packageName.equals(nonTvActivityInfo.activityInfo.packageName)) {
-                    nonDuplicate = false;
-                    break;
-                }
-            }
-            if (nonDuplicate) {
+            if (!tvPackageNames.contains(nonTvActivityInfo.activityInfo.packageName)) {
                 appCount += 1;
                 completionService.submit(() -> buildAppMap(nonTvActivityInfo.activityInfo, true, null));
             }
@@ -600,8 +606,6 @@ public class MainActivity extends FlutterActivity {
                 appCount -= 1;
             }
         }
-
-        executor.shutdown();
 
         if (!settingsPresent) {
             PackageManager packageManager = getPackageManager();
@@ -906,6 +910,10 @@ public class MainActivity extends FlutterActivity {
     }
 
     private Map<String, Object> buildSystemBridgeStatusLite() {
+        return buildSystemBridgeStatusLite(false);
+    }
+
+    private Map<String, Object> buildSystemBridgeStatusLite(boolean preferPeriodicCaches) {
         long startedAt = System.nanoTime();
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("snapshotKind", "lite");
@@ -915,8 +923,8 @@ public class MainActivity extends FlutterActivity {
         }
         map.put("voice", buildVoiceStatus());
         map.put("systemCore", buildSystemCoreStatus());
-        map.put("adbAutomation", SystemBridgeCoordinator.buildAdbAutomationStatus(this));
-        map.put("homeGuard", SystemBridgeCoordinator.buildHomeGuardStatus(this));
+        map.put("adbAutomation", buildLiteAdbAutomationStatus(preferPeriodicCaches));
+        map.put("homeGuard", buildLiteHomeGuardStatus(preferPeriodicCaches));
         map.put("density", DensityBridge.getStatus(this));
         map.put("privateDns", PrivateDnsController.getStatus(this));
         map.put(
@@ -925,9 +933,9 @@ public class MainActivity extends FlutterActivity {
                         ? sharedVideoWallpaperController.getStatus()
                         : new LinkedHashMap<>()
         );
-        map.put("provisioning", buildProvisioningSummary());
+        map.put("provisioning", buildLiteProvisioningSummary(preferPeriodicCaches));
         map.put("updates", buildUpdateStatus());
-        map.put("memory", buildMemoryStatus());
+        map.put("memory", buildLiteMemoryStatus(preferPeriodicCaches));
         map.put("fileAccess", VideoLibraryController.getFileAccessStatus(this));
         map.put("backup", buildBackupStatus());
         if (!firstLiteBridgeStatusLogged) {
@@ -939,7 +947,7 @@ public class MainActivity extends FlutterActivity {
 
     private Map<String, Object> buildSystemBridgeStatus() {
         long startedAt = System.nanoTime();
-        Map<String, Object> map = buildSystemBridgeStatusLite();
+        Map<String, Object> map = buildSystemBridgeStatusLite(false);
         map.put("snapshotKind", "full");
         map.put("provisioning", buildProvisioningChecklist());
         map.put("diagnosticsReport", SystemBridgeCoordinator.buildStatusReport(this));
@@ -948,6 +956,79 @@ public class MainActivity extends FlutterActivity {
             logPerf("time_to_full_bridge_status", startedAt);
         }
         return map;
+    }
+
+    private Map<String, Object> buildLiteAdbAutomationStatus(boolean preferPeriodicCaches) {
+        if (!preferPeriodicCaches) {
+            return SystemBridgeCoordinator.buildAdbAutomationStatus(this);
+        }
+        synchronized (LITE_STATUS_CACHE_LOCK) {
+            long now = SystemClock.elapsedRealtime();
+            if (cachedLiteAdbAutomationStatus == null
+                    || now - cachedLiteAdbAutomationAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                cachedLiteAdbAutomationStatus = SystemBridgeCoordinator.buildAdbAutomationStatus(this);
+                cachedLiteAdbAutomationAtElapsedMs = now;
+            }
+            return new LinkedHashMap<>(cachedLiteAdbAutomationStatus);
+        }
+    }
+
+    private Map<String, Object> buildLiteHomeGuardStatus(boolean preferPeriodicCaches) {
+        if (!preferPeriodicCaches) {
+            return SystemBridgeCoordinator.buildHomeGuardStatus(this);
+        }
+        synchronized (LITE_STATUS_CACHE_LOCK) {
+            long now = SystemClock.elapsedRealtime();
+            if (cachedLiteHomeGuardStatus == null
+                    || now - cachedLiteHomeGuardAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                cachedLiteHomeGuardStatus = SystemBridgeCoordinator.buildHomeGuardStatus(this);
+                cachedLiteHomeGuardAtElapsedMs = now;
+            }
+            return new LinkedHashMap<>(cachedLiteHomeGuardStatus);
+        }
+    }
+
+    private Map<String, Object> buildLiteProvisioningSummary(boolean preferPeriodicCaches) {
+        if (!preferPeriodicCaches) {
+            return buildProvisioningSummary();
+        }
+        synchronized (LITE_STATUS_CACHE_LOCK) {
+            long now = SystemClock.elapsedRealtime();
+            if (cachedLiteProvisioningSummary == null
+                    || now - cachedLiteProvisioningSummaryAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                cachedLiteProvisioningSummary = buildProvisioningSummary();
+                cachedLiteProvisioningSummaryAtElapsedMs = now;
+            }
+            return new LinkedHashMap<>(cachedLiteProvisioningSummary);
+        }
+    }
+
+    private Map<String, Object> buildLiteMemoryStatus(boolean preferPeriodicCaches) {
+        if (!preferPeriodicCaches) {
+            return buildMemoryStatus();
+        }
+        synchronized (LITE_STATUS_CACHE_LOCK) {
+            long now = SystemClock.elapsedRealtime();
+            if (cachedLiteMemoryStatus == null
+                    || now - cachedLiteMemoryStatusAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                cachedLiteMemoryStatus = buildMemoryStatus();
+                cachedLiteMemoryStatusAtElapsedMs = now;
+            }
+            return new LinkedHashMap<>(cachedLiteMemoryStatus);
+        }
+    }
+
+    private void invalidateLiteStatusCaches() {
+        synchronized (LITE_STATUS_CACHE_LOCK) {
+            cachedLiteAdbAutomationStatus = null;
+            cachedLiteAdbAutomationAtElapsedMs = 0L;
+            cachedLiteHomeGuardStatus = null;
+            cachedLiteHomeGuardAtElapsedMs = 0L;
+            cachedLiteProvisioningSummary = null;
+            cachedLiteProvisioningSummaryAtElapsedMs = 0L;
+            cachedLiteMemoryStatus = null;
+            cachedLiteMemoryStatusAtElapsedMs = 0L;
+        }
     }
 
     private Map<String, Object> buildVoiceStatus() {
@@ -1719,7 +1800,7 @@ public class MainActivity extends FlutterActivity {
         if (sharedVideoWallpaperController != null) {
             sharedVideoWallpaperController.onWallpaperModeChanged();
         }
-        emitSystemSnapshot();
+        emitWallpaperStatusDelta();
         return sharedVideoWallpaperController != null
                 ? sharedVideoWallpaperController.getStatus()
                 : new LinkedHashMap<>();
@@ -1742,68 +1823,149 @@ public class MainActivity extends FlutterActivity {
         Integer dimPercent = call.argument("dimPercent");
         String blur = call.argument("blur");
         Boolean autoResume = call.argument("autoResume");
+        Boolean videoAllowedByPerformanceMode = call.argument("videoAllowedByPerformanceMode");
+        Boolean disableAudioRendererWhenMuted = call.argument("disableAudioRendererWhenMuted");
+        Boolean deferForegroundResume = call.argument("deferForegroundResume");
+        boolean topologyChanged = false;
+        boolean playerPolicyChanged = false;
+        boolean presentationChanged = false;
+        boolean lifecyclePolicyChanged = false;
 
         if (!TextUtils.isEmpty(sourceType)) {
+            topologyChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoSourceType(this),
+                    sourceType
+            );
             BridgeStateStore.setWallpaperVideoSourceType(this, sourceType);
         }
         if (assetUris != null) {
-            BridgeStateStore.setWallpaperVideoAssetUris(this, assetUris);
-            if (!assetUris.isEmpty() && TextUtils.isEmpty(BridgeStateStore.getWallpaperPreviewPath(this))) {
+            List<String> nextAssetUris = new ArrayList<>(assetUris);
+            topologyChanged |= !BridgeStateStore.getWallpaperVideoAssetUris(this).equals(nextAssetUris);
+            BridgeStateStore.setWallpaperVideoAssetUris(this, nextAssetUris);
+            if (!nextAssetUris.isEmpty() && TextUtils.isEmpty(BridgeStateStore.getWallpaperPreviewPath(this))) {
                 try {
                     BridgeStateStore.setWallpaperPreviewPath(
                             this,
-                            createWallpaperPreview(Uri.parse(assetUris.get(0)), "video")
+                            createWallpaperPreview(Uri.parse(nextAssetUris.get(0)), "video")
                     );
                 } catch (Exception ignored) {
                 }
             }
         }
         if (folderUri != null) {
+            topologyChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoFolderUri(this),
+                    folderUri
+            );
             BridgeStateStore.setWallpaperVideoFolderUri(this, folderUri);
         }
         if (folderBucketId != null) {
+            topologyChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoFolderBucketId(this),
+                    folderBucketId
+            );
             BridgeStateStore.setWallpaperVideoFolderBucketId(this, folderBucketId);
         }
         if (folderName != null) {
+            topologyChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoFolderName(this),
+                    folderName
+            );
             BridgeStateStore.setWallpaperVideoFolderName(this, folderName);
         }
         if (!TextUtils.isEmpty(orderMode)) {
+            topologyChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoOrderMode(this),
+                    orderMode
+            );
             BridgeStateStore.setWallpaperVideoOrderMode(this, orderMode);
         }
         if (!TextUtils.isEmpty(advanceMode)) {
+            topologyChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoAdvanceMode(this),
+                    advanceMode
+            );
             BridgeStateStore.setWallpaperVideoAdvanceMode(this, advanceMode);
         }
         if (switchIntervalSeconds != null) {
-            BridgeStateStore.setWallpaperVideoSwitchIntervalSeconds(this, switchIntervalSeconds);
+            int nextSwitchIntervalSeconds = Math.max(5, switchIntervalSeconds);
+            playerPolicyChanged |= BridgeStateStore.getWallpaperVideoSwitchIntervalSeconds(this)
+                    != nextSwitchIntervalSeconds;
+            BridgeStateStore.setWallpaperVideoSwitchIntervalSeconds(this, nextSwitchIntervalSeconds);
         }
         if (repeatCountPerItem != null) {
-            BridgeStateStore.setWallpaperVideoRepeatCountPerItem(this, repeatCountPerItem);
+            int nextRepeatCountPerItem = Math.max(1, repeatCountPerItem);
+            topologyChanged |= BridgeStateStore.getWallpaperVideoRepeatCountPerItem(this)
+                    != nextRepeatCountPerItem;
+            BridgeStateStore.setWallpaperVideoRepeatCountPerItem(this, nextRepeatCountPerItem);
         }
         if (playlistLoop != null) {
+            playerPolicyChanged |= BridgeStateStore.isWallpaperVideoPlaylistLoopEnabled(this)
+                    != playlistLoop;
             BridgeStateStore.setWallpaperVideoPlaylistLoopEnabled(this, playlistLoop);
         }
         if (loop != null) {
+            playerPolicyChanged |= BridgeStateStore.isWallpaperVideoLoopEnabled(this) != loop;
             BridgeStateStore.setWallpaperVideoLoopEnabled(this, loop);
         }
         if (mute != null) {
+            presentationChanged |= BridgeStateStore.isWallpaperVideoMuted(this) != mute;
             BridgeStateStore.setWallpaperVideoMuted(this, mute);
         }
         if (!TextUtils.isEmpty(fit)) {
+            presentationChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoFit(this),
+                    fit
+            );
             BridgeStateStore.setWallpaperVideoFit(this, fit);
         }
         if (dimPercent != null) {
-            BridgeStateStore.setWallpaperVideoDimPercent(this, Math.max(0, Math.min(100, dimPercent)));
+            int nextDimPercent = Math.max(0, Math.min(100, dimPercent));
+            presentationChanged |= BridgeStateStore.getWallpaperVideoDimPercent(this) != nextDimPercent;
+            BridgeStateStore.setWallpaperVideoDimPercent(this, nextDimPercent);
         }
         if (!TextUtils.isEmpty(blur)) {
+            presentationChanged |= !TextUtils.equals(
+                    BridgeStateStore.getWallpaperVideoBlur(this),
+                    blur
+            );
             BridgeStateStore.setWallpaperVideoBlur(this, blur);
         }
         if (autoResume != null) {
+            playerPolicyChanged |= BridgeStateStore.isWallpaperVideoAutoResumeEnabled(this) != autoResume;
             BridgeStateStore.setWallpaperVideoAutoResumeEnabled(this, autoResume);
         }
         if (sharedVideoWallpaperController != null) {
-            sharedVideoWallpaperController.onVideoConfigChanged();
+            if (videoAllowedByPerformanceMode != null) {
+                lifecyclePolicyChanged |= sharedVideoWallpaperController
+                        .setVideoAllowedByPerformanceMode(videoAllowedByPerformanceMode);
+            }
+            if (disableAudioRendererWhenMuted != null) {
+                presentationChanged |= sharedVideoWallpaperController
+                        .setDisableAudioRendererWhenMuted(disableAudioRendererWhenMuted);
+            }
+            if (deferForegroundResume != null) {
+                lifecyclePolicyChanged =
+                        sharedVideoWallpaperController.setDeferForegroundResume(deferForegroundResume)
+                                || lifecyclePolicyChanged;
+            }
+            if (topologyChanged) {
+                sharedVideoWallpaperController.onVideoPlaylistTopologyChanged();
+            } else {
+                if (playerPolicyChanged) {
+                    sharedVideoWallpaperController.onVideoPlayerPolicyChanged();
+                }
+                if (presentationChanged) {
+                    sharedVideoWallpaperController.onVideoPresentationChanged();
+                }
+            }
         }
-        emitSystemSnapshot();
+        if (topologyChanged
+                || playerPolicyChanged
+                || presentationChanged
+                || lifecyclePolicyChanged) {
+            emitWallpaperStatusDelta();
+        }
         return sharedVideoWallpaperController != null
                 ? sharedVideoWallpaperController.getStatus()
                 : new LinkedHashMap<>();
@@ -1815,6 +1977,7 @@ public class MainActivity extends FlutterActivity {
         if (sharedVideoWallpaperController != null) {
             sharedVideoWallpaperController.setPlaybackSuppressed(suppressed, reason);
         }
+        emitWallpaperStatusDelta();
         return sharedVideoWallpaperController != null
                 ? sharedVideoWallpaperController.getStatus()
                 : new LinkedHashMap<>();
@@ -1851,7 +2014,7 @@ public class MainActivity extends FlutterActivity {
             map.put("mimeType", mimeType == null ? "" : mimeType);
             map.put("displayName", queryDisplayName(uri));
             map.put("previewPath", previewPath);
-            emitSystemSnapshot();
+            emitWallpaperStatusDelta();
             result.success(map);
         } catch (Exception exception) {
             result.error("picker_failed", exception.toString(), null);
@@ -1897,7 +2060,10 @@ public class MainActivity extends FlutterActivity {
             map.put("uris", uriStrings);
             map.put("primaryUri", uriStrings.get(0));
             map.put("previewPath", previewPath);
-            emitSystemSnapshot();
+            if (sharedVideoWallpaperController != null) {
+                sharedVideoWallpaperController.onVideoPlaylistTopologyChanged();
+            }
+            emitWallpaperStatusDelta();
             result.success(map);
         } catch (Exception exception) {
             result.error("picker_failed", exception.toString(), null);
@@ -1946,7 +2112,10 @@ public class MainActivity extends FlutterActivity {
             Map<String, Object> map = new LinkedHashMap<>(folder);
             map.put("cancelled", false);
             map.put("previewPath", previewPath);
-            emitSystemSnapshot();
+            if (sharedVideoWallpaperController != null) {
+                sharedVideoWallpaperController.onVideoPlaylistTopologyChanged();
+            }
+            emitWallpaperStatusDelta();
             result.success(map);
         } catch (Exception exception) {
             result.error("picker_failed", exception.toString(), null);
@@ -2737,13 +2906,14 @@ public class MainActivity extends FlutterActivity {
         if (sharedSystemEventSink == null) {
             return;
         }
+        invalidateLiteStatusCaches();
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            sharedSystemEventSink.success(buildSystemBridgeStatusLite());
+            sharedSystemEventSink.success(buildSystemBridgeStatusLite(false));
             return;
         }
         SHARED_SYSTEM_EVENT_HANDLER.post(() -> {
             if (sharedSystemEventSink != null) {
-                sharedSystemEventSink.success(buildSystemBridgeStatusLite());
+                sharedSystemEventSink.success(buildSystemBridgeStatusLite(false));
             }
         });
     }

@@ -38,6 +38,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'cache.test.first.invalidation',
       name: 'Cache Test',
@@ -88,6 +89,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.commit',
       name: 'Move Mode',
@@ -141,6 +143,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.remote.longpress.menu',
       name: 'Remote Long Press Menu',
@@ -194,6 +197,7 @@ void main() {
   testWidgets('escape cancels move mode session', (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.cancel',
       name: 'Cancel Move',
@@ -253,6 +257,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.armed',
       name: 'Armed Move',
@@ -310,6 +315,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.longpress.armed',
       name: 'Armed Long Press',
@@ -367,6 +373,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.remote.longpress.armed',
       name: 'Remote Armed Long Press',
@@ -431,6 +438,7 @@ void main() {
       (tester) async {
     final settingsService = await _createSettingsService();
     final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
     final application = fakeApp(
       packageName: 'move.mode.repeat.direction',
       name: 'Repeat Direction',
@@ -510,4 +518,8 @@ void main() {
 Future<SettingsService> _createSettingsService() async {
   SharedPreferences.setMockInitialValues(const <String, Object>{});
   return SettingsService(await SharedPreferences.getInstance());
+}
+
+void _stubAppsServiceDefaults(MockAppsService appsService) {
+  when(appsService.homeReorderModeEnabled).thenReturn(false);
 }

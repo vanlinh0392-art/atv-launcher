@@ -702,6 +702,13 @@
     "grantVideoLibraryAccessHint": "Hãy cấp quyền thư viện video nếu bạn muốn duyệt trực tiếp bộ nhớ TV mà không cần app quản lý tệp riêng.",
     "grantAccess": "Cấp quyền",
     "sourceSelectionTitle": "Chọn nguồn",
+    "videoWallpaperDisabledByPerformanceModeTitle": "Video hình nền bị tắt trong chế độ Tắt hiệu ứng",
+    "videoWallpaperDisabledByPerformanceModeMessage": "{mode} sẽ chặn video hình nền để giảm tải CPU và codec cho TV/box yếu. Hãy chuyển lại Cân bằng hoặc Mượt để tự khôi phục nguồn video đã lưu, hoặc tự chọn lại video thủ công sau khi chuyển sang Đẹp.",
+    "@videoWallpaperDisabledByPerformanceModeMessage": {
+        "placeholders": {
+            "mode": {}
+        }
+    },
     "singleVideo": "Một video",
     "pickMultipleVideos": "Chọn nhiều video",
     "pickFolder": "Chọn thư mục",

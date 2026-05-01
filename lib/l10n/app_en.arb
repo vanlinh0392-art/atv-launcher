@@ -613,6 +613,13 @@
     "grantVideoLibraryAccessHint": "Grant video library access if you want to browse TV storage directly without a separate file manager app.",
     "grantAccess": "Grant access",
     "sourceSelectionTitle": "Source selection",
+    "videoWallpaperDisabledByPerformanceModeTitle": "Video wallpaper is disabled in Effects off mode",
+    "videoWallpaperDisabledByPerformanceModeMessage": "{mode} turns off video wallpaper to reduce CPU and codec load on weaker devices. Switch back to Balanced or Smooth to restore the saved video source automatically, or pick a video again manually after moving to Quality.",
+    "@videoWallpaperDisabledByPerformanceModeMessage": {
+        "placeholders": {
+            "mode": {}
+        }
+    },
     "singleVideo": "Single video",
     "pickMultipleVideos": "Pick multiple videos",
     "pickFolder": "Pick folder",

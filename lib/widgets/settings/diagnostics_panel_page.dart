@@ -34,97 +34,96 @@ class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
+    final bridgeService = context.read<SystemBridgeService>();
+    final report = context.select<SystemBridgeService, String>(
+      (service) => service.diagnosticsReport,
+    );
+    final adbStatus = context.select<SystemBridgeService, Map<String, dynamic>>(
+      (service) => service.adbAutomationStatus,
+    );
+    final systemCoreStatus =
+        context.select<SystemBridgeService, Map<String, dynamic>>(
+      (service) => service.systemCoreStatus,
+    );
+    final lineCount = report.isEmpty ? 0 : '\n'.allMatches(report).length + 1;
 
-    return Consumer<SystemBridgeService>(
-      builder: (context, bridgeService, _) {
-        final report = bridgeService.diagnosticsReport;
-        final lineCount =
-            report.isEmpty ? 0 : '\n'.allMatches(report).length + 1;
-
-        return ListView(
-          key: const PageStorageKey<String>(DiagnosticsPanelPage.routeName),
-          children: [
-            SettingsSummarySection(
-              debugLabel: _summaryDebugLabel,
-              child: SettingsMetricsGrid(
-                minChildWidth: 180,
-                maxColumns: 3,
+    return ListView(
+      key: const PageStorageKey<String>(DiagnosticsPanelPage.routeName),
+      children: [
+        SettingsSummarySection(
+          debugLabel: _summaryDebugLabel,
+          child: SettingsMetricsGrid(
+            minChildWidth: 180,
+            maxColumns: 3,
+            children: [
+              SettingsMetricTile(
+                label: localizations.reportLines,
+                value: lineCount.toString(),
+                icon: Icons.receipt_long_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.adbAutomationPolicyTitle,
+                value: localizedAdbPolicy(
+                  localizations,
+                  adbStatus['policy']?.toString() ?? '',
+                ),
+                icon: Icons.adb_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.coreHealthLabel,
+                value: localizedBridgeHealth(
+                  localizations,
+                  systemCoreStatus['coreServiceHealth']?.toString() ?? '',
+                ),
+                icon: Icons.favorite_outline,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        SettingsSurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SettingsAdaptiveGrid(
+                minChildWidth: 220,
+                maxColumns: 2,
                 children: [
-                  SettingsMetricTile(
-                    label: localizations.reportLines,
-                    value: lineCount.toString(),
-                    icon: Icons.receipt_long_outlined,
-                  ),
-                  SettingsMetricTile(
-                    label: localizations.adbAutomationPolicyTitle,
-                    value: localizedAdbPolicy(
-                      localizations,
-                      bridgeService.adbAutomationStatus['policy']?.toString() ??
-                          '',
+                  SettingsActionCard(
+                    key: const Key('diagnostics_refresh_button'),
+                    focusNode: widget.primaryFocusNode,
+                    onMoveUpAtBoundary: () => focusCurrentSettingsNodeByDebugLabel(
+                      _summaryDebugLabel,
                     ),
-                    icon: Icons.adb_outlined,
+                    title: localizations.refreshLabel,
+                    subtitle: localizations.reportLines,
+                    icon: Icons.refresh,
+                    onPressed: () async => bridgeService.refreshFull(),
                   ),
-                  SettingsMetricTile(
-                    label: localizations.coreHealthLabel,
-                    value: localizedBridgeHealth(
-                      localizations,
-                      bridgeService.systemCoreStatus['coreServiceHealth']
-                              ?.toString() ??
-                          '',
+                  SettingsActionCard(
+                    onMoveUpAtBoundary: () => focusCurrentSettingsNodeByDebugLabel(
+                      _summaryDebugLabel,
                     ),
-                    icon: Icons.favorite_outline,
+                    title: localizations.copyReport,
+                    subtitle: localizations.reportLines,
+                    icon: Icons.copy_outlined,
+                    onPressed: () async =>
+                        Clipboard.setData(ClipboardData(text: report)),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 18),
-            SettingsSurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SettingsAdaptiveGrid(
-                    minChildWidth: 220,
-                    maxColumns: 2,
-                    children: [
-                      SettingsActionCard(
-                        key: const Key('diagnostics_refresh_button'),
-                        focusNode: widget.primaryFocusNode,
-                        onMoveUpAtBoundary: () =>
-                            focusCurrentSettingsNodeByDebugLabel(
-                          _summaryDebugLabel,
-                        ),
-                        title: localizations.refreshLabel,
-                        subtitle: localizations.reportLines,
-                        icon: Icons.refresh,
-                        onPressed: () async => bridgeService.refreshFull(),
-                      ),
-                      SettingsActionCard(
-                        onMoveUpAtBoundary: () =>
-                            focusCurrentSettingsNodeByDebugLabel(
-                          _summaryDebugLabel,
-                        ),
-                        title: localizations.copyReport,
-                        subtitle: localizations.reportLines,
-                        icon: Icons.copy_outlined,
-                        onPressed: () async =>
-                            Clipboard.setData(ClipboardData(text: report)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  SelectableText(
-                    report,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(height: 1.45),
-                  ),
-                ],
+              const SizedBox(height: 18),
+              SelectableText(
+                report,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(height: 1.45),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

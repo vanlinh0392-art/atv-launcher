@@ -40,6 +40,8 @@ class AppsService extends ChangeNotifier {
   static const Duration _liveSyncRetryDelayDefault = Duration(seconds: 6);
   static const Duration _liveSyncWarmDelayDefault =
       Duration(milliseconds: 1800);
+  static const Duration _appsChangedNotifyDebounce =
+      Duration(milliseconds: 500);
 
   final FLauncherChannel _fLauncherChannel;
   final FLauncherDatabase _database;
@@ -52,6 +54,7 @@ class AppsService extends ChangeNotifier {
   int _lastLiveSyncAt = 0;
   bool _homeReorderModeEnabled = false;
   Timer? _liveSyncRetryTimer;
+  Timer? _appsChangedNotifyTimer;
   Future<void>? _liveSyncFuture;
   final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
   bool _firstRenderableLogged = false;
@@ -168,7 +171,7 @@ class AppsService extends ChangeNotifier {
       }
       _staleCache = false;
       _lastLiveSyncAt = DateTime.now().millisecondsSinceEpoch;
-      notifyListeners();
+      _scheduleAppsChangedNotify();
     });
 
     await _loadStateFromDatabase(shouldNotifyListeners: false);
@@ -486,6 +489,14 @@ class AppsService extends ChangeNotifier {
     }
     _liveSyncRetryTimer = Timer(_liveSyncRetryDelay, () {
       unawaited(_runLiveSync(reason: 'retry_live_sync'));
+    });
+  }
+
+  void _scheduleAppsChangedNotify() {
+    _appsChangedNotifyTimer?.cancel();
+    _appsChangedNotifyTimer = Timer(_appsChangedNotifyDebounce, () {
+      _appsChangedNotifyTimer = null;
+      notifyListeners();
     });
   }
 
@@ -1367,6 +1378,7 @@ class AppsService extends ChangeNotifier {
   @override
   void dispose() {
     _liveSyncRetryTimer?.cancel();
+    _appsChangedNotifyTimer?.cancel();
     super.dispose();
   }
 

@@ -425,12 +425,15 @@ void main() {
     await tester.tap(find.byKey(const Key('permissions_advanced_toggle')));
     await tester.pumpAndSettle();
 
-    final advancedToggleFocus = tester.widgetList<Focus>(
-      find.descendant(
-        of: find.byKey(const Key('permissions_advanced_toggle')),
-        matching: find.byType(Focus),
-      ),
-    ).firstWhere((focus) => focus.focusNode?.debugLabel == 'permissions_advanced_toggle');
+    final advancedToggleFocus = tester
+        .widgetList<Focus>(
+          find.descendant(
+            of: find.byKey(const Key('permissions_advanced_toggle')),
+            matching: find.byType(Focus),
+          ),
+        )
+        .firstWhere((focus) =>
+            focus.focusNode?.debugLabel == 'permissions_advanced_toggle');
     advancedToggleFocus.focusNode!.requestFocus();
     await tester.pumpAndSettle();
 
@@ -1630,6 +1633,9 @@ Future<void> _pumpSettingsPanel(
         await SharedPreferences.getInstance(),
         MockFLauncherChannel(),
       );
+  if (appsService is MockAppsService) {
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+  }
   await tester.pumpWidget(
     MultiProvider(
       providers: [
@@ -1685,6 +1691,7 @@ MockWallpaperService _mockWallpaperService() {
   when(wallpaperService.wallpaperAssetUri).thenReturn('');
   when(wallpaperService.videoFolderName).thenReturn('');
   when(wallpaperService.isVideoMode).thenReturn(false);
+  when(wallpaperService.videoBlockedByPerformanceMode).thenReturn(false);
   when(wallpaperService.videoAdvanceMode).thenReturn('on_completion');
   when(wallpaperService.videoRepeatCountPerItem).thenReturn(3);
   when(wallpaperService.videoOrderMode).thenReturn('sequential');

@@ -50,7 +50,9 @@ void main() {
     );
   });
 
-  test('smooth and off clamp expensive video blur while quality keeps it', () {
+  test(
+      'balanced, smooth and off clamp expensive video blur for CPU-first modes',
+      () {
     final quality = HomePerformanceProfile.resolve(
       SettingsService.homeDockPerformanceModeQuality,
     );
@@ -65,9 +67,24 @@ void main() {
     );
 
     expect(quality.capWallpaperVideoBlurSigma(9), 9);
-    expect(balanced.capWallpaperVideoBlurSigma(9), 5);
+    expect(balanced.capWallpaperVideoBlurSigma(9), 0);
     expect(smooth.capWallpaperVideoBlurSigma(9), 0);
     expect(off.capWallpaperVideoBlurSigma(9), 0);
+    expect(balanced.wallpaperFilterQuality, FilterQuality.none);
+    expect(quality.startVideoAfterHomeSettles, isFalse);
+    expect(quality.releasePlayerOnBackground, isFalse);
+    expect(quality.allowVideoWallpaper, isTrue);
+    expect(quality.disableAudioRendererWhenMuted, isTrue);
+    expect(balanced.startVideoAfterHomeSettles, isTrue);
+    expect(balanced.releasePlayerOnBackground, isTrue);
+    expect(balanced.allowVideoWallpaper, isTrue);
+    expect(balanced.disableAudioRendererWhenMuted, isTrue);
+    expect(smooth.startVideoAfterHomeSettles, isTrue);
+    expect(smooth.allowVideoWallpaper, isTrue);
+    expect(smooth.disableAudioRendererWhenMuted, isTrue);
+    expect(off.startVideoAfterHomeSettles, isTrue);
+    expect(off.allowVideoWallpaper, isFalse);
+    expect(off.disableAudioRendererWhenMuted, isTrue);
   });
 
   test('smooth mode uses lighter sampling and static app focus treatment', () {

@@ -6,6 +6,7 @@ import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
 import 'package:flauncher/widgets/settings/backup_restore_panel_page.dart';
@@ -25,11 +26,18 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 Future<void> showSearchOverlayDialog(BuildContext context) {
+  final wallpaperService = context.read<WallpaperService>();
+  wallpaperService.cancelPendingHomeVideoStart();
   return showDialog<void>(
     context: context,
     barrierColor: Colors.black54,
     builder: (_) => SearchOverlayDialog(parentContext: context),
-  );
+  ).whenComplete(() {
+    if (!context.mounted) {
+      return;
+    }
+    wallpaperService.notifyHomeVisibleAndUsable();
+  });
 }
 
 class SearchOverlayDialog extends StatefulWidget {

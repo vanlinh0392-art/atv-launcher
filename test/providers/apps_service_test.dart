@@ -594,6 +594,76 @@ void main() {
       ['beta.app', 'alpha.app', 'gamma.app'],
     );
   });
+
+  test('debounces burst package events into a single listener notification',
+      () async {
+    final channel = MockFLauncherChannel();
+    void Function(Map<String, dynamic>)? appsChangedListener;
+    when(channel.getApplications()).thenAnswer((_) async => [
+          {
+            'packageName': 'tv.app',
+            'name': 'TV App',
+            'version': '1.0.0',
+            'sideloaded': false,
+          },
+        ]);
+    when(channel.applicationExists(any)).thenAnswer((_) async => false);
+    when(channel.addAppsChangedListener(any)).thenAnswer((invocation) {
+      appsChangedListener =
+          invocation.positionalArguments.single as void Function(Map<String, dynamic>);
+    });
+
+    final database = FLauncherDatabase.inMemory();
+    final service = AppsService(
+      channel,
+      database,
+      liveSyncWarmDelay: const Duration(days: 1),
+    );
+    addTearDown(service.dispose);
+    addTearDown(database.close);
+
+    for (var attempt = 0; attempt < 50 && !service.initialized; attempt += 1) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+
+    expect(service.initialized, isTrue);
+    expect(appsChangedListener, isA<void Function(Map<String, dynamic>)>());
+
+    var notificationCount = 0;
+    service.addListener(() {
+      notificationCount += 1;
+    });
+
+    appsChangedListener!.call({
+      'action': 'PACKAGE_CHANGED',
+      'activityInfo': {
+        'packageName': 'tv.app',
+        'name': 'TV App',
+        'version': '1.0.1',
+        'sideloaded': false,
+      },
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    appsChangedListener!.call({
+      'action': 'PACKAGE_CHANGED',
+      'activityInfo': {
+        'packageName': 'tv.app',
+        'name': 'TV App',
+        'version': '1.0.2',
+        'sideloaded': false,
+      },
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    expect(notificationCount, 0);
+
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(notificationCount, 1);
+    expect(
+      service.applications.singleWhere((app) => app.packageName == 'tv.app').version,
+      '1.0.2',
+    );
+  });
 }
 
 class _AppsHarness {

@@ -8,11 +8,13 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Surface;
 
+import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 
 import com.atv.launcher.systembridge.shared.state.BridgeStateStore;
 
@@ -36,6 +38,7 @@ public final class VideoWallpaperController {
     private TextureRegistry.SurfaceTextureEntry surfaceTextureEntry;
     private Surface surface;
     private ExoPlayer player;
+    private DefaultTrackSelector trackSelector;
     private boolean foregroundActive = true;
     private boolean videoReady;
     private String lastError = "";
@@ -46,6 +49,10 @@ public final class VideoWallpaperController {
     private boolean playbackSuppressed;
     private String playbackSuppressedReason = "";
     private boolean wasPlayingBeforeSuppression;
+    private boolean videoAllowedByPerformanceMode = true;
+    private boolean disableAudioRendererWhenMuted = true;
+    private boolean audioRendererEnabled = true;
+    private boolean deferForegroundResume;
     private boolean startupWarmupReady = !FAST_STARTUP_ENABLED;
     private long videoWarmupStartedAtNanos = 0L;
     private String activePlaybackConfigSignature = "";
@@ -78,8 +85,11 @@ public final class VideoWallpaperController {
 
     public long ensureTextureId() {
         startupWarmupReady = true;
+        if (!videoAllowedByPerformanceMode) {
+            return -1L;
+        }
         ensureSurface();
-        maybeStartPlayback();
+        maybeStartPlayback(true);
         return surfaceTextureEntry.id();
     }
 
@@ -113,6 +123,10 @@ public final class VideoWallpaperController {
         map.put("resolvedPlaylistUris", new ArrayList<>(resolvedPlaylistUris));
         map.put("playbackSuppressed", playbackSuppressed);
         map.put("playbackSuppressedReason", playbackSuppressedReason);
+        map.put("videoAllowedByPerformanceMode", videoAllowedByPerformanceMode);
+        map.put("disableAudioRendererWhenMuted", disableAudioRendererWhenMuted);
+        map.put("audioRendererEnabled", resolveDesiredAudioRendererEnabled());
+        map.put("deferForegroundResume", deferForegroundResume);
         return map;
     }
 
@@ -122,7 +136,10 @@ public final class VideoWallpaperController {
         if (!startupWarmupReady) {
             return;
         }
-        maybeStartPlayback();
+        if (deferForegroundResume) {
+            return;
+        }
+        maybeStartPlayback(false);
     }
 
     public void onStop() {
@@ -135,6 +152,11 @@ public final class VideoWallpaperController {
             }
         }
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        if (deferForegroundResume) {
+            startupWarmupReady = false;
+            releasePlayer();
+            return;
+        }
         mainHandler.postDelayed(backgroundReleaseRunnable, BACKGROUND_PLAYER_RELEASE_DELAY_MS);
     }
 
@@ -151,27 +173,99 @@ public final class VideoWallpaperController {
             releasePlayer();
             return;
         }
-        maybeStartPlayback();
+        maybeStartPlayback(false);
     }
 
     public void onVideoConfigChanged() {
         startupWarmupReady = true;
+        onVideoPlaylistTopologyChanged();
+        onVideoPlayerPolicyChanged();
+        onVideoPresentationChanged();
+    }
+
+    public void onVideoPlaylistTopologyChanged() {
+        startupWarmupReady = true;
         activePlaybackConfigSignature = "";
         if (player != null) {
             resolvedPlaylistUris = resolvePlaylistUris();
-            applyMediaItems();
-            applyPlayerSettings();
-            player.prepare();
-            scheduleIntervalAdvance();
-            if (!playbackSuppressed &&
-                    !player.isPlaying() &&
-                    foregroundActive &&
-                    BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)) {
-                player.play();
+            if (resolvedPlaylistUris.isEmpty()) {
+                videoReady = false;
+                lastError = "No playable wallpaper videos were resolved.";
+                releasePlayer();
+                return;
             }
+            currentIndex = 0;
+            applyMediaItems();
+            applyPlayerPolicySettings();
+            applyPresentationSettings();
+            player.prepare();
+            if (!playbackSuppressed &&
+                    foregroundActive &&
+                    BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext) &&
+                    !deferForegroundResume) {
+                resumeExistingPlayerIfNeeded();
+            }
+            scheduleIntervalAdvance();
         } else {
-            maybeStartPlayback();
+            maybeStartPlayback(false);
         }
+    }
+
+    public void onVideoPlayerPolicyChanged() {
+        startupWarmupReady = true;
+        if (player == null) {
+            maybeStartPlayback(false);
+            return;
+        }
+        applyPlayerPolicySettings();
+        if (!playbackSuppressed
+                && foregroundActive
+                && BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)
+                && !player.isPlaying()
+                && !deferForegroundResume) {
+            resumeExistingPlayerIfNeeded();
+        }
+        scheduleIntervalAdvance();
+    }
+
+    public void onVideoPresentationChanged() {
+        startupWarmupReady = true;
+        if (player == null) {
+            maybeStartPlayback(false);
+            return;
+        }
+        applyPresentationSettings();
+    }
+
+    public boolean setVideoAllowedByPerformanceMode(boolean allowed) {
+        if (videoAllowedByPerformanceMode == allowed) {
+            return false;
+        }
+        videoAllowedByPerformanceMode = allowed;
+        if (!allowed) {
+            startupWarmupReady = false;
+            releasePlayer();
+        }
+        return true;
+    }
+
+    public boolean setDisableAudioRendererWhenMuted(boolean disable) {
+        if (disableAudioRendererWhenMuted == disable) {
+            return false;
+        }
+        disableAudioRendererWhenMuted = disable;
+        if (player != null) {
+            applyPresentationSettings();
+        }
+        return true;
+    }
+
+    public boolean setDeferForegroundResume(boolean deferForegroundResume) {
+        if (this.deferForegroundResume == deferForegroundResume) {
+            return false;
+        }
+        this.deferForegroundResume = deferForegroundResume;
+        return true;
     }
 
     public void setPlaybackSuppressed(boolean suppressed, String reason) {
@@ -199,18 +293,18 @@ public final class VideoWallpaperController {
             return;
         }
         if (player == null) {
-            if (shouldResume) {
-                maybeStartPlayback();
+            if (shouldResume && !deferForegroundResume) {
+                maybeStartPlayback(false);
             }
             return;
         }
-        if (shouldResume) {
+        if (shouldResume && !deferForegroundResume) {
             resumeExistingPlayerIfNeeded();
+            scheduleIntervalAdvance();
         }
-        scheduleIntervalAdvance();
     }
 
-    private void maybeStartPlayback() {
+    private void maybeStartPlayback(boolean explicitWarmup) {
         if (!foregroundActive) {
             return;
         }
@@ -220,16 +314,25 @@ public final class VideoWallpaperController {
         if (!startupWarmupReady) {
             return;
         }
+        if (!videoAllowedByPerformanceMode) {
+            return;
+        }
+        if (deferForegroundResume && !explicitWarmup) {
+            return;
+        }
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
             return;
         }
-        String desiredConfigSignature = buildConfigSignature();
+        String desiredConfigSignature = buildPlaybackTopologySignature();
         if (player != null &&
                 surfaceTextureEntry != null &&
                 surface != null &&
                 TextUtils.equals(activePlaybackConfigSignature, desiredConfigSignature)) {
-            applyPlayerSettings();
-            if (BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext) && !player.isPlaying()) {
+            applyPlayerPolicySettings();
+            applyPresentationSettings();
+            if (BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)
+                    && !player.isPlaying()
+                    && (explicitWarmup || !deferForegroundResume)) {
                 resumeExistingPlayerIfNeeded();
             }
             scheduleIntervalAdvance();
@@ -251,7 +354,10 @@ public final class VideoWallpaperController {
         activePlaybackConfigSignature = desiredConfigSignature;
         videoWarmupStartedAtNanos = System.nanoTime();
 
-        player = new ExoPlayer.Builder(appContext).build();
+        trackSelector = new DefaultTrackSelector(appContext);
+        player = new ExoPlayer.Builder(appContext)
+                .setTrackSelector(trackSelector)
+                .build();
         player.setVideoSurface(surface);
         player.addListener(new Player.Listener() {
             @Override
@@ -292,9 +398,11 @@ public final class VideoWallpaperController {
             }
         });
         applyMediaItems();
-        applyPlayerSettings();
+        applyPlayerPolicySettings();
+        applyPresentationSettings();
         player.prepare();
-        if (BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)) {
+        if (BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)
+                && (explicitWarmup || !deferForegroundResume)) {
             player.play();
         }
     }
@@ -312,7 +420,7 @@ public final class VideoWallpaperController {
         player.setMediaItems(mediaItems, false);
     }
 
-    private void applyPlayerSettings() {
+    private void applyPlayerPolicySettings() {
         if (player == null) {
             return;
         }
@@ -333,6 +441,13 @@ public final class VideoWallpaperController {
                             : Player.REPEAT_MODE_OFF
             );
         }
+    }
+
+    private void applyPresentationSettings() {
+        if (player == null) {
+            return;
+        }
+        applyAudioRendererPolicy(resolveDesiredAudioRendererEnabled());
         player.setVolume(BridgeStateStore.isWallpaperVideoMuted(appContext) ? 0f : 1f);
     }
 
@@ -385,13 +500,11 @@ public final class VideoWallpaperController {
         }
         if (player.hasNextMediaItem()) {
             player.seekToNextMediaItem();
-            player.prepare();
             player.play();
             return true;
         }
         if (BridgeStateStore.isWallpaperVideoPlaylistLoopEnabled(appContext)) {
             player.seekToDefaultPosition(0);
-            player.prepare();
             player.play();
             return true;
         }
@@ -412,6 +525,8 @@ public final class VideoWallpaperController {
             }
             player = null;
         }
+        trackSelector = null;
+        videoReady = false;
         activePlaybackConfigSignature = "";
     }
 
@@ -464,25 +579,18 @@ public final class VideoWallpaperController {
     private boolean shouldResumeWhenUnsuppressed() {
         return foregroundActive
                 && startupWarmupReady
+                && videoAllowedByPerformanceMode
                 && TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))
                 && BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext);
     }
 
-    private String buildConfigSignature() {
+    private String buildPlaybackTopologySignature() {
         StringBuilder builder = new StringBuilder();
         builder.append(BridgeStateStore.getWallpaperMode(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoSourceType(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoOrderMode(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoAdvanceMode(appContext)).append('|');
-        builder.append(BridgeStateStore.getWallpaperVideoSwitchIntervalSeconds(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoRepeatCountPerItem(appContext)).append('|');
-        builder.append(BridgeStateStore.isWallpaperVideoPlaylistLoopEnabled(appContext)).append('|');
-        builder.append(BridgeStateStore.isWallpaperVideoLoopEnabled(appContext)).append('|');
-        builder.append(BridgeStateStore.isWallpaperVideoMuted(appContext)).append('|');
-        builder.append(BridgeStateStore.getWallpaperVideoFit(appContext)).append('|');
-        builder.append(BridgeStateStore.getWallpaperVideoDimPercent(appContext)).append('|');
-        builder.append(BridgeStateStore.getWallpaperVideoBlur(appContext)).append('|');
-        builder.append(BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoFolderUri(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoFolderBucketId(appContext)).append('|');
         builder.append(BridgeStateStore.getWallpaperVideoFolderName(appContext)).append('|');
@@ -501,5 +609,23 @@ public final class VideoWallpaperController {
         }
         long elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
         Log.d(TAG, label + " elapsedMs=" + elapsedMs);
+    }
+
+    private boolean resolveDesiredAudioRendererEnabled() {
+        return videoAllowedByPerformanceMode
+                && (!BridgeStateStore.isWallpaperVideoMuted(appContext)
+                || !disableAudioRendererWhenMuted);
+    }
+
+    private void applyAudioRendererPolicy(boolean enabled) {
+        audioRendererEnabled = enabled;
+        if (trackSelector == null) {
+            return;
+        }
+        trackSelector.setParameters(
+                trackSelector.buildUponParameters()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, !enabled)
+                        .build()
+        );
     }
 }

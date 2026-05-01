@@ -912,6 +912,9 @@ Future<void> _pumpLauncher(
   SettingsService? settingsService,
 }) async {
   final resolvedSettings = settingsService ?? await _createSettingsService();
+  if (appsService is MockAppsService) {
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+  }
   if (bridgeService is MockSystemBridgeService) {
     when(bridgeService.status).thenReturn(const <String, dynamic>{
       'memory': <String, dynamic>{},
@@ -971,6 +974,7 @@ void _stubWallpaperService(
   when(wallpaperService.gradient)
       .thenReturn(gradient ?? FLauncherGradients.greatWhale);
   when(wallpaperService.isVideoMode).thenReturn(isVideoMode);
+  when(wallpaperService.videoBlockedByPerformanceMode).thenReturn(false);
   when(wallpaperService.videoTextureId).thenReturn(videoTextureId);
   when(wallpaperService.videoFit).thenReturn(videoFit);
   when(wallpaperService.videoBlur).thenReturn(videoBlur);

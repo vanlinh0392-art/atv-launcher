@@ -18,6 +18,10 @@ class HomePerformanceProfile {
   final Duration dockShortScrollDuration;
   final Duration dockLongScrollDuration;
   final double wallpaperVideoBlurSigmaCap;
+  final bool allowVideoWallpaper;
+  final bool disableAudioRendererWhenMuted;
+  final bool startVideoAfterHomeSettles;
+  final bool releasePlayerOnBackground;
   final FilterQuality wallpaperFilterQuality;
   final FilterQuality appCardFilterQuality;
   final Duration wallpaperVideoWarmUpDelay;
@@ -53,6 +57,10 @@ class HomePerformanceProfile {
     required this.dockShortScrollDuration,
     required this.dockLongScrollDuration,
     required this.wallpaperVideoBlurSigmaCap,
+    required this.allowVideoWallpaper,
+    required this.disableAudioRendererWhenMuted,
+    required this.startVideoAfterHomeSettles,
+    required this.releasePlayerOnBackground,
     required this.wallpaperFilterQuality,
     required this.appCardFilterQuality,
     required this.wallpaperVideoWarmUpDelay,
@@ -92,6 +100,10 @@ class HomePerformanceProfile {
           dockShortScrollDuration: Duration(milliseconds: 96),
           dockLongScrollDuration: Duration(milliseconds: 132),
           wallpaperVideoBlurSigmaCap: 9,
+          allowVideoWallpaper: true,
+          disableAudioRendererWhenMuted: true,
+          startVideoAfterHomeSettles: false,
+          releasePlayerOnBackground: false,
           wallpaperFilterQuality: FilterQuality.low,
           appCardFilterQuality: FilterQuality.low,
           wallpaperVideoWarmUpDelay: Duration(milliseconds: 320),
@@ -128,6 +140,10 @@ class HomePerformanceProfile {
           dockShortScrollDuration: Duration(milliseconds: 68),
           dockLongScrollDuration: Duration(milliseconds: 88),
           wallpaperVideoBlurSigmaCap: 0,
+          allowVideoWallpaper: true,
+          disableAudioRendererWhenMuted: true,
+          startVideoAfterHomeSettles: true,
+          releasePlayerOnBackground: true,
           wallpaperFilterQuality: FilterQuality.none,
           appCardFilterQuality: FilterQuality.none,
           wallpaperVideoWarmUpDelay: Duration(milliseconds: 650),
@@ -164,6 +180,10 @@ class HomePerformanceProfile {
           dockShortScrollDuration: Duration(milliseconds: 58),
           dockLongScrollDuration: Duration(milliseconds: 74),
           wallpaperVideoBlurSigmaCap: 0,
+          allowVideoWallpaper: false,
+          disableAudioRendererWhenMuted: true,
+          startVideoAfterHomeSettles: true,
+          releasePlayerOnBackground: true,
           wallpaperFilterQuality: FilterQuality.none,
           appCardFilterQuality: FilterQuality.none,
           wallpaperVideoWarmUpDelay: Duration(milliseconds: 850),
@@ -182,6 +202,7 @@ class HomePerformanceProfile {
           appCardHighlightGlowBaseSpread: 0.0,
           appCardHighlightGlowPulseSpreadDelta: 0.0,
         );
+      case SettingsService.homeDockPerformanceModeBalanced:
       default:
         return const HomePerformanceProfile(
           dockStaticMaxBlurSigma: 10,
@@ -199,8 +220,12 @@ class HomePerformanceProfile {
           dockHeightAnimationDuration: Duration(milliseconds: 300),
           dockShortScrollDuration: Duration(milliseconds: 78),
           dockLongScrollDuration: Duration(milliseconds: 102),
-          wallpaperVideoBlurSigmaCap: 5,
-          wallpaperFilterQuality: FilterQuality.low,
+          wallpaperVideoBlurSigmaCap: 0,
+          allowVideoWallpaper: true,
+          disableAudioRendererWhenMuted: true,
+          startVideoAfterHomeSettles: true,
+          releasePlayerOnBackground: true,
+          wallpaperFilterQuality: FilterQuality.none,
           appCardFilterQuality: FilterQuality.low,
           wallpaperVideoWarmUpDelay: Duration(milliseconds: 400),
           appCardHighlightPulseEnabled: true,

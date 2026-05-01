@@ -229,6 +229,9 @@ class FLauncherChannel {
     int? dimPercent,
     String? blur,
     bool? autoResume,
+    bool? videoAllowedByPerformanceMode,
+    bool? disableAudioRendererWhenMuted,
+    bool? deferForegroundResume,
   }) async =>
       _invokeMapMethod('setVideoWallpaperOptions', {
         'sourceType': sourceType,
@@ -247,6 +250,9 @@ class FLauncherChannel {
         'dimPercent': dimPercent,
         'blur': blur,
         'autoResume': autoResume,
+        'videoAllowedByPerformanceMode': videoAllowedByPerformanceMode,
+        'disableAudioRendererWhenMuted': disableAudioRendererWhenMuted,
+        'deferForegroundResume': deferForegroundResume,
       });
 
   Future<Map<String, dynamic>> setVideoWallpaperPlaybackSuppressed({

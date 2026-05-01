@@ -789,6 +789,28 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
       ) as _i2.Future<Map<String, dynamic>>);
 
   @override
+  _i2.Future<Map<String, dynamic>> prepareLauncherUpdateInstall() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #prepareLauncherUpdateInstall,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> installDownloadedApk(String? filePath) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #installDownloadedApk,
+          [filePath],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
   _i2.Future<Map<String, dynamic>> browseLocalVideoLibrary(
           {String? bucketId}) =>
       (super.noSuchMethod(
@@ -913,6 +935,9 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
     int? dimPercent,
     String? blur,
     bool? autoResume,
+    bool? videoAllowedByPerformanceMode,
+    bool? disableAudioRendererWhenMuted,
+    bool? deferForegroundResume,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -935,6 +960,9 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
             #dimPercent: dimPercent,
             #blur: blur,
             #autoResume: autoResume,
+            #videoAllowedByPerformanceMode: videoAllowedByPerformanceMode,
+            #disableAudioRendererWhenMuted: disableAudioRendererWhenMuted,
+            #deferForegroundResume: deferForegroundResume,
           },
         ),
         returnValue:
@@ -1092,6 +1120,18 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
   @override
   bool get isVideoMode => (super.noSuchMethod(
         Invocation.getter(#isVideoMode),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  bool get videoAllowedByPerformanceMode => (super.noSuchMethod(
+        Invocation.getter(#videoAllowedByPerformanceMode),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  bool get videoBlockedByPerformanceMode => (super.noSuchMethod(
+        Invocation.getter(#videoBlockedByPerformanceMode),
         returnValue: false,
       ) as bool);
 
@@ -1485,14 +1525,64 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
       ) as _i2.Future<void>);
 
   @override
-  _i2.Future<void> syncVideoOptionsToNative() => (super.noSuchMethod(
+  void notifyHomeVisibleAndUsable() => super.noSuchMethod(
+        Invocation.method(
+          #notifyHomeVisibleAndUsable,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void cancelPendingHomeVideoStart({bool? clearHomeVisible = false}) =>
+      super.noSuchMethod(
+        Invocation.method(
+          #cancelPendingHomeVideoStart,
+          [],
+          {#clearHomeVisible: clearHomeVisible},
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  _i2.Future<void> syncVideoOptionsToNative({bool? notifyFlutter = true}) =>
+      (super.noSuchMethod(
         Invocation.method(
           #syncVideoOptionsToNative,
           [],
+          {#notifyFlutter: notifyFlutter},
         ),
         returnValue: _i2.Future<void>.value(),
         returnValueForMissingStub: _i2.Future<void>.value(),
       ) as _i2.Future<void>);
+
+  @override
+  void scheduleHomeVisibleVideoStart() => super.noSuchMethod(
+        Invocation.method(
+          #scheduleHomeVisibleVideoStart,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void didChangeAppLifecycleState(_i14.AppLifecycleState? state) =>
+      super.noSuchMethod(
+        Invocation.method(
+          #didChangeAppLifecycleState,
+          [state],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void dispose() => super.noSuchMethod(
+        Invocation.method(
+          #dispose,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
 
   @override
   void addListener(_i14.VoidCallback? listener) => super.noSuchMethod(
@@ -1513,18 +1603,149 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
       );
 
   @override
-  void dispose() => super.noSuchMethod(
+  void notifyListeners() => super.noSuchMethod(
         Invocation.method(
-          #dispose,
+          #notifyListeners,
           [],
         ),
         returnValueForMissingStub: null,
       );
 
   @override
-  void notifyListeners() => super.noSuchMethod(
+  _i2.Future<bool> didPopRoute() => (super.noSuchMethod(
         Invocation.method(
-          #notifyListeners,
+          #didPopRoute,
+          [],
+        ),
+        returnValue: _i2.Future<bool>.value(false),
+      ) as _i2.Future<bool>);
+
+  @override
+  bool handleStartBackGesture(_i9.PredictiveBackEvent? backEvent) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #handleStartBackGesture,
+          [backEvent],
+        ),
+        returnValue: false,
+      ) as bool);
+
+  @override
+  void handleUpdateBackGestureProgress(_i9.PredictiveBackEvent? backEvent) =>
+      super.noSuchMethod(
+        Invocation.method(
+          #handleUpdateBackGestureProgress,
+          [backEvent],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void handleCommitBackGesture() => super.noSuchMethod(
+        Invocation.method(
+          #handleCommitBackGesture,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void handleCancelBackGesture() => super.noSuchMethod(
+        Invocation.method(
+          #handleCancelBackGesture,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  _i2.Future<bool> didPushRoute(String? route) => (super.noSuchMethod(
+        Invocation.method(
+          #didPushRoute,
+          [route],
+        ),
+        returnValue: _i2.Future<bool>.value(false),
+      ) as _i2.Future<bool>);
+
+  @override
+  _i2.Future<bool> didPushRouteInformation(
+          _i8.RouteInformation? routeInformation) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #didPushRouteInformation,
+          [routeInformation],
+        ),
+        returnValue: _i2.Future<bool>.value(false),
+      ) as _i2.Future<bool>);
+
+  @override
+  void didChangeMetrics() => super.noSuchMethod(
+        Invocation.method(
+          #didChangeMetrics,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void didChangeTextScaleFactor() => super.noSuchMethod(
+        Invocation.method(
+          #didChangeTextScaleFactor,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void didChangePlatformBrightness() => super.noSuchMethod(
+        Invocation.method(
+          #didChangePlatformBrightness,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void didChangeLocales(List<_i14.Locale>? locales) => super.noSuchMethod(
+        Invocation.method(
+          #didChangeLocales,
+          [locales],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void didChangeViewFocus(_i14.ViewFocusEvent? event) => super.noSuchMethod(
+        Invocation.method(
+          #didChangeViewFocus,
+          [event],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  _i2.Future<_i14.AppExitResponse> didRequestAppExit() => (super.noSuchMethod(
+        Invocation.method(
+          #didRequestAppExit,
+          [],
+        ),
+        returnValue:
+            _i2.Future<_i14.AppExitResponse>.value(_i14.AppExitResponse.exit),
+      ) as _i2.Future<_i14.AppExitResponse>);
+
+  @override
+  void didHaveMemoryPressure() => super.noSuchMethod(
+        Invocation.method(
+          #didHaveMemoryPressure,
+          [],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  void didChangeAccessibilityFeatures() => super.noSuchMethod(
+        Invocation.method(
+          #didChangeAccessibilityFeatures,
           [],
         ),
         returnValueForMissingStub: null,
@@ -1576,7 +1797,6 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
   bool get homeReorderModeEnabled => (super.noSuchMethod(
         Invocation.getter(#homeReorderModeEnabled),
         returnValue: false,
-        returnValueForMissingStub: false,
       ) as bool);
 
   @override
@@ -1779,7 +1999,6 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
           [category],
         ),
         returnValue: false,
-        returnValueForMissingStub: false,
       ) as bool);
 
   @override
@@ -1820,7 +2039,6 @@ class MockAppsService extends _i1.Mock implements _i15.AppsService {
           ],
         ),
         returnValue: false,
-        returnValueForMissingStub: false,
       ) as bool);
 
   @override
@@ -2129,6 +2347,15 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as bool);
 
   @override
+  String get appHighlightAnimationColorPreset => (super.noSuchMethod(
+        Invocation.getter(#appHighlightAnimationColorPreset),
+        returnValue: _i12.dummyValue<String>(
+          this,
+          Invocation.getter(#appHighlightAnimationColorPreset),
+        ),
+      ) as String);
+
+  @override
   bool get appKeyClickEnabled => (super.noSuchMethod(
         Invocation.getter(#appKeyClickEnabled),
         returnValue: false,
@@ -2309,6 +2536,12 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as String);
 
   @override
+  bool get wallpaperVideoRestoreCandidatePending => (super.noSuchMethod(
+        Invocation.getter(#wallpaperVideoRestoreCandidatePending),
+        returnValue: false,
+      ) as bool);
+
+  @override
   String get videoWallpaperSourceType => (super.noSuchMethod(
         Invocation.getter(#videoWallpaperSourceType),
         returnValue: _i12.dummyValue<String>(
@@ -2371,6 +2604,12 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
   @override
   int get videoWallpaperSwitchIntervalSeconds => (super.noSuchMethod(
         Invocation.getter(#videoWallpaperSwitchIntervalSeconds),
+        returnValue: 0,
+      ) as int);
+
+  @override
+  int get videoWallpaperRepeatCountPerItem => (super.noSuchMethod(
+        Invocation.getter(#videoWallpaperRepeatCountPerItem),
         returnValue: 0,
       ) as int);
 
@@ -2483,6 +2722,17 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       (super.noSuchMethod(
         Invocation.method(
           #setAppHighlightAnimationEnabled,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setAppHighlightAnimationColorPreset(String? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setAppHighlightAnimationColorPreset,
           [value],
         ),
         returnValue: _i2.Future<void>.value(),
@@ -2767,6 +3017,17 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as _i2.Future<void>);
 
   @override
+  _i2.Future<void> setWallpaperVideoRestoreCandidatePending(bool? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setWallpaperVideoRestoreCandidatePending,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
   _i2.Future<void> setVideoWallpaperSourceType(String? value) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -2848,6 +3109,17 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       (super.noSuchMethod(
         Invocation.method(
           #setVideoWallpaperSwitchIntervalSeconds,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
+  _i2.Future<void> setVideoWallpaperRepeatCountPerItem(int? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setVideoWallpaperRepeatCountPerItem,
           [value],
         ),
         returnValue: _i2.Future<void>.value(),
@@ -3094,6 +3366,12 @@ class MockSystemBridgeService extends _i1.Mock
   @override
   Map<String, dynamic> get provisioningStatus => (super.noSuchMethod(
         Invocation.getter(#provisioningStatus),
+        returnValue: <String, dynamic>{},
+      ) as Map<String, dynamic>);
+
+  @override
+  Map<String, dynamic> get updateStatus => (super.noSuchMethod(
+        Invocation.getter(#updateStatus),
         returnValue: <String, dynamic>{},
       ) as Map<String, dynamic>);
 
@@ -3417,6 +3695,28 @@ class MockSystemBridgeService extends _i1.Mock
         Invocation.method(
           #requestMediaReadPermission,
           [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> prepareLauncherUpdateInstall() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #prepareLauncherUpdateInstall,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> installDownloadedApk(String? filePath) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #installDownloadedApk,
+          [filePath],
         ),
         returnValue:
             _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),

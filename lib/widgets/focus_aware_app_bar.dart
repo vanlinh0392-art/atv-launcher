@@ -2,6 +2,7 @@ import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -35,10 +36,16 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
     if (!allowed || !context.mounted) {
       return;
     }
-    showDialog(
+    final wallpaperService = context.read<WallpaperService>();
+    wallpaperService.cancelPendingHomeVideoStart();
+    await showDialog<void>(
       context: context,
       builder: (_) => SettingsPanel(initialRoute: initialRoute),
     );
+    if (!context.mounted) {
+      return;
+    }
+    wallpaperService.notifyHomeVisibleAndUsable();
   }
 
   Future<void> _startVoiceSearch(BuildContext context) async {
@@ -98,8 +105,8 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
           automaticallyImplyLeading: false,
           leadingWidth: showRam
               ? (isCompact
-                    ? _statusBarRamChipLeadingWidthCompact
-                    : _statusBarRamChipLeadingWidthRegular)
+                  ? _statusBarRamChipLeadingWidthCompact
+                  : _statusBarRamChipLeadingWidthRegular)
               : 18,
           titleSpacing: showRam ? 12 : 16,
           leading: showRam
@@ -448,7 +455,8 @@ class _StatusBarActionSurface extends StatefulWidget {
   });
 
   @override
-  State<_StatusBarActionSurface> createState() => _StatusBarActionSurfaceState();
+  State<_StatusBarActionSurface> createState() =>
+      _StatusBarActionSurfaceState();
 }
 
 class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {

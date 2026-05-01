@@ -53,6 +53,8 @@ const _appCardMediaScalePercent = "app_card_media_scale_percent";
 const _wallpaperMode = "wallpaper_mode";
 const _wallpaperAssetUri = "wallpaper_asset_uri";
 const _wallpaperPreviewPath = "wallpaper_preview_path";
+const _wallpaperVideoRestoreCandidatePending =
+    "wallpaper_video_restore_candidate_pending";
 const _videoWallpaperSourceType = "video_wallpaper_source_type";
 const _videoWallpaperUris = "video_wallpaper_uris";
 const _videoWallpaperFolderUri = "video_wallpaper_folder_uri";
@@ -258,6 +260,10 @@ class SettingsService extends ChangeNotifier {
 
   String get wallpaperPreviewPath =>
       _sharedPreferences.getString(_wallpaperPreviewPath) ?? "";
+
+  bool get wallpaperVideoRestoreCandidatePending =>
+      _sharedPreferences.getBool(_wallpaperVideoRestoreCandidatePending) ??
+      false;
 
   String get videoWallpaperSourceType =>
       _sharedPreferences.getString(_videoWallpaperSourceType) ?? "single_file";
@@ -499,6 +505,14 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> setWallpaperPreviewPath(String value) async {
     await _sharedPreferences.setString(_wallpaperPreviewPath, value);
+    notifyListeners();
+  }
+
+  Future<void> setWallpaperVideoRestoreCandidatePending(bool value) async {
+    await _sharedPreferences.setBool(
+      _wallpaperVideoRestoreCandidatePending,
+      value,
+    );
     notifyListeners();
   }
 

@@ -1,5 +1,6 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +43,38 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(wallpaperService.pickVideoWallpaper()).called(1);
+  });
+
+  testWidgets('effects-off mode shows video controls as disabled',
+      (tester) async {
+    _prepareView(tester);
+    final wallpaperService = _mockWallpaperService(
+      wallpaperMode: 'image',
+      blockedByPerformanceMode: true,
+    );
+    final bridgeService = MockSystemBridgeService();
+    when(bridgeService.fileAccessStatus)
+        .thenReturn(const <String, dynamic>{'hasMediaPermission': true});
+
+    await _pumpWidget(tester, wallpaperService, bridgeService);
+    await _pumpDeferredSections(tester);
+
+    expect(
+      find.text('Video wallpaper is disabled in Effects off mode'),
+      findsOneWidget,
+    );
+    final singleVideoCard = tester.widget<SettingsActionCard>(
+      find.ancestor(
+        of: find.text('Single video'),
+        matching: find.byType(SettingsActionCard),
+      ),
+    );
+    expect(singleVideoCard.onPressed, isNull);
+
+    await tester.tap(find.text('Single video'));
+    await tester.pumpAndSettle();
+
+    verifyNever(wallpaperService.pickVideoWallpaper());
   });
 
   testWidgets('fixed interval mode shows switch interval stepper',
@@ -181,15 +214,19 @@ Future<void> _pumpDeferredSections(WidgetTester tester) async {
 }
 
 MockWallpaperService _mockWallpaperService(
-    {String advanceMode = 'on_completion'}) {
+    {String advanceMode = 'on_completion',
+    String wallpaperMode = 'video',
+    bool blockedByPerformanceMode = false}) {
   final wallpaperService = MockWallpaperService();
-  when(wallpaperService.wallpaperMode).thenReturn('video');
+  when(wallpaperService.wallpaperMode).thenReturn(wallpaperMode);
   when(wallpaperService.videoSourceType).thenReturn('single_file');
   when(wallpaperService.videoUris)
       .thenReturn(const <String>['content://video/1']);
   when(wallpaperService.wallpaperAssetUri).thenReturn('content://video/1');
   when(wallpaperService.videoFolderName).thenReturn('');
-  when(wallpaperService.isVideoMode).thenReturn(true);
+  when(wallpaperService.isVideoMode).thenReturn(wallpaperMode == 'video');
+  when(wallpaperService.videoBlockedByPerformanceMode)
+      .thenReturn(blockedByPerformanceMode);
   when(wallpaperService.videoAdvanceMode).thenReturn(advanceMode);
   when(wallpaperService.videoRepeatCountPerItem).thenReturn(3);
   when(wallpaperService.videoOrderMode).thenReturn('sequential');
