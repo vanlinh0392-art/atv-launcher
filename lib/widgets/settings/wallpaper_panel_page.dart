@@ -82,7 +82,9 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
         SettingsSummarySection(
           debugLabel: _summaryDebugLabel,
           focusNode: _summaryFocusNode,
-          child: SettingsAdaptiveGrid(
+          child: SettingsMetricsGrid(
+            minChildWidth: 168,
+            maxColumns: 4,
             children: [
               SettingsMetricTile(
                 label: localizations.modeSettingLabel,

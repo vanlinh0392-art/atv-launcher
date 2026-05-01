@@ -52,9 +52,9 @@ class _ProfilesSecurityPanelPageState extends State<ProfilesSecurityPanelPage> {
           children: [
             SettingsSummarySection(
               debugLabel: _summaryDebugLabel,
-              child: SettingsAdaptiveGrid(
-                minChildWidth: metricsWideLayout ? 190 : 240,
-                maxColumns: metricsWideLayout ? 4 : 2,
+              child: SettingsMetricsGrid(
+                minChildWidth: metricsWideLayout ? 168 : 184,
+                maxColumns: metricsWideLayout ? 4 : 3,
                 children: [
                   SettingsMetricTile(
                     width: double.infinity,

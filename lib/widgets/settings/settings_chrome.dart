@@ -440,6 +440,34 @@ class SettingsAdaptiveGrid extends StatelessWidget {
   }
 }
 
+class SettingsMetricsGrid extends StatelessWidget {
+  final List<Widget> children;
+  final double spacing;
+  final double runSpacing;
+  final double minChildWidth;
+  final int maxColumns;
+
+  const SettingsMetricsGrid({
+    super.key,
+    required this.children,
+    this.spacing = 8,
+    this.runSpacing = 8,
+    this.minChildWidth = 168,
+    this.maxColumns = 4,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsAdaptiveGrid(
+      spacing: spacing,
+      runSpacing: runSpacing,
+      minChildWidth: minChildWidth,
+      maxColumns: maxColumns,
+      children: children,
+    );
+  }
+}
+
 class SettingsFocusFrame extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -538,15 +566,20 @@ class SettingsStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
+        color: color.withOpacity(0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.36)),
+        border: Border.all(color: color.withOpacity(0.32)),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(color: color),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
@@ -555,6 +588,7 @@ class SettingsStatusChip extends StatelessWidget {
 class SettingsMetricTile extends StatefulWidget {
   final FocusNode? focusNode;
   final bool autofocus;
+  final bool focusable;
   final String label;
   final String value;
   final IconData icon;
@@ -565,6 +599,7 @@ class SettingsMetricTile extends StatefulWidget {
     super.key,
     this.focusNode,
     this.autofocus = false,
+    this.focusable = false,
     required this.label,
     required this.value,
     required this.icon,
@@ -629,7 +664,7 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
       child: Focus(
         focusNode: _focusNode,
         autofocus: widget.autofocus,
-        canRequestFocus: true,
+        canRequestFocus: widget.focusable,
         onFocusChange: (value) {
           if (_focused != value) {
             setState(() => _focused = value);
@@ -647,8 +682,8 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
         child: SizedBox(
           width: widget.width,
           child: SettingsFocusFrame(
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
-            borderRadius: BorderRadius.circular(20),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            borderRadius: BorderRadius.circular(18),
             baseColor: baseColor,
             focusEmphasis: 1.08,
             variant: SettingsFocusFrameVariant.rowOnly,
@@ -657,27 +692,37 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(widget.icon, size: 22, color: iconColor),
-                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: subtitleColor,
+                                  height: 1.15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Icon(widget.icon, size: 18, color: iconColor),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
                   widget.value,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: titleColor,
                         fontWeight:
                             _focused ? FontWeight.w700 : FontWeight.w600,
+                        height: 1.12,
                       ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: subtitleColor),
                 ),
               ],
             ),
@@ -700,6 +745,7 @@ class SettingsSummarySection extends StatefulWidget {
   final FocusNode? focusNode;
   final Widget child;
   final double focusEmphasis;
+  final bool focusable;
 
   const SettingsSummarySection({
     super.key,
@@ -707,6 +753,7 @@ class SettingsSummarySection extends StatefulWidget {
     this.focusNode,
     required this.child,
     this.focusEmphasis = 1.12,
+    this.focusable = true,
   });
 
   @override
@@ -753,7 +800,7 @@ class _SettingsSummarySectionState extends State<SettingsSummarySection> {
       preferImmediate: true,
       child: Focus(
         focusNode: _focusNode,
-        canRequestFocus: true,
+        canRequestFocus: widget.focusable,
         onFocusChange: (value) {
           if (_focused != value) {
             setState(() => _focused = value);
@@ -769,8 +816,8 @@ class _SettingsSummarySectionState extends State<SettingsSummarySection> {
           return KeyEventResult.ignored;
         },
         child: SettingsFocusFrame(
-          padding: const EdgeInsets.all(12),
-          borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.all(10),
+          borderRadius: BorderRadius.circular(20),
           baseColor: Colors.transparent,
           focusEmphasis: widget.focusEmphasis,
           variant: SettingsFocusFrameVariant.rowOnly,

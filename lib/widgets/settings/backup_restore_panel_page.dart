@@ -43,7 +43,9 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
       children: [
         SettingsSummarySection(
           debugLabel: _summaryDebugLabel,
-          child: SettingsAdaptiveGrid(
+          child: SettingsMetricsGrid(
+            minChildWidth: 188,
+            maxColumns: 3,
             children: [
               SettingsMetricTile(
                 label: localizations.lastExport,

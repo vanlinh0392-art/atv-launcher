@@ -83,8 +83,7 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
           FocusNode(debugLabel: 'density_primary_apply'),
       DiagnosticsPanelPage.routeName:
           FocusNode(debugLabel: 'diagnostics_primary_refresh'),
-      UpdatePanelPage.routeName:
-          FocusNode(debugLabel: 'updates_primary_check'),
+      UpdatePanelPage.routeName: FocusNode(debugLabel: 'updates_primary_check'),
     };
     _selectedRoute = _detailPrimaryFocusNodes.containsKey(
       widget.initialSelectedRoute,
@@ -144,11 +143,6 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
     final selectedIndex = destinations.indexWhere(
       (item) => item.route == _selectedRoute,
     );
-    final destination = destinations.firstWhere(
-      (item) => item.route == _selectedRoute,
-      orElse: () => destinations.first,
-    );
-
     return PopScope(
       canPop: !_detailPaneActive,
       onPopInvokedWithResult: (didPop, _) {
@@ -235,46 +229,24 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
                       key: const Key('settings_detail_pane_card'),
                       highlighted: _detailPaneActive,
                       padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            destination.title,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            destination.subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 12),
-                          Expanded(
-                            child: _detailContentReady
-                                ? FocusTraversalGroup(
-                                    policy: RowByRowTraversalPolicy(),
-                                    child: PageStorage(
-                                      bucket: _detailPageStorageBucket,
-                                      child: KeyedSubtree(
-                                        key: ValueKey<String>(_selectedRoute),
-                                        child: _buildPage(
-                                          selectedIndex < 0
-                                              ? destinations.first.route
-                                              : _selectedRoute,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : _SettingsDetailPlaceholder(
-                                    label: localizations.loading,
+                      child: _detailContentReady
+                          ? FocusTraversalGroup(
+                              policy: RowByRowTraversalPolicy(),
+                              child: PageStorage(
+                                bucket: _detailPageStorageBucket,
+                                child: KeyedSubtree(
+                                  key: ValueKey<String>(_selectedRoute),
+                                  child: _buildPage(
+                                    selectedIndex < 0
+                                        ? destinations.first.route
+                                        : _selectedRoute,
                                   ),
-                          ),
-                        ],
-                      ),
+                                ),
+                              ),
+                            )
+                          : _SettingsDetailPlaceholder(
+                              label: localizations.loading,
+                            ),
                     ),
                   ),
                 ),

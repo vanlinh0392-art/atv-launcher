@@ -34,7 +34,9 @@ class SystemCorePanelPage extends StatelessWidget {
           children: [
             SettingsSummarySection(
               debugLabel: _summaryDebugLabel,
-              child: SettingsAdaptiveGrid(
+              child: SettingsMetricsGrid(
+                minChildWidth: 168,
+                maxColumns: 4,
                 children: [
                   SettingsMetricTile(
                     label: localizations.adbLabel,

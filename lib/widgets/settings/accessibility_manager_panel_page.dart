@@ -64,7 +64,8 @@ class _AccessibilityManagerPanelPageState
             children: [
               SettingsSummarySection(
                 debugLabel: _summaryDebugLabel,
-                child: SettingsAdaptiveGrid(
+                child: SettingsMetricsGrid(
+                  minChildWidth: 176,
                   maxColumns: metricsMaxColumns,
                   children: [
                     SettingsMetricTile(

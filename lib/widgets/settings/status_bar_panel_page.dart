@@ -44,7 +44,9 @@ class StatusBarPanelPage extends StatelessWidget {
       children: [
         SettingsSummarySection(
           debugLabel: _summaryDebugLabel,
-          child: SettingsAdaptiveGrid(
+          child: SettingsMetricsGrid(
+            minChildWidth: 176,
+            maxColumns: 3,
             children: [
               SettingsMetricTile(
                 label: localizations.autoHideAppBar,

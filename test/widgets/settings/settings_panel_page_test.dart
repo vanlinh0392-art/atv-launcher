@@ -45,7 +45,7 @@ void main() {
 
     expect(find.text('ATV Launcher Settings'), findsOneWidget);
     expect(find.text('Control Center'), findsOneWidget);
-    expect(find.text('Home & Layout'), findsAtLeastNWidgets(1));
+    expect(find.text('Home & Layout'), findsOneWidget);
   });
 
   testWidgets('switches to Wallpaper & Media section from the rail',
@@ -67,6 +67,7 @@ void main() {
     await tester.tap(find.text('Wallpaper & Media').first);
     await tester.pumpAndSettle();
 
+    expect(find.text('Wallpaper & Media'), findsOneWidget);
     expect(find.text('Source selection'), findsOneWidget);
     expect(find.text('Single video'), findsOneWidget);
   });

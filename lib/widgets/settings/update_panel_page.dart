@@ -33,9 +33,10 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
   static const String _statusDebugLabel = 'update_panel_status_section';
   static const String _releaseDetailsDebugLabel =
       'update_panel_release_details';
-  static const double _actionCardHeight = 120;
+  static const double _actionCardHeight = 108;
   static const Color _statusOkColor = Color(0xFF7BE0A5);
   static const Color _statusNeedsActionColor = Color(0xFFFFC970);
+  static const Color _statusInfoColor = Color(0xFF8CCBFF);
 
   late final LauncherUpdateClient _updateClient;
   late final FocusNode _statusFocusNode;
@@ -109,17 +110,10 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
           localizations,
           latestAsset,
         );
-        final latestAssetUploadedAtLabel = _resolveLatestAssetUploadedAtLabel(
-          context,
-          localizations,
-          latestAsset,
-        );
         final latestReleaseLabel = _resolveLatestReleaseLabel(localizations);
         final installerLabel = permissionReady
             ? localizations.launcherUpdatePermissionReady
             : localizations.launcherUpdatePermissionMissing;
-        final permissionColor =
-            permissionReady ? _statusOkColor : _statusNeedsActionColor;
         final downloadedLabel = _resolveDownloadedLabel(localizations);
         final checkCardSubtitle = _resolveCheckCardSubtitle(
           localizations,
@@ -150,54 +144,20 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
           key: const PageStorageKey<String>(UpdatePanelPage.routeName),
           padding: const EdgeInsets.only(bottom: 16),
           children: [
-            SettingsSummarySection(
-              debugLabel: _summaryDebugLabel,
-              child: SettingsAdaptiveGrid(
-                minChildWidth: 170,
-                maxColumns: 3,
-                children: [
-                  SettingsMetricTile(
-                    label: localizations.launcherUpdateInstalledVersion,
-                    value: _installedVersionLabel,
-                    icon: Icons.info_outline,
-                  ),
-                  SettingsMetricTile(
-                    label: localizations.launcherUpdateLatestRelease,
-                    value: latestReleaseLabel,
-                    icon: Icons.system_update_outlined,
-                  ),
-                  SettingsMetricTile(
-                    label: localizations.launcherUpdateInstallerPermission,
-                    value: installerLabel,
-                    icon: permissionReady
-                        ? Icons.verified_user_outlined
-                        : Icons.warning_amber_outlined,
-                    accentColor: permissionColor,
-                  ),
-                  SettingsMetricTile(
-                    label: localizations.launcherUpdateDownloadedBuild,
-                    value: downloadedLabel,
-                    icon: Icons.download_done_outlined,
-                  ),
-                  SettingsMetricTile(
-                    label: localizations.launcherUpdateSizeLabel,
-                    value: latestAssetSizeLabel,
-                    icon: Icons.sd_storage_outlined,
-                  ),
-                  SettingsMetricTile(
-                    label: localizations.launcherUpdateUploadedAt,
-                    value: latestAssetUploadedAtLabel,
-                    icon: Icons.event_outlined,
-                  ),
-                ],
-              ),
+            _buildOverviewSummary(
+              localizations: localizations,
+              latestReleaseLabel: latestReleaseLabel,
+              latestAssetSizeLabel: latestAssetSizeLabel,
+              installerLabel: installerLabel,
+              downloadedLabel: downloadedLabel,
+              permissionReady: permissionReady,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             SettingsSurfaceCard(
               padding: const EdgeInsets.all(12),
               child: SettingsAdaptiveGrid(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 8,
+                runSpacing: 8,
                 minChildWidth: 240,
                 maxColumns: 2,
                 children: [
@@ -265,73 +225,13 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
               ),
             ),
             if (_lastMessage.trim().isNotEmpty || _showDownloadProgress) ...[
-              const SizedBox(height: 18),
-              SettingsSurfaceCard(
-                child: SettingsSummarySection(
-                  debugLabel: _statusDebugLabel,
-                  focusNode: _statusFocusNode,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        localizations.launcherUpdateStatusTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      if (_lastMessage.trim().isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          _lastMessage,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                      if (_showDownloadProgress) ...[
-                        const SizedBox(height: 12),
-                        if ((_downloadFileName ?? '').trim().isNotEmpty) ...[
-                          Text(
-                            _downloadFileName!,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        LinearProgressIndicator(
-                          value: _downloadProgress,
-                          minHeight: 8,
-                          borderRadius: BorderRadius.circular(999),
-                          backgroundColor: Colors.white12,
-                          color: const Color(0xFF8ACBFF),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _downloadProgress == null
-                              ? localizations
-                                  .launcherUpdateDownloadIndeterminate
-                              : localizations.launcherUpdateDownloadProgress(
-                                  (_downloadProgress! * 100).round(),
-                                ),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _resolveDownloadBytesLabel(localizations),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.white60),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+              const SizedBox(height: 14),
+              _buildStatusSummary(
+                context: context,
+                localizations: localizations,
               ),
             ],
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             SettingsSurfaceCard(
               child: SettingsSummarySection(
                 debugLabel: _releaseDetailsDebugLabel,
@@ -685,24 +585,6 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     return formatUpdateFileSize(asset.sizeBytes);
   }
 
-  String _resolveLatestAssetUploadedAtLabel(
-    BuildContext context,
-    AppLocalizations localizations,
-    LauncherUpdateAsset? asset,
-  ) {
-    if (!_hasCheckedOfficialRelease) {
-      return localizations.launcherUpdateNotChecked;
-    }
-    if (_latestRelease == null) {
-      return localizations.launcherUpdateNoOfficialRelease;
-    }
-    return _formatUpdateDateTime(
-      context,
-      asset?.uploadedAt ?? _latestRelease?.publishedAt,
-      includeTime: false,
-    );
-  }
-
   Widget _buildUniformActionCard({
     FocusNode? focusNode,
     SettingsBoundaryMoveHandler? onMoveUpAtBoundary,
@@ -721,6 +603,182 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         icon: icon,
         focusEmphasis: 1.18,
         onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildOverviewSummary({
+    required AppLocalizations localizations,
+    required String latestReleaseLabel,
+    required String latestAssetSizeLabel,
+    required String installerLabel,
+    required String downloadedLabel,
+    required bool permissionReady,
+  }) {
+    final chips = <Widget>[
+      SettingsStatusChip(
+        label: _resolveOverviewChipLabel(localizations),
+        color: _resolveOverviewChipColor(),
+      ),
+      SettingsStatusChip(
+        label: installerLabel,
+        color: permissionReady ? _statusOkColor : _statusNeedsActionColor,
+      ),
+    ];
+    if (_downloadedApkCount > 0) {
+      chips.add(
+        SettingsStatusChip(
+          label: downloadedLabel,
+          color: _statusInfoColor,
+        ),
+      );
+    }
+    if (_latestRelease?.preferredApkAsset != null) {
+      chips.add(
+        SettingsStatusChip(
+          label: latestAssetSizeLabel,
+          color: const Color(0xFFC6A6FF),
+        ),
+      );
+    }
+
+    return SettingsSummarySection(
+      debugLabel: _summaryDebugLabel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: chips,
+          ),
+          const SizedBox(height: 12),
+          SettingsMetricsGrid(
+            minChildWidth: 188,
+            maxColumns: 4,
+            children: [
+              SettingsMetricTile(
+                label: localizations.launcherUpdateInstalledVersion,
+                value: _installedVersionLabel,
+                icon: Icons.info_outline,
+              ),
+              SettingsMetricTile(
+                label: localizations.launcherUpdateLatestRelease,
+                value: latestReleaseLabel,
+                icon: Icons.system_update_outlined,
+              ),
+              SettingsMetricTile(
+                label: localizations.launcherUpdateInstallerPermission,
+                value: installerLabel,
+                icon: permissionReady
+                    ? Icons.verified_user_outlined
+                    : Icons.warning_amber_outlined,
+                accentColor:
+                    permissionReady ? _statusOkColor : _statusNeedsActionColor,
+              ),
+              SettingsMetricTile(
+                label: localizations.launcherUpdateDownloadedBuild,
+                value: downloadedLabel,
+                icon: Icons.download_done_outlined,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusSummary({
+    required BuildContext context,
+    required AppLocalizations localizations,
+  }) {
+    final progressLabel = _downloadProgress == null
+        ? localizations.launcherUpdateDownloadIndeterminate
+        : localizations.launcherUpdateDownloadProgress(
+            (_downloadProgress! * 100).round(),
+          );
+
+    return SettingsSurfaceCard(
+      padding: const EdgeInsets.all(10),
+      child: SettingsSummarySection(
+        debugLabel: _statusDebugLabel,
+        focusNode: _statusFocusNode,
+        focusEmphasis: 1.16,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  _showDownloadProgress
+                      ? Icons.downloading_outlined
+                      : Icons.info_outline,
+                  color: Colors.white.withOpacity(0.92),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_lastMessage.trim().isNotEmpty)
+                        Text(
+                          _lastMessage,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      if (_showDownloadProgress) ...[
+                        if (_lastMessage.trim().isNotEmpty)
+                          const SizedBox(height: 10),
+                        if ((_downloadFileName ?? '').trim().isNotEmpty) ...[
+                          Text(
+                            _downloadFileName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.white.withOpacity(0.92),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        LinearProgressIndicator(
+                          value: _downloadProgress,
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(999),
+                          backgroundColor: Colors.white12,
+                          color: const Color(0xFF8ACBFF),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _resolveDownloadBytesLabel(localizations),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.white70),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              progressLabel,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelLarge
+                                  ?.copyWith(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -799,6 +857,30 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       return localizations.launcherUpdateNoOfficialRelease;
     }
     return localizations.launcherUpdateNotChecked;
+  }
+
+  String _resolveOverviewChipLabel(AppLocalizations localizations) {
+    if (!_hasCheckedOfficialRelease) {
+      return localizations.launcherUpdateNotChecked;
+    }
+    if (_latestRelease == null) {
+      return localizations.launcherUpdateNoOfficialRelease;
+    }
+    return _latestRelease!.matchesInstalledVersion(_installedVersionLabel)
+        ? localizations.launcherUpdateInstalledChip
+        : localizations.launcherUpdateLatestChip;
+  }
+
+  Color _resolveOverviewChipColor() {
+    if (!_hasCheckedOfficialRelease) {
+      return _statusInfoColor;
+    }
+    if (_latestRelease == null) {
+      return _statusNeedsActionColor;
+    }
+    return _latestRelease!.matchesInstalledVersion(_installedVersionLabel)
+        ? _statusOkColor
+        : _statusInfoColor;
   }
 
   String _resolveCheckCardSubtitle(
@@ -929,13 +1011,29 @@ class _ReleaseDetailsCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Text(
-                release.displayName.isEmpty
-                    ? release.tagName
-                    : release.displayName,
-                style: Theme.of(context).textTheme.titleLarge,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    release.displayName.isEmpty
+                        ? release.tagName
+                        : release.displayName,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${LauncherUpdateClient.githubOwner}/${LauncherUpdateClient.githubRepo}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                ],
               ),
             ),
             SettingsStatusChip(
@@ -956,39 +1054,41 @@ class _ReleaseDetailsCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        _ReleaseInfoRow(
-          label: localizations.launcherUpdateRepoLabel,
-          value:
-              '${LauncherUpdateClient.githubOwner}/${LauncherUpdateClient.githubRepo}',
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _ReleaseMetaChip(
+              label: localizations.launcherUpdateTagLabel,
+              value: release.tagName.isEmpty ? '-' : release.tagName,
+            ),
+            _ReleaseMetaChip(
+              label: localizations.launcherUpdatePublishedAt,
+              value: _formatUpdateDateTime(context, publishedAt),
+            ),
+            _ReleaseMetaChip(
+              label: localizations.launcherUpdateUploadedAt,
+              value: _formatUpdateDateTime(context, uploadedAt),
+            ),
+            if (asset != null)
+              _ReleaseMetaChip(
+                label: localizations.launcherUpdateSizeLabel,
+                value: formatUpdateFileSize(asset.sizeBytes),
+              ),
+            if (asset != null)
+              _ReleaseMetaChip(
+                label: localizations.launcherUpdateDownloadsLabel,
+                value: asset.downloadCount.toString(),
+              ),
+          ],
         ),
-        _ReleaseInfoRow(
-          label: localizations.launcherUpdateTagLabel,
-          value: release.tagName.isEmpty ? '-' : release.tagName,
-        ),
-        _ReleaseInfoRow(
-          label: localizations.launcherUpdatePublishedAt,
-          value: _formatUpdateDateTime(context, publishedAt),
-        ),
-        _ReleaseInfoRow(
-          label: localizations.launcherUpdateUploadedAt,
-          value: _formatUpdateDateTime(context, uploadedAt),
-        ),
+        const SizedBox(height: 12),
         _ReleaseInfoRow(
           label: localizations.launcherUpdateAssetLabel,
           value: asset == null
               ? localizations.launcherUpdateNoApkAsset
-              : '${asset.name}  •  ${formatUpdateFileSize(asset.sizeBytes)}',
+              : '${asset.name} | ${formatUpdateFileSize(asset.sizeBytes)}',
         ),
-        if (asset != null)
-          _ReleaseInfoRow(
-            label: localizations.launcherUpdateSizeLabel,
-            value: formatUpdateFileSize(asset.sizeBytes),
-          ),
-        if (asset != null)
-          _ReleaseInfoRow(
-            label: localizations.launcherUpdateDownloadsLabel,
-            value: asset.downloadCount.toString(),
-          ),
         if (release.body.trim().isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
@@ -1005,6 +1105,49 @@ class _ReleaseDetailsCard extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _ReleaseMetaChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ReleaseMetaChip({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: Colors.white60),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1036,26 +1179,21 @@ class _ReleaseInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 190,
-            child: Text(
-              label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Colors.white70),
-            ),
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: Colors.white60),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
       ),

@@ -100,14 +100,15 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Text(
+                            localizations.provisioningWizardTitle,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  localizations.provisioningWizardTitle,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ),
                               SettingsStatusChip(
                                 label:
                                     '${localizations.adbLabel} ${adbEnabled ? localizations.yesLabel : localizations.noLabel}',
@@ -115,7 +116,6 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                                     ? const Color(0xFF7BE0A5)
                                     : const Color(0xFFFFC970),
                               ),
-                              const SizedBox(width: 10),
                               SettingsStatusChip(
                                 label:
                                     '${localizations.adbWifiLabel} ${adbWifiEnabled ? localizations.yesLabel : localizations.noLabel}',
@@ -125,49 +125,78 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
                             adbEnabled
                                 ? localizations.provisioningWizardDescription
                                 : localizations.wizardStepOpenDeveloperOptions,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: Colors.white70,
-                                ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.white70,
+                                      height: 1.28,
+                                    ),
                           ),
                           if (!adbEnabled) ...[
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 10),
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.all(14),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0x22FFC970),
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: const Color(0x66FFC970),
                                 ),
                               ),
-                              child: Column(
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    localizations.requirementAdbEnabledGuidance,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(
-                                          color: const Color(0xFFFFD99A),
-                                        ),
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 1),
+                                    child: Icon(
+                                      Icons.developer_board_outlined,
+                                      color: Color(0xFFFFD99A),
+                                      size: 18,
+                                    ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    localizations.wizardStepGrantWss,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(color: Colors.white70),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          localizations
+                                              .requirementAdbEnabledGuidance,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelLarge
+                                              ?.copyWith(
+                                                color: const Color(0xFFFFD99A),
+                                              ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          localizations.wizardStepGrantWss,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Colors.white70,
+                                                height: 1.25,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -179,11 +208,9 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                     const SizedBox(height: 14),
                     SettingsSummarySection(
                       debugLabel: _summaryDebugLabel,
-                      child: SettingsAdaptiveGrid(
-                        minChildWidth: 180,
+                      child: SettingsMetricsGrid(
+                        minChildWidth: 172,
                         maxColumns: 3,
-                        spacing: 10,
-                        runSpacing: 10,
                         children: [
                           SettingsMetricTile(
                             label: localizations.permissionHealthLabel,
@@ -213,7 +240,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                       Container(
                         key: const Key('permissions_missing_summary'),
                         width: double.infinity,
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.045),
                           borderRadius: BorderRadius.circular(20),
@@ -231,10 +258,15 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                             const SizedBox(height: 6),
                             Text(
                               localizations.missingSetupItemsDescription,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
-                                  ?.copyWith(color: Colors.white70),
+                                  ?.copyWith(
+                                    color: Colors.white70,
+                                    height: 1.25,
+                                  ),
                             ),
                             if (missingRequiredRequirements.isNotEmpty) ...[
                               const SizedBox(height: 12),
@@ -837,7 +869,6 @@ class _PermissionsAdvancedToggleTileState
       ),
     );
   }
-
 }
 
 class _PermissionRequirementTile extends StatelessWidget {
