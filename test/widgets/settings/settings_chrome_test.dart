@@ -127,7 +127,7 @@ void main() {
     expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
   });
 
-  testWidgets('settings metric tiles are focusable row-only summaries',
+  testWidgets('settings metric tiles stay non-focusable compact summaries',
       (tester) async {
     final focusNode = FocusNode(debugLabel: 'metric_tile_focus');
     addTearDown(focusNode.dispose);
@@ -149,7 +149,8 @@ void main() {
     final frame =
         tester.widget<SettingsFocusFrame>(find.byType(SettingsFocusFrame));
     expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
-    expect(frame.focused, isTrue);
+    expect(frame.focused, isFalse);
+    expect(focusNode.canRequestFocus, isFalse);
   });
 
   testWidgets('explicit row-only focus binding produces a visible focus frame',
