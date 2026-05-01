@@ -61,6 +61,10 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
     context.read<AppsService>().toggleHomeReorderMode();
   }
 
+  Future<void> _openWifiSettings(BuildContext context) async {
+    await context.read<SystemBridgeService>().openSpecificSettingsPage('wifi');
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCompact = MediaQuery.sizeOf(context).width < 1000;
@@ -92,7 +96,11 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
         },
         child: AppBar(
           automaticallyImplyLeading: false,
-          leadingWidth: showRam ? (isCompact ? 114 : 126) : 18,
+          leadingWidth: showRam
+              ? (isCompact
+                    ? _statusBarRamChipLeadingWidthCompact
+                    : _statusBarRamChipLeadingWidthRegular)
+              : 18,
           titleSpacing: showRam ? 12 : 16,
           leading: showRam
               ? const Padding(
@@ -138,8 +146,19 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
                   ),
                   if (!isCompact) ...[
                     const SizedBox(width: _statusBarActionSpacing),
-                    const _StatusBarIconBadge(
-                      child: NetworkWidget(),
+                    _StatusBarActionSurface(
+                      tooltip: AppLocalizations.of(context)!.openWifiSettings,
+                      onPressed: () => _openWifiSettings(context),
+                      child: IconTheme.merge(
+                        data: const IconThemeData(
+                          color: _statusBarGlyphColor,
+                          size: _statusBarGlyphSize,
+                        ),
+                        child: DefaultTextStyle.merge(
+                          style: const TextStyle(color: _statusBarGlyphColor),
+                          child: const NetworkWidget(),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: _statusBarActionSpacing),
                     _GrantHealthChipButton(
@@ -415,20 +434,27 @@ class _StatusBarIconButton extends StatelessWidget {
   }
 }
 
-class _StatusBarActionSurface extends StatelessWidget {
+class _StatusBarActionSurface extends StatefulWidget {
   final Widget child;
   final VoidCallback? onPressed;
   final String? tooltip;
-  final bool interactive;
   final Color? badgeColor;
 
   const _StatusBarActionSurface({
     required this.child,
     this.onPressed,
     this.tooltip,
-    this.interactive = true,
     this.badgeColor,
   });
+
+  @override
+  State<_StatusBarActionSurface> createState() => _StatusBarActionSurfaceState();
+}
+
+class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
+  final GlobalKey<TooltipState> _tooltipKey = GlobalKey<TooltipState>();
+  bool _focused = false;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -443,24 +469,24 @@ class _StatusBarActionSurface extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            child: interactive
+            child: widget.onPressed != null
                 ? TextButton(
-                    onPressed: onPressed,
+                    onPressed: widget.onPressed,
                     style: _statusBarCompactButtonStyle(intensityFactor),
-                    child: child,
+                    child: widget.child,
                   )
                 : DecoratedBox(
                     decoration: _statusBarSurfaceDecoration(intensityFactor),
-                    child: Center(child: child),
+                    child: Center(child: widget.child),
                   ),
           ),
-          if (badgeColor != null)
+          if (widget.badgeColor != null)
             Positioned(
               right: 1,
               bottom: 1,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: badgeColor,
+                  color: widget.badgeColor,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: _statusBarBaseSurface.withOpacity(0.88),
@@ -480,35 +506,60 @@ class _StatusBarActionSurface extends StatelessWidget {
         ],
       ),
     );
-    if (tooltip == null) {
+    if (widget.tooltip == null) {
       return content;
     }
-    return Tooltip(message: tooltip!, child: content);
-  }
-}
-
-class _StatusBarIconBadge extends StatelessWidget {
-  final Widget child;
-
-  const _StatusBarIconBadge({
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _StatusBarActionSurface(
-      interactive: false,
-      child: IconTheme.merge(
-        data: const IconThemeData(
-          color: _statusBarGlyphColor,
-          size: _statusBarGlyphSize,
-        ),
-        child: DefaultTextStyle.merge(
-          style: const TextStyle(color: _statusBarGlyphColor),
-          child: child,
+    return Focus(
+      canRequestFocus: false,
+      descendantsAreFocusable: true,
+      onFocusChange: (hasFocus) {
+        if (_focused == hasFocus) {
+          return;
+        }
+        setState(() => _focused = hasFocus);
+        _syncTooltipVisibility();
+      },
+      child: MouseRegion(
+        onEnter: (_) {
+          if (_hovered) {
+            return;
+          }
+          setState(() => _hovered = true);
+          _syncTooltipVisibility();
+        },
+        onExit: (_) {
+          if (!_hovered) {
+            return;
+          }
+          setState(() => _hovered = false);
+          _syncTooltipVisibility();
+        },
+        child: Tooltip(
+          key: _tooltipKey,
+          message: widget.tooltip!,
+          triggerMode: TooltipTriggerMode.manual,
+          waitDuration: Duration.zero,
+          showDuration: const Duration(days: 1),
+          child: content,
         ),
       ),
     );
+  }
+
+  void _syncTooltipVisibility() {
+    if (widget.tooltip == null) {
+      return;
+    }
+    if (_focused || _hovered) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !(_focused || _hovered)) {
+          return;
+        }
+        _tooltipKey.currentState?.ensureTooltipVisible();
+      });
+      return;
+    }
+    Tooltip.dismissAllToolTips();
   }
 }
 
@@ -532,6 +583,8 @@ TextStyle _scaledStatusBarTextStyle(
 const double _statusBarActionSpacing = 12;
 const double _statusBarActionExtent = 50;
 const double _statusBarGlyphSize = 21;
+const double _statusBarRamChipLeadingWidthCompact = 128;
+const double _statusBarRamChipLeadingWidthRegular = 142;
 const Color _statusBarGlyphColor = Color(0xFFF5F8FF);
 const Color _statusBarBaseSurface = Color(0xFF132134);
 const Color _statusBarBaseFocusedSurface = Color(0xFF1D314D);

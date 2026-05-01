@@ -116,6 +116,21 @@ public class MainActivity extends FlutterActivity {
     private static final String NETWORK_EVENT_CHANNEL = "com.atv.launcher/event_network";
     private static final String SYSTEM_EVENT_CHANNEL = "com.atv.launcher/event_system";
     private static final String DEBUG_BENCHMARK_ACTION = "com.atv.launcher.DEBUG_BENCHMARK";
+    private static final String XIAOMI_TV_SETTINGS_ACTION = "com.xiaomi.mitv.settings.SETTINGS";
+    private static final String XIAOMI_TV_SETTINGS_PACKAGE = "com.xiaomi.mitv.settings";
+    private static final String XIAOMI_TV_SETTINGS_ACTIVITY =
+            "com.xiaomi.mitv.settings.entry.MainActivity";
+    private static final String XIAOMI_TV_WIFI_SETTINGS_ACTION = "com.xiaomi.mitv.settings.WIFI_SETTINGS";
+    private static final String XIAOMI_TV_WIFI_SETTINGS_ACTIVITY =
+            "com.xiaomi.mitv.settings.wifi.MitvWifiActivity";
+    private static final String AOSP_TV_SETTINGS_PACKAGE = "com.android.tv.settings";
+    private static final String AOSP_TV_SETTINGS_ACTIVITY =
+            "com.android.tv.settings.MainSettings";
+    private static final String GOOGLE_TV_SETTINGS_PACKAGE = "com.google.android.tv.settings";
+    private static final String GOOGLE_TV_SETTINGS_ACTIVITY =
+            "com.google.android.tv.settings.MainSettings";
+    private static final String AOSP_SETTINGS_PACKAGE = "com.android.settings";
+    private static final String AOSP_SETTINGS_ACTIVITY = "com.android.settings.Settings";
     private static final long SYSTEM_EVENT_INTERVAL_MS = 3000L;
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
     private static final long APPLICATIONS_CACHE_TTL_MS = 20_000L;
@@ -846,7 +861,7 @@ public class MainActivity extends FlutterActivity {
     }
 
     private boolean openSettings() {
-        return launchActivityFromAction(Settings.ACTION_SETTINGS);
+        return openSystemSettings();
     }
 
     private boolean openAppInfo(String packageName) {
@@ -1038,6 +1053,7 @@ public class MainActivity extends FlutterActivity {
 
     private ProvisioningEvaluation evaluateProvisioning() {
         List<Map<String, Object>> requirements = new ArrayList<>();
+        boolean launcherAccessibilityHealthy = isLauncherAccessibilityHealthy();
         requirements.add(buildPermissionItem(android.Manifest.permission.WRITE_SECURE_SETTINGS,
                 isDeclaredPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS),
                 hasPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS),
@@ -1088,6 +1104,11 @@ public class MainActivity extends FlutterActivity {
                 hasPermission(mediaReadPermissionName()),
                 "Use the in-app prompt, local ADB wizard or PC ADB grant",
                 "required"));
+        requirements.add(buildPermissionItem("launcher_accessibility_service",
+                true,
+                launcherAccessibilityHealthy,
+                "Auto-repaired after the local ADB grant; use Repair accessibility if it stays off.",
+                "recommended"));
 
         int missingRequiredCount = 0;
         int missingRecommendedCount = 0;
@@ -1301,15 +1322,39 @@ public class MainActivity extends FlutterActivity {
         return buildSystemBridgeStatus();
     }
 
+    private boolean isLauncherAccessibilityHealthy() {
+        return readSecureInt(Settings.Secure.ACCESSIBILITY_ENABLED, 0) == 1
+                && readEnabledAccessibilityServices().contains(SystemBridgeCoordinator.ownAccessibilityServiceId(this));
+    }
+
+    private boolean repairLauncherAccessibilityAfterProvisioning(List<String> log, String reason) {
+        boolean launcherHealthy = SystemBridgeCoordinator.repairLauncherAccessibility(this, reason);
+        AccessibilityGrantCoordinator.RecoveryResult managedResult =
+                AccessibilityGrantCoordinator.ensureManagedAccessibility(this, reason);
+        if (log != null) {
+            log.add("launcher_accessibility=" + BridgeStateStore.getLastAccessibilityRepairResult(this));
+            log.add("managed_accessibility=" + managedResult.resultCode);
+        }
+        return launcherHealthy && isLauncherAccessibilityHealthy();
+    }
+
     private Map<String, Object> grantWriteSecureSettingsWithLocalAdb() {
         AccessibilityGrantCoordinator.LocalGrantResult grantResult =
                 AccessibilityGrantCoordinator.tryGrantWriteSecureSettingsWithLocalAdb(this);
+        List<String> log = new ArrayList<>();
         if (grantResult.success) {
+            repairLauncherAccessibilityAfterProvisioning(log, "local_adb_wss_grant");
             BridgeStateStore.setLastProvisioningVerifyAt(this, System.currentTimeMillis());
         }
         Map<String, Object> map = buildProvisioningChecklist();
         map.put("success", grantResult.success);
-        map.put("message", grantResult.message);
+        map.put(
+                "message",
+                grantResult.success && !isLauncherAccessibilityHealthy()
+                        ? grantResult.message + " WRITE_SECURE_SETTINGS was granted, but launcher accessibility is still degraded."
+                        : grantResult.message
+        );
+        map.put("log", log);
         emitSystemSnapshot();
         return map;
     }
@@ -1352,6 +1397,7 @@ public class MainActivity extends FlutterActivity {
             LocalAdbBridge.Result grantResult = null;
             String grantMessage = "";
             boolean requiresAdbAuthorization = false;
+            boolean launcherAccessibilityHealthy = isLauncherAccessibilityHealthy();
             if (adbEnabledBefore && hadActionableGaps) {
                 grantResult = runLocalAdbGrantBatch(buildProvisioningGrantCommands());
                 grantMessage = grantResult.success
@@ -1378,6 +1424,12 @@ public class MainActivity extends FlutterActivity {
                     requiresAdbAuthorization = looksLikeLocalAdbAuthorizationIssue(policyMessage);
                 }
             }
+            if (writeSecureSettingsGranted) {
+                launcherAccessibilityHealthy = repairLauncherAccessibilityAfterProvisioning(
+                        log,
+                        "local_adb_provisioning"
+                );
+            }
             ProvisioningEvaluation afterEvaluation = evaluateProvisioning();
             boolean hasActionableGapsAfter = hasActionableProvisioningGaps(afterEvaluation);
             boolean requiresAdbSetup = !adbEnabledBefore && hasActionableGapsAfter;
@@ -1386,6 +1438,7 @@ public class MainActivity extends FlutterActivity {
             map.put("requiresAdbSetup", requiresAdbSetup);
             map.put("requiresAdbAuthorization", requiresAdbAuthorization);
             map.put("localAdbGrantMessage", grantMessage);
+            map.put("launcherAccessibilityHealthy", launcherAccessibilityHealthy);
             map.put("remainingRequiredCount", afterEvaluation.missingRequiredCount);
             map.put("remainingRecommendedCount", afterEvaluation.missingRecommendedCount);
             if (!hadActionableGaps && !hasActionableGapsAfter) {
@@ -2441,6 +2494,9 @@ public class MainActivity extends FlutterActivity {
         String normalized = page == null ? "" : page.trim().toLowerCase(Locale.US);
         switch (normalized) {
             case "accessibility" -> intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            case "wifi", "wireless", "network" -> {
+                return openWifiSettings();
+            }
             case "write_settings" -> intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
                     .setData(Uri.parse("package:" + getPackageName()));
             case "overlay" -> intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
@@ -2456,19 +2512,83 @@ public class MainActivity extends FlutterActivity {
             case "notifications" -> intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
             case "development" -> intent = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
-            default -> intent = new Intent(Settings.ACTION_SETTINGS);
+            default -> {
+                return openSystemSettings();
+            }
         }
         return tryStartActivity(intent);
     }
 
+    private boolean openSystemSettings() {
+        List<Intent> candidates = new ArrayList<>();
+        candidates.add(new Intent(XIAOMI_TV_SETTINGS_ACTION).setPackage(XIAOMI_TV_SETTINGS_PACKAGE));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent()
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(AOSP_TV_SETTINGS_PACKAGE, AOSP_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(GOOGLE_TV_SETTINGS_PACKAGE, GOOGLE_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Settings.ACTION_SETTINGS));
+        candidates.add(new Intent()
+                .setClassName(AOSP_SETTINGS_PACKAGE, AOSP_SETTINGS_ACTIVITY));
+        return tryStartActivityCandidates("system_settings", candidates);
+    }
+
+    private boolean openWifiSettings() {
+        List<Intent> candidates = new ArrayList<>();
+        candidates.add(new Intent(XIAOMI_TV_WIFI_SETTINGS_ACTION).setPackage(XIAOMI_TV_SETTINGS_PACKAGE));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_WIFI_SETTINGS_ACTIVITY));
+        candidates.add(new Intent()
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_WIFI_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Settings.ACTION_WIFI_SETTINGS));
+        candidates.add(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+        candidates.add(new Intent(XIAOMI_TV_SETTINGS_ACTION).setPackage(XIAOMI_TV_SETTINGS_PACKAGE));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent().setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Settings.ACTION_SETTINGS));
+        return tryStartActivityCandidates("wifi_settings", candidates);
+    }
+
+    private boolean tryStartActivityCandidates(String label, List<Intent> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return false;
+        }
+        for (Intent candidate : candidates) {
+            if (tryStartActivity(candidate)) {
+                Log.i(TAG, "Opened " + label + " via " + describeIntent(candidate));
+                return true;
+            }
+        }
+        Log.w(TAG, "Failed to open " + label + " after " + candidates.size() + " fallback candidates");
+        return false;
+    }
+
     private boolean tryStartActivity(Intent intent) {
+        if (intent == null) {
+            return false;
+        }
         boolean success = true;
         try {
             startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            Log.w(TAG, "Failed to start activity " + describeIntent(intent), exception);
             success = false;
         }
         return success;
+    }
+
+    private String describeIntent(Intent intent) {
+        if (intent == null) {
+            return "<null>";
+        }
+        String component = intent.getComponent() == null ? "" : " cmp=" + intent.getComponent().flattenToShortString();
+        String pkg = TextUtils.isEmpty(intent.getPackage()) ? "" : " pkg=" + intent.getPackage();
+        String action = TextUtils.isEmpty(intent.getAction()) ? "<none>" : intent.getAction();
+        return action + component + pkg;
     }
 
     private boolean shouldRedirectNonHomeEntry(Intent intent) {

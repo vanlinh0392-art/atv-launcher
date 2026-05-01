@@ -461,7 +461,7 @@ class SettingsMetricsGrid extends StatelessWidget {
     super.key,
     required this.children,
     this.spacing = 8,
-    this.runSpacing = 8,
+    this.runSpacing = 6,
     this.minChildWidth = 168,
     this.maxColumns = 4,
     this.avoidTrailingSingleton = true,
@@ -618,7 +618,7 @@ class SettingsMetricTile extends StatefulWidget {
     required this.icon,
     this.width,
     this.accentColor,
-    this.minHeight = 92,
+    this.minHeight = 46,
   });
 
   @override
@@ -696,7 +696,7 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
         child: SizedBox(
           width: widget.width,
           child: SettingsFocusFrame(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
             borderRadius: BorderRadius.circular(18),
             baseColor: baseColor,
             focusEmphasis: 1.08,
@@ -721,16 +721,16 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
                               .labelMedium
                               ?.copyWith(
                                 color: subtitleColor,
-                                height: 1.15,
+                                height: 1.08,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Icon(widget.icon, size: 18, color: iconColor),
+                      const SizedBox(width: 6),
+                      Icon(widget.icon, size: 14, color: iconColor),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     widget.value,
                     maxLines: 2,
@@ -739,7 +739,7 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
                           color: titleColor,
                           fontWeight:
                               _focused ? FontWeight.w700 : FontWeight.w600,
-                          height: 1.12,
+                          height: 1.06,
                         ),
                   ),
                 ],
@@ -835,7 +835,7 @@ class _SettingsSummarySectionState extends State<SettingsSummarySection> {
           return KeyEventResult.ignored;
         },
         child: SettingsFocusFrame(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           borderRadius: BorderRadius.circular(20),
           baseColor: Colors.transparent,
           focusEmphasis: widget.focusEmphasis,

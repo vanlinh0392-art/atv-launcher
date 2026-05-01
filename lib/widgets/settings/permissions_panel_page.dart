@@ -24,13 +24,16 @@ class PermissionsPanelPage extends StatefulWidget {
 class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
   static const String _headerDebugLabel = 'permissions_summary_header';
   static const String _summaryDebugLabel = 'permissions_summary_metrics';
+  static const String _advancedToggleDebugLabel = 'permissions_advanced_toggle';
   bool _showAdvanced = false;
   late final FocusNode _headerFocusNode;
+  late final FocusNode _advancedToggleFocusNode;
 
   @override
   void initState() {
     super.initState();
     _headerFocusNode = FocusNode(debugLabel: _headerDebugLabel);
+    _advancedToggleFocusNode = FocusNode(debugLabel: _advancedToggleDebugLabel);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bridgeService = context.read<SystemBridgeService>();
       if (bridgeService.provisioningStatus.isEmpty) {
@@ -42,6 +45,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
   @override
   void dispose() {
     _headerFocusNode.dispose();
+    _advancedToggleFocusNode.dispose();
     super.dispose();
   }
 
@@ -440,6 +444,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
                   children: [
                     _PermissionsAdvancedToggleTile(
                       key: const Key('permissions_advanced_toggle'),
+                      focusNode: _advancedToggleFocusNode,
                       title: localizations.requirementChecklistTitle,
                       subtitle:
                           '${localizations.requiredMissingLabel}: $missingRequired  /  ${localizations.recommendedMissingLabel}: $missingRecommended',
@@ -697,6 +702,8 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
       case 'android.permission.READ_MEDIA_VIDEO':
       case 'android.permission.READ_EXTERNAL_STORAGE':
         return localizations.requirementMediaReadLabel;
+      case 'launcher_accessibility_service':
+        return localizations.requirementLauncherAccessibilityLabel;
       default:
         return name;
     }
@@ -729,6 +736,8 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
       case 'android.permission.READ_MEDIA_VIDEO':
       case 'android.permission.READ_EXTERNAL_STORAGE':
         return localizations.requirementMediaReadGuidance;
+      case 'launcher_accessibility_service':
+        return localizations.requirementLauncherAccessibilityGuidance;
       default:
         return fallback;
     }
@@ -751,6 +760,7 @@ class _PermissionsPanelPageState extends State<PermissionsPanelPage> {
 }
 
 class _PermissionsAdvancedToggleTile extends StatefulWidget {
+  final FocusNode? focusNode;
   final String title;
   final String subtitle;
   final bool expanded;
@@ -758,6 +768,7 @@ class _PermissionsAdvancedToggleTile extends StatefulWidget {
 
   const _PermissionsAdvancedToggleTile({
     super.key,
+    this.focusNode,
     required this.title,
     required this.subtitle,
     required this.expanded,
@@ -783,6 +794,7 @@ class _PermissionsAdvancedToggleTileState
       settleFrameCount: 1,
       preferImmediate: true,
       child: Focus(
+        focusNode: widget.focusNode,
         onFocusChange: (value) {
           if (_focused != value) {
             setState(() {
@@ -871,7 +883,7 @@ class _PermissionsAdvancedToggleTileState
   }
 }
 
-class _PermissionRequirementTile extends StatelessWidget {
+class _PermissionRequirementTile extends StatefulWidget {
   final String title;
   final String subtitle;
   final bool granted;
@@ -885,29 +897,126 @@ class _PermissionRequirementTile extends StatelessWidget {
   });
 
   @override
+  State<_PermissionRequirementTile> createState() =>
+      _PermissionRequirementTileState();
+}
+
+class _PermissionRequirementTileState extends State<_PermissionRequirementTile> {
+  late final FocusNode _focusNode;
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final debugToken = widget.title.trim().replaceAll(RegExp(r'\s+'), '_');
+    _focusNode = FocusNode(debugLabel: 'permission_requirement_$debugToken');
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final color = granted
+    final color = widget.granted
         ? const Color(0xFF7BE0A5)
-        : _requirementImportanceColor(importance);
-    final icon = granted
+        : _requirementImportanceColor(widget.importance);
+    final icon = widget.granted
         ? Icons.check_circle
-        : switch (importance) {
+        : switch (widget.importance) {
             'recommended' => Icons.warning_amber_rounded,
             'optional' => Icons.info_outline,
             _ => Icons.gpp_bad_outlined,
           };
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        icon,
-        color: color,
-      ),
-      title: Text(title),
-      subtitle: Text(
-        subtitle,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: granted ? Colors.white70 : color.withOpacity(0.92),
+    final titleColor = _focused ? Colors.white : Colors.white.withOpacity(0.96);
+    final subtitleColor = _focused
+        ? Colors.white.withOpacity(0.86)
+        : (widget.granted ? Colors.white70 : color.withOpacity(0.92));
+    return EnsureVisible(
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
+      child: Focus(
+        focusNode: _focusNode,
+        canRequestFocus: true,
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+              ? TraversalDirection.up
+              : event.logicalKey == LogicalKeyboardKey.arrowDown
+                  ? TraversalDirection.down
+                  : null;
+          if (direction != null) {
+            if (!moveSettingsVerticalFocus(
+              direction: direction,
+              localNodes: <FocusNode>[_focusNode],
+            )) {
+              if (direction == TraversalDirection.up &&
+                  focusNearestSettingsSummaryAbove(_focusNode)) {
+                return KeyEventResult.handled;
+              }
+              _focusNode.focusInDirection(direction);
+            }
+            return KeyEventResult.handled;
+          }
+          if (isSettingsActivateKey(event.logicalKey)) {
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SettingsFocusFrame(
+          padding: EdgeInsets.zero,
+          variant: SettingsFocusFrameVariant.rowOnly,
+          focusEmphasis: 1.18,
+          focused: _focused,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    icon,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: titleColor,
+                              fontWeight:
+                                  _focused ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        widget.subtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: subtitleColor,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
+        ),
       ),
     );
   }

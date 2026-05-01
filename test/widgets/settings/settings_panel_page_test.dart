@@ -328,6 +328,137 @@ void main() {
   });
 
   testWidgets(
+      'permissions advanced requirements become focusable and scroll with DPAD',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService(
+      provisioningStatus: const <String, dynamic>{
+        'health': 'missing_required',
+        'missingRequiredCount': 4,
+        'missingRecommendedCount': 2,
+        'requirements': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'name': 'android.permission.WRITE_SECURE_SETTINGS',
+            'granted': false,
+            'importance': 'required',
+          },
+          <String, dynamic>{
+            'name': 'adb_enabled',
+            'granted': false,
+            'importance': 'required',
+          },
+          <String, dynamic>{
+            'name': 'adb_wifi_enabled',
+            'granted': false,
+            'importance': 'recommended',
+          },
+          <String, dynamic>{
+            'name': 'request_install_packages',
+            'granted': false,
+            'importance': 'recommended',
+          },
+          <String, dynamic>{
+            'name': 'ignore_battery_optimizations',
+            'granted': false,
+            'importance': 'required',
+          },
+          <String, dynamic>{
+            'name': 'device_owner',
+            'granted': false,
+            'importance': 'optional',
+          },
+          <String, dynamic>{
+            'name': 'android.permission.WRITE_SETTINGS',
+            'granted': true,
+            'importance': 'required',
+          },
+          <String, dynamic>{
+            'name': 'android.permission.SYSTEM_ALERT_WINDOW',
+            'granted': true,
+            'importance': 'required',
+          },
+          <String, dynamic>{
+            'name': 'android.permission.READ_MEDIA_VIDEO',
+            'granted': true,
+            'importance': 'recommended',
+          },
+          <String, dynamic>{
+            'name': 'post_notifications',
+            'granted': true,
+            'importance': 'optional',
+          },
+        ],
+        'commands': <String>[],
+      },
+    );
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permissions & Provisioning').first);
+    await tester.pumpAndSettle();
+
+    final permissionsPageFinder = find.byKey(
+      const PageStorageKey<String>(PermissionsPanelPage.routeName),
+    );
+    final permissionsScrollableFinder = find.descendant(
+      of: permissionsPageFinder,
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permissions_advanced_toggle')),
+      260,
+      scrollable: permissionsScrollableFinder,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('permissions_advanced_toggle')));
+    await tester.pumpAndSettle();
+
+    final advancedToggleFocus = tester.widgetList<Focus>(
+      find.descendant(
+        of: find.byKey(const Key('permissions_advanced_toggle')),
+        matching: find.byType(Focus),
+      ),
+    ).firstWhere((focus) => focus.focusNode?.debugLabel == 'permissions_advanced_toggle');
+    advancedToggleFocus.focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'permissions_advanced_toggle',
+    );
+
+    final scrollableState =
+        tester.state<ScrollableState>(permissionsScrollableFinder);
+    final initialPixels = scrollableState.position.pixels;
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
+      contains('permission_requirement_'),
+    );
+
+    for (var i = 0; i < 5; i += 1) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+
+    expect(scrollableState.position.pixels, greaterThan(initialPixels));
+  });
+
+  testWidgets(
       'permissions route surfaces missing requirement names with importance colors',
       (tester) async {
     _prepareView(tester);

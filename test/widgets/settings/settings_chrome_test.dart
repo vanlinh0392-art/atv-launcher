@@ -153,6 +153,55 @@ void main() {
     expect(focusNode.canRequestFocus, isFalse);
   });
 
+  testWidgets('settings metric tiles use the compact summary height target',
+      (tester) async {
+    await tester.pumpWidget(
+      _settingsHarness(
+        const SettingsMetricTile(
+          label: 'Installed version',
+          value: '2026.05.004+19',
+          icon: Icons.system_update_outlined,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final tileSize = tester.getSize(find.byType(SettingsFocusFrame));
+    expect(tileSize.height, lessThan(64));
+    expect(tileSize.height, greaterThan(48));
+  });
+
+  testWidgets('settings summary sections keep a compact header frame',
+      (tester) async {
+    await tester.pumpWidget(
+      _settingsHarness(
+        SettingsSummarySection(
+          debugLabel: 'summary_header_test',
+          child: Row(
+            children: const [
+              Expanded(
+                child: Text(
+                  'Official release ready',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(width: 8),
+              Icon(Icons.verified_outlined, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final summarySize = tester.getSize(find.byType(SettingsFocusFrame));
+    expect(summarySize.height, lessThan(56));
+    expect(summarySize.height, greaterThan(36));
+  });
+
   testWidgets(
       'settings metrics grid avoids a trailing single card for four summary tiles',
       (tester) async {

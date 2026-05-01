@@ -199,6 +199,27 @@ public final class SystemBridgeCoordinator {
         return summary;
     }
 
+    public static boolean repairLauncherAccessibility(Context context, String reason) {
+        Context appContext = context.getApplicationContext();
+        AccessibilityState accessibilityState = readAccessibilityState(appContext);
+        AccessibilityRepairPlan repairPlan = buildTargetAccessibilityState(appContext, accessibilityState);
+        AccessibilityRepairResult repairResult = applyAccessibilityRepair(appContext, accessibilityState, repairPlan);
+
+        BridgeStateStore.setEnabledServiceSnapshot(appContext, repairResult.snapshotEnabledIds);
+        BridgeStateStore.setLastAccessibilityRepairResult(appContext, repairResult.resultCode);
+        BridgeStateStore.setLastMissingServiceIds(appContext, repairResult.missingIds);
+        BridgeStateStore.setLastWriteSecureSettingsGranted(appContext, repairResult.writeSecureSettingsGranted);
+        if (repairResult.isHealthy()) {
+            long now = System.currentTimeMillis();
+            BridgeStateStore.setLastAccessibilityRestoreAt(appContext, now);
+            BridgeStateStore.setLastSuccessAt(appContext, now);
+        }
+        BridgeStateStore.setLastRecoveryReason(appContext, reason);
+        scheduleRecurringWork(appContext);
+        kickAccessManager(appContext, reason);
+        return repairResult.isHealthy();
+    }
+
     public static String buildStatusReport(Context context) {
         Context appContext = context.getApplicationContext();
         AccessibilityState accessibilityState = readAccessibilityState(appContext);
