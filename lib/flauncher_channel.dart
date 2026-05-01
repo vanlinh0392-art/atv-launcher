@@ -71,6 +71,16 @@ class FLauncherChannel {
   Future<Map<String, dynamic>> getSystemBridgeStatusLite() async =>
       _invokeMapMethod('getSystemBridgeStatusLite');
 
+  Future<List<String>> getSupportedAbis() async {
+    final abis = await _methodChannel.invokeListMethod<dynamic>(
+      'getSupportedAbis',
+    );
+    return (abis ?? const <dynamic>[])
+        .map((value) => _normalizeSupportedAbi(value?.toString() ?? ''))
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> getProvisioningChecklist() async =>
       _invokeMapMethod('getProvisioningChecklist');
 
@@ -323,5 +333,21 @@ class FLauncherChannel {
     final map = await _methodChannel.invokeMapMethod<dynamic, dynamic>(
         method, arguments);
     return (map ?? const {}).cast<String, dynamic>();
+  }
+
+  String _normalizeSupportedAbi(String rawAbi) {
+    final normalized = rawAbi.trim().toLowerCase().replaceAll('_', '-');
+    if (normalized.isEmpty) {
+      return '';
+    }
+    if (normalized.contains('arm64') || normalized.contains('aarch64')) {
+      return 'arm64-v8a';
+    }
+    if (normalized.contains('armeabi-v7a') ||
+        normalized == 'armeabi' ||
+        normalized.contains('armv7')) {
+      return 'armeabi-v7a';
+    }
+    return normalized;
   }
 }

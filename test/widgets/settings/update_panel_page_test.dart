@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flauncher/launcher_update_client.dart';
+import 'package:flauncher/providers/launcher_update_session.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
@@ -271,6 +272,285 @@ void main() {
     await _pumpUi(tester);
   });
 
+  testWidgets(
+      'arm64 device shows arm64 asset details and binds the download card to arm64',
+      (tester) async {
+    _prepareView(tester);
+    final tempDirectory = await _createTempTestDirectory('update-panel-arm64');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+    PackageInfo.setMockInitialValues(
+      appName: 'ATV Launcher',
+      packageName: 'com.atv.launcher',
+      version: '2026.05.006',
+      buildNumber: '21',
+      buildSignature: 'release',
+      installerStore: 'adb',
+    );
+
+    final bridgeService = _createBridgeService(
+      canRequestPackageInstalls: true,
+      adbEnabled: true,
+    );
+    addTearDown(bridgeService.dispose);
+
+    final downloadedAssets = <String>[];
+    final release = LauncherUpdateRelease(
+      tagName: 'v2026.05.007-release',
+      name: 'ATV Launcher Release',
+      htmlUrl: 'https://example.com/release',
+      publishedAt: DateTime(2026, 5, 1, 8, 0),
+      body: '',
+      isDraft: false,
+      isPrerelease: false,
+      assets: [
+        LauncherUpdateAsset(
+          name: 'atv-launcher-armeabi-v7a-release.apk',
+          browserDownloadUrl: 'https://example.com/v7a.apk',
+          sizeBytes: 12 * 1024 * 1024,
+          downloadCount: 40,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 5),
+        ),
+        LauncherUpdateAsset(
+          name: 'atv-launcher-arm64-v8a-release.apk',
+          browserDownloadUrl: 'https://example.com/v8a.apk',
+          sizeBytes: 13 * 1024 * 1024,
+          downloadCount: 20,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 10),
+        ),
+      ],
+    );
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(
+        release: release,
+        onDownload: ({
+          required asset,
+          required destinationFile,
+          required onProgress,
+        }) async {
+          downloadedAssets.add(asset.name);
+          await destinationFile.writeAsString('apk');
+          return LauncherDownloadedApk(
+            fileName: asset.name,
+            filePath: destinationFile.path,
+          );
+        },
+      ),
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['arm64-v8a'],
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SystemBridgeService>.value(
+        value: bridgeService,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdatePanelPage(updateSession: session),
+          ),
+        ),
+      ),
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
+
+    final downloadCard = tester.widget<SettingsActionCard>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SettingsActionCard &&
+            widget.title == 'Download latest official APK',
+      ),
+    );
+    expect(downloadCard.subtitle, startsWith('13 MB |'));
+    expect(downloadCard.onPressed, isNotNull);
+    expect(
+      find.textContaining('atv-launcher-arm64-v8a-release.apk'),
+      findsOneWidget,
+    );
+    expect(downloadedAssets, isEmpty);
+  });
+
+  testWidgets('v7a device keeps v7a asset in update panel', (tester) async {
+    _prepareView(tester);
+    final tempDirectory = await _createTempTestDirectory('update-panel-v7a');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+    PackageInfo.setMockInitialValues(
+      appName: 'ATV Launcher',
+      packageName: 'com.atv.launcher',
+      version: '2026.05.006',
+      buildNumber: '21',
+      buildSignature: 'release',
+      installerStore: 'adb',
+    );
+
+    final bridgeService = _createBridgeService(
+      canRequestPackageInstalls: true,
+      adbEnabled: true,
+    );
+    addTearDown(bridgeService.dispose);
+
+    final release = LauncherUpdateRelease(
+      tagName: 'v2026.05.007-release',
+      name: 'ATV Launcher Release',
+      htmlUrl: 'https://example.com/release',
+      publishedAt: DateTime(2026, 5, 1, 8, 0),
+      body: '',
+      isDraft: false,
+      isPrerelease: false,
+      assets: [
+        LauncherUpdateAsset(
+          name: 'atv-launcher-armeabi-v7a-release.apk',
+          browserDownloadUrl: 'https://example.com/v7a.apk',
+          sizeBytes: 12 * 1024 * 1024,
+          downloadCount: 40,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 5),
+        ),
+        LauncherUpdateAsset(
+          name: 'atv-launcher-arm64-v8a-release.apk',
+          browserDownloadUrl: 'https://example.com/v8a.apk',
+          sizeBytes: 13 * 1024 * 1024,
+          downloadCount: 20,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 10),
+        ),
+      ],
+    );
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(release: release),
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['armeabi-v7a'],
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SystemBridgeService>.value(
+        value: bridgeService,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdatePanelPage(updateSession: session),
+          ),
+        ),
+      ),
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
+
+    final downloadCard = tester.widget<SettingsActionCard>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SettingsActionCard &&
+            widget.title == 'Download latest official APK',
+      ),
+    );
+    expect(downloadCard.subtitle, startsWith('12 MB |'));
+    expect(
+      find.textContaining('atv-launcher-armeabi-v7a-release.apk'),
+      findsOneWidget,
+    );
+  });
+
+  test('arm64 session downloads the arm64 asset selected for the device',
+      () async {
+    final tempDirectory =
+        await _createTempTestDirectory('update-session-arm64');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+
+    final localizations =
+        await AppLocalizations.delegate.load(const Locale('en'));
+    final downloadedAssets = <String>[];
+    final release = LauncherUpdateRelease(
+      tagName: 'v2026.05.007-release',
+      name: 'ATV Launcher Release',
+      htmlUrl: 'https://example.com/release',
+      publishedAt: DateTime(2026, 5, 1, 8, 0),
+      body: '',
+      isDraft: false,
+      isPrerelease: false,
+      assets: [
+        LauncherUpdateAsset(
+          name: 'atv-launcher-armeabi-v7a-release.apk',
+          browserDownloadUrl: 'https://example.com/v7a.apk',
+          sizeBytes: 12 * 1024 * 1024,
+          downloadCount: 40,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 5),
+        ),
+        LauncherUpdateAsset(
+          name: 'atv-launcher-arm64-v8a-release.apk',
+          browserDownloadUrl: 'https://example.com/v8a.apk',
+          sizeBytes: 13 * 1024 * 1024,
+          downloadCount: 20,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 5, 1, 8, 10),
+        ),
+      ],
+    );
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(
+        release: release,
+        onDownload: ({
+          required asset,
+          required destinationFile,
+          required onProgress,
+        }) async {
+          downloadedAssets.add(asset.name);
+          await destinationFile.writeAsString('apk');
+          return LauncherDownloadedApk(
+            fileName: asset.name,
+            filePath: destinationFile.path,
+          );
+        },
+      ),
+      launcherChannel: _FakeFLauncherChannel(
+        liteStatus: const <String, dynamic>{},
+        supportedAbis: const ['arm64-v8a'],
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await session.initialize();
+    await session.checkLatestRelease(localizations);
+
+    final selectedAsset = session.latestReleaseAsset;
+    expect(selectedAsset?.name, 'atv-launcher-arm64-v8a-release.apk');
+
+    await session.downloadLatestApk(selectedAsset!, localizations);
+
+    expect(downloadedAssets, ['atv-launcher-arm64-v8a-release.apk']);
+    expect(session.downloadedAssetName, 'atv-launcher-arm64-v8a-release.apk');
+  });
+
   testWidgets('update action cards keep uniform size for a compact grid',
       (tester) async {
     _prepareView(tester);
@@ -423,18 +703,19 @@ void main() {
     await _pumpUi(tester);
     expect(find.text('Official Build 001'), findsWidgets);
 
-    await tester.ensureVisible(find.text('Check latest official release').first);
+    await tester
+        .ensureVisible(find.text('Check latest official release').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Check latest official release'));
     await _pumpUi(tester);
 
     expect(find.text('Official Build 001'), findsNothing);
     expect(
-      find.textContaining('GitHub official release check failed: Bad state: offline'),
+      find.textContaining(
+          'GitHub official release check failed: Bad state: offline'),
       findsOneWidget,
     );
   });
-
 }
 
 class _FakeLauncherUpdateClient extends LauncherUpdateClient {
@@ -484,7 +765,8 @@ class _SequencedFakeLauncherUpdateClient extends LauncherUpdateClient {
 
   @override
   Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async {
-    final index = _callCount < responses.length ? _callCount : responses.length - 1;
+    final index =
+        _callCount < responses.length ? _callCount : responses.length - 1;
     _callCount += 1;
     final value = responses[index];
     if (value is LauncherUpdateRelease?) {
@@ -517,13 +799,18 @@ SystemBridgeService _createBridgeService({
 
 class _FakeFLauncherChannel extends FLauncherChannel {
   final Map<String, dynamic> liteStatus;
+  final List<String> supportedAbis;
 
   _FakeFLauncherChannel({
     required this.liteStatus,
+    this.supportedAbis = const <String>[],
   });
 
   @override
   Future<Map<String, dynamic>> getSystemBridgeStatusLite() async => liteStatus;
+
+  @override
+  Future<List<String>> getSupportedAbis() async => supportedAbis;
 
   @override
   StreamSubscription<dynamic> addSystemChangedListener(

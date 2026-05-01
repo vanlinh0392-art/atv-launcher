@@ -52,6 +52,31 @@ def hasReleaseSigningCredentials =
         secretProperties['signing_key_alias'] &&
         secretProperties['signing_key_alias'] != 'null'
 
+def configuredReleaseAbis = []
+def flutterTargetPlatforms = project.findProperty('target-platform')
+        ?.toString()
+        ?.split(',')
+        ?.collect { it.trim() }
+        ?.findAll { !it.isEmpty() }
+
+if (flutterTargetPlatforms?.contains('android-arm64')) {
+    configuredReleaseAbis << 'arm64-v8a'
+}
+if (flutterTargetPlatforms?.contains('android-arm')) {
+    configuredReleaseAbis << 'armeabi-v7a'
+}
+if (flutterTargetPlatforms?.contains('android-x64')) {
+    configuredReleaseAbis << 'x86_64'
+}
+if (configuredReleaseAbis.isEmpty()) {
+    configuredReleaseAbis << (project.findProperty('releaseAbi') ?: 'armeabi-v7a')
+}
+def buildUniversalReleaseApk =
+        configuredReleaseAbis.size() > 1 ||
+        (project.findProperty('releaseUniversalApk') ?: 'false')
+                .toString()
+                .toBoolean()
+
 android {
     namespace 'com.atv.launcher'
     compileSdk 35
@@ -93,8 +118,8 @@ android {
             // https://stackoverflow.com/a/39950584/21037183
             enable gradle.startParameter.taskNames.any { it.contains("assembleRelease") }
             reset()
-            include "armeabi-v7a"
-            universalApk false
+            include(*configuredReleaseAbis)
+            universalApk buildUniversalReleaseApk
         }
     }
 

@@ -158,6 +158,159 @@ void main() {
       );
     });
 
+    test('arm64 device prefers arm64 asset when both arm64 and v7a exist', () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.05.01-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-05-01T10:00:00Z',
+        'body': officialMarker,
+        'assets': [
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/arm.apk',
+            'size': 456,
+            'download_count': 10,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+          {
+            'name': 'atv-launcher-arm64-v8a-release.apk',
+            'browser_download_url': 'https://example.com/arm64.apk',
+            'size': 512,
+            'download_count': 2,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(
+        release.preferredApkAssetFor(const ['arm64-v8a'])?.name,
+        'atv-launcher-arm64-v8a-release.apk',
+      );
+    });
+
+    test('arm64 device falls back to v7a before universal', () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.05.01-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-05-01T10:00:00Z',
+        'body': officialMarker,
+        'assets': [
+          {
+            'name': 'atv-launcher-universal-release.apk',
+            'browser_download_url': 'https://example.com/universal.apk',
+            'size': 999,
+            'download_count': 50,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/arm.apk',
+            'size': 456,
+            'download_count': 1,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(
+        release.preferredApkAssetFor(const ['arm64-v8a'])?.name,
+        'atv-launcher-armeabi-v7a-release.apk',
+      );
+    });
+
+    test('arm64 device uses universal only when both arm64 and v7a are absent',
+        () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.05.01-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-05-01T10:00:00Z',
+        'body': officialMarker,
+        'assets': [
+          {
+            'name': 'atv-launcher-universal-release.apk',
+            'browser_download_url': 'https://example.com/universal.apk',
+            'size': 999,
+            'download_count': 50,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(
+        release.preferredApkAssetFor(const ['arm64-v8a'])?.name,
+        'atv-launcher-universal-release.apk',
+      );
+    });
+
+    test('v7a device prefers v7a asset', () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.05.01-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-05-01T10:00:00Z',
+        'body': officialMarker,
+        'assets': [
+          {
+            'name': 'atv-launcher-arm64-v8a-release.apk',
+            'browser_download_url': 'https://example.com/arm64.apk',
+            'size': 512,
+            'download_count': 2,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/arm.apk',
+            'size': 456,
+            'download_count': 10,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(
+        release.preferredApkAssetFor(const ['armeabi-v7a'])?.name,
+        'atv-launcher-armeabi-v7a-release.apk',
+      );
+    });
+
+    test('unknown ABI keeps legacy generic fallback ordering', () {
+      final release = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.05.01-release',
+        'name': 'ATV Launcher Release',
+        'html_url': 'https://example.com/release',
+        'published_at': '2026-05-01T10:00:00Z',
+        'body': officialMarker,
+        'assets': [
+          {
+            'name': 'atv-launcher-arm64-v8a-release.apk',
+            'browser_download_url': 'https://example.com/arm64.apk',
+            'size': 512,
+            'download_count': 2,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/arm.apk',
+            'size': 456,
+            'download_count': 10,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      expect(
+        release.preferredApkAssetFor(const ['x86_64'])?.name,
+        release.preferredApkAsset?.name,
+      );
+      expect(
+        release.preferredApkAssetFor(const ['x86_64'])?.name,
+        'atv-launcher-armeabi-v7a-release.apk',
+      );
+    });
+
     test('returns no preferred asset when only debug APKs exist', () {
       final release = LauncherUpdateRelease.fromGitHubJson({
         'tag_name': 'v2026.04.30-release',

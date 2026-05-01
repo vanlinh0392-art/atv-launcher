@@ -213,6 +213,28 @@ class LauncherUpdateRelease {
     return apkAssets.first;
   }
 
+  LauncherUpdateAsset? preferredApkAssetFor(Iterable<String> deviceAbis) {
+    final apkAssets = eligibleApkAssets.toList(growable: false);
+    if (apkAssets.isEmpty) {
+      return null;
+    }
+
+    final deviceProfile = _resolveDeviceAbiProfile(deviceAbis);
+    if (deviceProfile == _DeviceAbiProfile.unknown) {
+      return preferredApkAsset;
+    }
+
+    apkAssets.sort(
+      (left, right) => _compareDeviceAwareApkAssets(
+        left,
+        right,
+        deviceProfile,
+      ),
+    );
+    final selected = apkAssets.first;
+    return _deviceAwarePriority(selected, deviceProfile) > 0 ? selected : null;
+  }
+
   Iterable<LauncherUpdateAsset> get eligibleApkAssets =>
       assets.where((asset) => asset.isOfficialApkAsset);
 
@@ -231,8 +253,8 @@ class LauncherUpdateRelease {
 
   bool get _hasOfficialChannelMarker =>
       _normalizedBody.contains(
-            LauncherUpdateClient.officialChannelMarker.toLowerCase(),
-          ) ||
+        LauncherUpdateClient.officialChannelMarker.toLowerCase(),
+      ) ||
       (_normalizedBody.contains('updater-channel:') &&
           _normalizedBody.contains(
             LauncherUpdateClient.officialChannelSlug.toLowerCase(),
@@ -315,10 +337,9 @@ class LauncherUpdateRelease {
       return versionPriority;
     }
 
-    final uploadedPriority = (right.preferredApkAsset?.uploadedAt
-                ?.millisecondsSinceEpoch ??
-            -1)
-        .compareTo(
+    final uploadedPriority =
+        (right.preferredApkAsset?.uploadedAt?.millisecondsSinceEpoch ?? -1)
+            .compareTo(
       left.preferredApkAsset?.uploadedAt?.millisecondsSinceEpoch ?? -1,
     );
     if (uploadedPriority != 0) {
@@ -334,8 +355,9 @@ class LauncherUpdateRelease {
     }
     final leftParts = _parseVersionParts(left);
     final rightParts = _parseVersionParts(right);
-    final maxLength =
-        leftParts.length > rightParts.length ? leftParts.length : rightParts.length;
+    final maxLength = leftParts.length > rightParts.length
+        ? leftParts.length
+        : rightParts.length;
     for (var index = 0; index < maxLength; index += 1) {
       final leftValue = index < leftParts.length ? leftParts[index] : 0;
       final rightValue = index < rightParts.length ? rightParts[index] : 0;
@@ -389,6 +411,21 @@ class LauncherUpdateRelease {
     return right.sizeBytes.compareTo(left.sizeBytes);
   }
 
+  static int _compareDeviceAwareApkAssets(
+    LauncherUpdateAsset left,
+    LauncherUpdateAsset right,
+    _DeviceAbiProfile deviceProfile,
+  ) {
+    final devicePriority = _deviceAwarePriority(
+      right,
+      deviceProfile,
+    ).compareTo(_deviceAwarePriority(left, deviceProfile));
+    if (devicePriority != 0) {
+      return devicePriority;
+    }
+    return _compareApkAssets(left, right);
+  }
+
   static int _releaseAssetPriority(LauncherUpdateAsset asset) {
     final name = asset.name.toLowerCase();
     if (name.contains('release')) {
@@ -418,6 +455,74 @@ class LauncherUpdateRelease {
     final name = asset.name.toLowerCase();
     return name.contains('universal') ? 1 : 0;
   }
+
+  static _DeviceAbiProfile _resolveDeviceAbiProfile(
+      Iterable<String> deviceAbis) {
+    final normalizedAbis = deviceAbis
+        .map(_normalizeDeviceAbi)
+        .where((abi) => abi.isNotEmpty)
+        .toSet();
+    if (normalizedAbis.any(
+      (abi) => abi == 'arm64-v8a' || abi == 'aarch64',
+    )) {
+      return _DeviceAbiProfile.arm64;
+    }
+    if (normalizedAbis.any(
+      (abi) => abi == 'armeabi-v7a' || abi == 'armeabi',
+    )) {
+      return _DeviceAbiProfile.armV7;
+    }
+    return _DeviceAbiProfile.unknown;
+  }
+
+  static int _deviceAwarePriority(
+    LauncherUpdateAsset asset,
+    _DeviceAbiProfile deviceProfile,
+  ) {
+    final assetAbi = _resolveAssetAbi(asset);
+    switch (deviceProfile) {
+      case _DeviceAbiProfile.arm64:
+        switch (assetAbi) {
+          case _LauncherAssetAbi.arm64:
+            return 3;
+          case _LauncherAssetAbi.armV7:
+            return 2;
+          case _LauncherAssetAbi.universal:
+            return 1;
+          case _LauncherAssetAbi.unknown:
+            return 0;
+        }
+      case _DeviceAbiProfile.armV7:
+        switch (assetAbi) {
+          case _LauncherAssetAbi.armV7:
+            return 3;
+          case _LauncherAssetAbi.universal:
+            return 2;
+          case _LauncherAssetAbi.arm64:
+          case _LauncherAssetAbi.unknown:
+            return 0;
+        }
+      case _DeviceAbiProfile.unknown:
+        return 0;
+    }
+  }
+
+  static _LauncherAssetAbi _resolveAssetAbi(LauncherUpdateAsset asset) {
+    final name = asset.name.toLowerCase();
+    if (name.contains('universal')) {
+      return _LauncherAssetAbi.universal;
+    }
+    if (name.contains('arm64') || name.contains('aarch64')) {
+      return _LauncherAssetAbi.arm64;
+    }
+    if (name.contains('armeabi') || name.contains('v7a')) {
+      return _LauncherAssetAbi.armV7;
+    }
+    return _LauncherAssetAbi.unknown;
+  }
+
+  static String _normalizeDeviceAbi(String rawAbi) =>
+      rawAbi.trim().toLowerCase().replaceAll('_', '-');
 }
 
 class LauncherUpdateAsset {
@@ -487,6 +592,19 @@ class LauncherDownloadedApk {
     required this.fileName,
     required this.filePath,
   });
+}
+
+enum _DeviceAbiProfile {
+  arm64,
+  armV7,
+  unknown,
+}
+
+enum _LauncherAssetAbi {
+  arm64,
+  armV7,
+  universal,
+  unknown,
 }
 
 String normalizeVersionToken(String raw) {

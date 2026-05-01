@@ -112,7 +112,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         final permissionReady =
             updateStatus['canRequestPackageInstalls'] == true;
         final adbEnabled = updateStatus['adbEnabled'] == true;
-        final latestAsset = _updateSession.latestRelease?.preferredApkAsset;
+        final latestAsset = _updateSession.latestReleaseAsset;
         final latestAssetSizeLabel = _resolveLatestAssetSizeLabel(
           localizations,
           latestAsset,
@@ -495,7 +495,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         ),
       );
     }
-    if (_updateSession.latestRelease?.preferredApkAsset != null) {
+    if (_updateSession.latestReleaseAsset != null) {
       chips.add(
         SettingsStatusChip(
           label: latestAssetSizeLabel,
@@ -580,26 +580,26 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_updateSession.lastMessage.trim().isNotEmpty)
+                        Text(
+                          _updateSession.lastMessage,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      if (_showDownloadProgress) ...[
                         if (_updateSession.lastMessage.trim().isNotEmpty)
+                          const SizedBox(height: 10),
+                        if ((_updateSession.downloadFileName ?? '')
+                            .trim()
+                            .isNotEmpty) ...[
                           Text(
-                            _updateSession.lastMessage,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        if (_showDownloadProgress) ...[
-                          if (_updateSession.lastMessage.trim().isNotEmpty)
-                            const SizedBox(height: 10),
-                          if ((_updateSession.downloadFileName ?? '')
-                              .trim()
-                              .isNotEmpty) ...[
-                            Text(
-                              _updateSession.downloadFileName!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style:
-                                  Theme.of(context).textTheme.bodySmall?.copyWith(
+                            _updateSession.downloadFileName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Colors.white.withOpacity(0.92),
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -676,8 +676,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       return localizations.launcherUpdateNoOfficialRelease;
     }
     return _updateSession.latestRelease!.matchesInstalledVersion(
-          _installedVersionLabel,
-        )
+      _installedVersionLabel,
+    )
         ? localizations.launcherUpdateInstalledChip
         : localizations.launcherUpdateLatestChip;
   }
@@ -690,8 +690,8 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       return _statusNeedsActionColor;
     }
     return _updateSession.latestRelease!.matchesInstalledVersion(
-          _installedVersionLabel,
-        )
+      _installedVersionLabel,
+    )
         ? _statusOkColor
         : _statusInfoColor;
   }
@@ -714,8 +714,11 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     if (!_updateSession.hasCheckedOfficialRelease) {
       return localizations.launcherUpdateNotChecked;
     }
-    if (_updateSession.latestRelease == null || asset == null) {
+    if (_updateSession.latestRelease == null) {
       return localizations.launcherUpdateNoOfficialRelease;
+    }
+    if (asset == null) {
+      return localizations.launcherUpdateNoApkAsset;
     }
     return '${formatUpdateFileSize(asset.sizeBytes)} | ${_formatUpdateDateTime(context, asset.uploadedAt, includeTime: false)}';
   }
@@ -796,6 +799,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     }
     return _ReleaseDetailsCard(
       release: _updateSession.latestRelease!,
+      asset: _updateSession.latestReleaseAsset,
       installedVersionLabel: _installedVersionLabel,
       permissionReady: permissionReady,
     );
@@ -804,11 +808,13 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
 
 class _ReleaseDetailsCard extends StatelessWidget {
   final LauncherUpdateRelease release;
+  final LauncherUpdateAsset? asset;
   final String installedVersionLabel;
   final bool permissionReady;
 
   const _ReleaseDetailsCard({
     required this.release,
+    required this.asset,
     required this.installedVersionLabel,
     required this.permissionReady,
   });
@@ -816,9 +822,9 @@ class _ReleaseDetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
-    final asset = release.preferredApkAsset;
+    final selectedAsset = asset;
     final publishedAt = release.publishedAt;
-    final uploadedAt = asset?.uploadedAt ?? publishedAt;
+    final uploadedAt = selectedAsset?.uploadedAt ?? publishedAt;
     final matchesInstalled =
         release.matchesInstalledVersion(installedVersionLabel);
     final permissionColor = permissionReady
@@ -890,24 +896,24 @@ class _ReleaseDetailsCard extends StatelessWidget {
               label: localizations.launcherUpdateUploadedAt,
               value: _formatUpdateDateTime(context, uploadedAt),
             ),
-            if (asset != null)
+            if (selectedAsset != null)
               _ReleaseMetaChip(
                 label: localizations.launcherUpdateSizeLabel,
-                value: formatUpdateFileSize(asset.sizeBytes),
+                value: formatUpdateFileSize(selectedAsset.sizeBytes),
               ),
-            if (asset != null)
+            if (selectedAsset != null)
               _ReleaseMetaChip(
                 label: localizations.launcherUpdateDownloadsLabel,
-                value: asset.downloadCount.toString(),
+                value: selectedAsset.downloadCount.toString(),
               ),
           ],
         ),
         const SizedBox(height: 8),
         _ReleaseInfoRow(
           label: localizations.launcherUpdateAssetLabel,
-          value: asset == null
+          value: selectedAsset == null
               ? localizations.launcherUpdateNoApkAsset
-              : '${asset.name} | ${formatUpdateFileSize(asset.sizeBytes)}',
+              : '${selectedAsset.name} | ${formatUpdateFileSize(selectedAsset.sizeBytes)}',
         ),
         if (release.body.trim().isNotEmpty) ...[
           const SizedBox(height: 8),

@@ -426,6 +426,7 @@ public class MainActivity extends FlutterActivity {
             case "isDefaultLauncher" -> result.success(isDefaultLauncher());
             case "checkForGetContentAvailability" -> result.success(checkForGetContentAvailability());
             case "startAmbientMode" -> result.success(startAmbientMode());
+            case "getSupportedAbis" -> result.success(getSupportedAbis());
             case "getActiveNetworkInformation" -> result.success(getActiveNetworkInformation());
             case "getSystemBridgeStatusLite" -> result.success(buildSystemBridgeStatusLite());
             case "getSystemBridgeStatus" -> result.success(buildSystemBridgeStatus());
@@ -3121,6 +3122,45 @@ public class MainActivity extends FlutterActivity {
             return true;
         }
         return getPackageManager().canRequestPackageInstalls();
+    }
+
+    private List<String> getSupportedAbis() {
+        LinkedHashSet<String> normalizedAbis = new LinkedHashSet<>();
+        if (Build.SUPPORTED_ABIS != null) {
+            for (String abi : Build.SUPPORTED_ABIS) {
+                String normalized = normalizeSupportedAbi(abi);
+                if (!TextUtils.isEmpty(normalized)) {
+                    normalizedAbis.add(normalized);
+                }
+            }
+        }
+        if (normalizedAbis.isEmpty()) {
+            String cpuAbi = normalizeSupportedAbi(Build.CPU_ABI);
+            if (!TextUtils.isEmpty(cpuAbi)) {
+                normalizedAbis.add(cpuAbi);
+            }
+            String cpuAbi2 = normalizeSupportedAbi(Build.CPU_ABI2);
+            if (!TextUtils.isEmpty(cpuAbi2)) {
+                normalizedAbis.add(cpuAbi2);
+            }
+        }
+        return new ArrayList<>(normalizedAbis);
+    }
+
+    private String normalizeSupportedAbi(String abi) {
+        if (TextUtils.isEmpty(abi)) {
+            return "";
+        }
+        String normalized = abi.trim().toLowerCase(Locale.US).replace('_', '-');
+        if (normalized.contains("arm64") || normalized.contains("aarch64")) {
+            return "arm64-v8a";
+        }
+        if (normalized.contains("armeabi-v7a")
+                || TextUtils.equals(normalized, "armeabi")
+                || normalized.contains("armv7")) {
+            return "armeabi-v7a";
+        }
+        return normalized;
     }
 
     private String mediaReadPermissionName() {

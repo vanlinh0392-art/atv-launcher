@@ -28,6 +28,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   int? _videoTextureId;
   bool _videoWarmUpScheduled = false;
   bool _videoWarmUpCompleted = false;
+  bool _videoNeedsForegroundRearm = false;
   int _settingsPlaybackSuppressionCount = 0;
   final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
   Timer? _pendingVideoWarmUpTimer;
@@ -81,7 +82,17 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   bool get _shouldDelayVideoUntilHomeSettles =>
       _performanceProfile.startVideoAfterHomeSettles;
 
+  bool get _shouldDelayVideoAfterReturningHome =>
+      _settingsService.homeDockPerformanceMode ==
+      SettingsService.homeDockPerformanceModeSmooth;
+
+  bool get _shouldExplicitlyRearmVideoAfterForegroundReturn =>
+      _settingsService.homeDockPerformanceMode ==
+      SettingsService.homeDockPerformanceModeBalanced;
+
   bool get _shouldReleasePlayerOnBackground =>
+      _settingsService.homeDockPerformanceMode !=
+          SettingsService.homeDockPerformanceModeBalanced &&
       _performanceProfile.releasePlayerOnBackground;
 
   bool get _canActivateVideoWallpaper =>
@@ -242,6 +253,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _ensureVideoTextureId();
     await syncVideoOptionsToNative(notifyFlutter: false);
     _videoWarmUpCompleted = true;
+    _videoNeedsForegroundRearm = false;
     notifyListeners();
     _logStartupMetric(
       'time_to_video_ready_request',
@@ -450,8 +462,11 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     if (suppressed) {
       _settingsPlaybackSuppressionCount += 1;
       cancelPendingHomeVideoStart();
-      if (_shouldDelayVideoUntilHomeSettles) {
+      if (_shouldDelayVideoAfterReturningHome) {
         _markVideoNeedsWarmUp(clearTexture: false);
+      } else if (_shouldExplicitlyRearmVideoAfterForegroundReturn &&
+          _videoWarmUpCompleted) {
+        _videoNeedsForegroundRearm = true;
       }
     } else if (_settingsPlaybackSuppressionCount > 0) {
       _settingsPlaybackSuppressionCount -= 1;
@@ -466,14 +481,23 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       suppressed: nextSuppressed,
       reason: nextSuppressed ? 'settings_panel' : 'settings_panel_release',
     );
-    if (!nextSuppressed && _shouldDelayVideoUntilHomeSettles) {
-      scheduleHomeVisibleVideoStart();
+    if (nextSuppressed || !_canActivateVideoWallpaper) {
+      return;
     }
+    if (_shouldDelayVideoAfterReturningHome) {
+      scheduleHomeVisibleVideoStart();
+      return;
+    }
+    await _resumeVideoAfterForegroundReturnIfNeeded();
   }
 
   void notifyHomeVisibleAndUsable() {
     _homeVisibleAndUsable = true;
     if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
+      return;
+    }
+    if (_videoNeedsForegroundRearm) {
+      unawaited(_resumeVideoAfterForegroundReturnIfNeeded());
       return;
     }
     if (_shouldDelayVideoUntilHomeSettles) {
@@ -556,6 +580,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }) {
     cancelPendingHomeVideoStart();
     _videoWarmUpCompleted = false;
+    _videoNeedsForegroundRearm = false;
     if (clearTexture) {
       _videoTextureId = null;
     }
@@ -566,6 +591,11 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _handleAppBackgrounded() {
     cancelPendingHomeVideoStart(clearHomeVisible: true);
+    if (_shouldExplicitlyRearmVideoAfterForegroundReturn &&
+        _canActivateVideoWallpaper &&
+        _videoWarmUpCompleted) {
+      _videoNeedsForegroundRearm = true;
+    }
     if (_shouldReleasePlayerOnBackground && _canActivateVideoWallpaper) {
       _markVideoNeedsWarmUp(clearTexture: true);
     }
@@ -574,16 +604,10 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (!_canActivateVideoWallpaper || _shouldDelayVideoUntilHomeSettles) {
+      if (!_canActivateVideoWallpaper || _shouldDelayVideoAfterReturningHome) {
         return;
       }
-      if (!_videoWarmUpCompleted && !_videoWarmUpScheduled) {
-        if (fastStartupEnabled) {
-          _scheduleVideoWarmUp(allowDeferredStart: false);
-        } else {
-          unawaited(_warmUpVideoController());
-        }
-      }
+      unawaited(_resumeVideoAfterForegroundReturnIfNeeded());
       return;
     }
     _handleAppBackgrounded();
@@ -605,6 +629,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _applyPerformanceModePolicyChange() async {
+    if (!_shouldExplicitlyRearmVideoAfterForegroundReturn) {
+      _videoNeedsForegroundRearm = false;
+    }
     await syncVideoOptionsToNative(notifyFlutter: false);
     if (videoBlockedByPerformanceMode && isVideoMode) {
       await _fallbackFromVideoForPerformanceMode(autoRestoreEligible: true);
@@ -692,5 +719,28 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     );
     await _warmUpVideoControllerForCurrentMode(allowDeferred: true);
     notifyListeners();
+  }
+
+  Future<void> _resumeVideoImmediatelyIfNeeded() async {
+    if (!_canActivateVideoWallpaper ||
+        _videoWarmUpCompleted ||
+        _videoWarmUpScheduled) {
+      return;
+    }
+    await _warmUpVideoController();
+  }
+
+  Future<void> _resumeVideoAfterForegroundReturnIfNeeded() async {
+    if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
+      return;
+    }
+    if (_videoNeedsForegroundRearm) {
+      if (_videoWarmUpScheduled) {
+        return;
+      }
+      await _warmUpVideoController();
+      return;
+    }
+    await _resumeVideoImmediatelyIfNeeded();
   }
 }

@@ -40,34 +40,59 @@ jobs:
       - name: Test
         run: flutter test --no-pub
 
-      - name: Build release APK
-        id: build_release
+      - name: Build armeabi-v7a release APK
+        id: build_release_v7a
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p build/release-assets
           rm -f build/app/outputs/flutter-apk/*release*.apk || true
           rm -f build/app/outputs/apk/release/*release*.apk || true
           set +e
           flutter build apk --release --target-platform android-arm --no-pub
           status=$?
           set -e
-          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*release*.apk' | head -n 1)"
+          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*armeabi-v7a*release*.apk' | head -n 1)"
+          if [[ -z "${apk_path}" ]]; then
+            apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*release*.apk' | head -n 1)"
+          fi
           if [[ ${status} -ne 0 && -z "${apk_path}" ]]; then
-            echo "Release APK was not produced."
+            echo "armeabi-v7a release APK was not produced."
             exit "${status}"
           fi
+          if [[ -z "${apk_path}" ]]; then
+            echo "armeabi-v7a release APK was not produced."
+            exit 1
+          fi
+          asset_path="build/release-assets/atv-launcher-armeabi-v7a-release.apk"
+          cp "${apk_path}" "${asset_path}"
+          echo "asset_path=${asset_path}" >> "${GITHUB_OUTPUT}"
 
-      - name: Prepare official release asset
-        id: prepare_release_asset
+      - name: Build arm64-v8a release APK
+        id: build_release_v8a
         shell: bash
         run: |
           set -euo pipefail
-          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*release*.apk' | head -n 1)"
+          mkdir -p build/release-assets
+          rm -f build/app/outputs/flutter-apk/*release*.apk || true
+          rm -f build/app/outputs/apk/release/*release*.apk || true
+          set +e
+          flutter build apk --release --target-platform android-arm64 --no-pub
+          status=$?
+          set -e
+          apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*arm64-v8a*release*.apk' | head -n 1)"
           if [[ -z "${apk_path}" ]]; then
-            echo "Release APK was not produced."
+            apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*release*.apk' | head -n 1)"
+          fi
+          if [[ ${status} -ne 0 && -z "${apk_path}" ]]; then
+            echo "arm64-v8a release APK was not produced."
+            exit "${status}"
+          fi
+          if [[ -z "${apk_path}" ]]; then
+            echo "arm64-v8a release APK was not produced."
             exit 1
           fi
-          asset_path="build/app/outputs/flutter-apk/atv-launcher-armeabi-v7a-release.apk"
+          asset_path="build/release-assets/atv-launcher-arm64-v8a-release.apk"
           cp "${apk_path}" "${asset_path}"
           echo "asset_path=${asset_path}" >> "${GITHUB_OUTPUT}"
 
@@ -113,7 +138,9 @@ jobs:
 
           footer = [
               "",
-              "Tep phat hanh: `atv-launcher-armeabi-v7a-release.apk`",
+              "Tep phat hanh:",
+              "- `atv-launcher-armeabi-v7a-release.apk`",
+              "- `atv-launcher-arm64-v8a-release.apk`",
               "",
               "Updater-Channel: xfire0392-netizen-official",
               "Launcher updater chi nhan official release va bo qua debug build.",
@@ -124,11 +151,13 @@ jobs:
           )
           PY
 
-      - name: Upload official APK artifact
+      - name: Upload official APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: atv-launcher-armeabi-v7a-release
-          path: ${{ steps.prepare_release_asset.outputs.asset_path }}
+          name: atv-launcher-official-release-apks
+          path: |
+            ${{ steps.build_release_v7a.outputs.asset_path }}
+            ${{ steps.build_release_v8a.outputs.asset_path }}
           retention-days: 30
 
       - name: Publish official GitHub release
@@ -137,4 +166,6 @@ jobs:
           tag_name: ${{ steps.official_release_meta.outputs.tag_name }}
           name: ${{ steps.official_release_meta.outputs.release_name }}
           body_path: build/release_notes.md
-          files: ${{ steps.prepare_release_asset.outputs.asset_path }}
+          files: |
+            ${{ steps.build_release_v7a.outputs.asset_path }}
+            ${{ steps.build_release_v8a.outputs.asset_path }}
