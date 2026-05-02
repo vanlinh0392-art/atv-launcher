@@ -33,6 +33,7 @@ public final class VideoWallpaperController {
 
     private final Context appContext;
     private final TextureRegistry textureRegistry;
+    private final Runnable statusChangedCallback;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private TextureRegistry.SurfaceTextureEntry surfaceTextureEntry;
@@ -78,9 +79,14 @@ public final class VideoWallpaperController {
 
     private final Runnable backgroundReleaseRunnable = this::releasePlayer;
 
-    public VideoWallpaperController(Context context, TextureRegistry textureRegistry) {
+    public VideoWallpaperController(
+            Context context,
+            TextureRegistry textureRegistry,
+            Runnable statusChangedCallback
+    ) {
         this.appContext = context.getApplicationContext();
         this.textureRegistry = textureRegistry;
+        this.statusChangedCallback = statusChangedCallback;
     }
 
     public long ensureTextureId() {
@@ -168,9 +174,9 @@ public final class VideoWallpaperController {
 
     public void onWallpaperModeChanged() {
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
-            videoReady = false;
-            lastError = "";
+            boolean changed = setVideoReady(false) | setLastError("");
             releasePlayer();
+            notifyStatusChangedIf(changed);
             return;
         }
         maybeStartPlayback(false);
@@ -189,12 +195,13 @@ public final class VideoWallpaperController {
         if (player != null) {
             resolvedPlaylistUris = resolvePlaylistUris();
             if (resolvedPlaylistUris.isEmpty()) {
-                videoReady = false;
-                lastError = "No playable wallpaper videos were resolved.";
+                boolean changed = setVideoReady(false)
+                        | setLastError("No playable wallpaper videos were resolved.");
                 releasePlayer();
+                notifyStatusChangedIf(changed);
                 return;
             }
-            currentIndex = 0;
+            boolean changed = setCurrentIndex(0);
             applyMediaItems();
             applyPlayerPolicySettings();
             applyPresentationSettings();
@@ -206,6 +213,7 @@ public final class VideoWallpaperController {
                 resumeExistingPlayerIfNeeded();
             }
             scheduleIntervalAdvance();
+            notifyStatusChangedIf(changed);
         } else {
             maybeStartPlayback(false);
         }
@@ -341,18 +349,20 @@ public final class VideoWallpaperController {
 
         resolvedPlaylistUris = resolvePlaylistUris();
         if (resolvedPlaylistUris.isEmpty()) {
-            videoReady = false;
-            lastError = "No playable wallpaper videos were resolved.";
+            boolean changed = setVideoReady(false)
+                    | setLastError("No playable wallpaper videos were resolved.");
+            notifyStatusChangedIf(changed);
             return;
         }
 
         ensureSurface();
         releasePlayer();
-        videoReady = false;
-        lastError = "";
-        currentIndex = 0;
+        boolean resetStatusChanged = setVideoReady(false)
+                | setLastError("")
+                | setCurrentIndex(0);
         activePlaybackConfigSignature = desiredConfigSignature;
         videoWarmupStartedAtNanos = System.nanoTime();
+        notifyStatusChangedIf(resetStatusChanged);
 
         trackSelector = new DefaultTrackSelector(appContext);
         player = new ExoPlayer.Builder(appContext)
@@ -362,18 +372,20 @@ public final class VideoWallpaperController {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
-                videoReady = playbackState == Player.STATE_READY;
+                boolean statusChanged = setVideoReady(playbackState == Player.STATE_READY);
                 if (videoReady) {
                     logPerf("time_to_video_ready", videoWarmupStartedAtNanos);
                     videoWarmupStartedAtNanos = 0L;
                     scheduleIntervalAdvance();
                 }
+                notifyStatusChangedIf(statusChanged);
             }
 
             @Override
             public void onPlayerError(PlaybackException error) {
-                videoReady = false;
-                lastError = error.getMessage() == null ? error.toString() : error.getMessage();
+                boolean statusChanged = setVideoReady(false)
+                        | setLastError(error.getMessage() == null ? error.toString() : error.getMessage());
+                notifyStatusChangedIf(statusChanged);
                 if (!advancePlaylist()) {
                     releasePlayer();
                 }
@@ -381,20 +393,19 @@ public final class VideoWallpaperController {
 
             @Override
             public void onVideoSizeChanged(VideoSize size) {
-                if (size.width > 0) {
-                    videoWidth = size.width;
-                }
-                if (size.height > 0) {
-                    videoHeight = size.height;
-                }
+                notifyStatusChangedIf(setVideoSize(size.width, size.height));
             }
 
             @Override
             public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+                boolean statusChanged = false;
                 if (player != null) {
-                    currentIndex = Math.max(0, player.getCurrentMediaItemIndex());
+                    statusChanged = setCurrentIndex(
+                            Math.max(0, player.getCurrentMediaItemIndex())
+                    );
                 }
                 scheduleIntervalAdvance();
+                notifyStatusChangedIf(statusChanged);
             }
         });
         applyMediaItems();
@@ -526,7 +537,7 @@ public final class VideoWallpaperController {
             player = null;
         }
         trackSelector = null;
-        videoReady = false;
+        notifyStatusChangedIf(setVideoReady(false));
         activePlaybackConfigSignature = "";
     }
 
@@ -627,5 +638,61 @@ public final class VideoWallpaperController {
                         .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, !enabled)
                         .build()
         );
+    }
+
+    private void notifyStatusChangedIf(boolean changed) {
+        if (!changed) {
+            return;
+        }
+        notifyStatusChanged();
+    }
+
+    private void notifyStatusChanged() {
+        if (statusChangedCallback == null) {
+            return;
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            statusChangedCallback.run();
+            return;
+        }
+        mainHandler.post(statusChangedCallback);
+    }
+
+    private boolean setVideoReady(boolean ready) {
+        if (videoReady == ready) {
+            return false;
+        }
+        videoReady = ready;
+        return true;
+    }
+
+    private boolean setLastError(String error) {
+        String normalized = error == null ? "" : error;
+        if (TextUtils.equals(lastError, normalized)) {
+            return false;
+        }
+        lastError = normalized;
+        return true;
+    }
+
+    private boolean setVideoSize(int width, int height) {
+        boolean changed = false;
+        if (width > 0 && videoWidth != width) {
+            videoWidth = width;
+            changed = true;
+        }
+        if (height > 0 && videoHeight != height) {
+            videoHeight = height;
+            changed = true;
+        }
+        return changed;
+    }
+
+    private boolean setCurrentIndex(int index) {
+        if (currentIndex == index) {
+            return false;
+        }
+        currentIndex = index;
+        return true;
     }
 }

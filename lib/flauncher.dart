@@ -73,7 +73,7 @@ typedef _HomeDockSettingsSnapshot = ({
 typedef _HomeSectionsSnapshot = ({
   bool initialized,
   List<LauncherSection> sections,
-  String signature,
+  Object sectionsIdentity,
 });
 
 typedef _NavigationSnapshot = ({
@@ -222,7 +222,7 @@ class _HomeContentState extends State<_HomeContent> {
           return const (
             initialized: false,
             sections: <LauncherSection>[],
-            signature: 'loading',
+            sectionsIdentity: '',
           );
         }
         final sections = security == null
@@ -231,12 +231,12 @@ class _HomeContentState extends State<_HomeContent> {
         return (
           initialized: true,
           sections: sections,
-          signature: _launcherSectionsSignature(sections),
+          sectionsIdentity: sections,
         );
       },
       shouldRebuild: (previous, next) =>
           previous.initialized != next.initialized ||
-          previous.signature != next.signature,
+          !identical(previous.sectionsIdentity, next.sectionsIdentity),
       builder: (context, homeSections, _) {
         if (!homeSections.initialized) {
           return const _HomeLoadingState();
@@ -245,7 +245,7 @@ class _HomeContentState extends State<_HomeContent> {
         if (launcherVisible) {
           _scheduleHomeUsableSignal(
             context,
-            '${homeSections.signature}|${navigation.homeSequence}',
+            '${identityHashCode(homeSections.sectionsIdentity)}|${navigation.homeSequence}',
           );
         }
 
@@ -271,43 +271,6 @@ class _HomeContentState extends State<_HomeContent> {
       },
     );
   }
-}
-
-String _launcherSectionsSignature(List<LauncherSection> sections) {
-  final buffer = StringBuffer();
-  for (final section in sections) {
-    buffer.write(section.runtimeType);
-    buffer.write(':');
-    buffer.write(section.id);
-    buffer.write(':');
-    buffer.write(section.order);
-    if (section is LauncherSpacer) {
-      buffer.write(':');
-      buffer.write(section.height);
-    } else if (section is Category) {
-      buffer.write(':');
-      buffer.write(section.name);
-      buffer.write(':');
-      buffer.write(section.sort.name);
-      buffer.write(':');
-      buffer.write(section.type.name);
-      buffer.write(':');
-      buffer.write(section.columnsCount);
-      buffer.write(':');
-      buffer.write(section.rowHeight);
-      buffer.write(':');
-      for (final app in section.applications) {
-        buffer.write(app.packageName);
-        buffer.write('@');
-        buffer.write(app.name);
-        buffer.write('@');
-        buffer.write(app.hidden ? 1 : 0);
-        buffer.write(',');
-      }
-    }
-    buffer.write('|');
-  }
-  return buffer.toString();
 }
 
 class _HomeLoadingState extends StatelessWidget {
@@ -477,6 +440,8 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   String? _activeSectionName;
   String? _lastFocusedRowSignature;
   BuildContext? _lastFocusedItemContext;
+  List<FocusNode> _cachedDockTraversalNodes = const <FocusNode>[];
+  bool _dockTraversalNodesDirty = true;
 
   HomePerformanceProfile get _performanceProfile =>
       HomePerformanceProfile.resolve(widget.performanceMode);
@@ -486,6 +451,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     super.initState();
     _collapsed = widget.autoCollapseEnabled;
     _activeSectionName = _firstCategoryName(widget.sections);
+    _invalidateDockTraversalCache();
   }
 
   @override
@@ -495,6 +461,10 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         widget.homeSequence > 0 &&
         widget.homeNavigationReason == 'home_reentry') {
       _handleHomeReentry();
+    }
+    if (!identical(widget.sections, oldWidget.sections) ||
+        widget.homeReorderModeEnabled != oldWidget.homeReorderModeEnabled) {
+      _invalidateDockTraversalCache();
     }
     if (widget.homeReorderModeEnabled != oldWidget.homeReorderModeEnabled) {
       if (widget.homeReorderModeEnabled) {
@@ -802,7 +772,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     if (current == null) {
       return false;
     }
-    final nodes = _dockTraversalNodes();
+    final nodes = _dockTraversalNodes(current: current);
     if (nodes.isEmpty || !nodes.contains(current)) {
       return false;
     }
@@ -1199,15 +1169,35 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     nodes.first.requestFocus();
   }
 
-  List<FocusNode> _dockTraversalNodes() {
-    return _dockFocusNode.traversalDescendants
-        .where(
-          (node) =>
-              node.context != null &&
-              node.canRequestFocus &&
-              !node.skipTraversal,
-        )
+  void _invalidateDockTraversalCache() {
+    _dockTraversalNodesDirty = true;
+    _cachedDockTraversalNodes = const <FocusNode>[];
+  }
+
+  bool _isUsableDockTraversalNode(FocusNode node) {
+    return node.context != null && node.canRequestFocus && !node.skipTraversal;
+  }
+
+  List<FocusNode> _dockTraversalNodes({FocusNode? current}) {
+    if (!_dockTraversalNodesDirty && _cachedDockTraversalNodes.isNotEmpty) {
+      var cachedNodesStillUsable = true;
+      for (final node in _cachedDockTraversalNodes) {
+        if (!_isUsableDockTraversalNode(node)) {
+          cachedNodesStillUsable = false;
+          break;
+        }
+      }
+      if (cachedNodesStillUsable &&
+          (current == null || _cachedDockTraversalNodes.contains(current))) {
+        return _cachedDockTraversalNodes;
+      }
+    }
+    final nodes = _dockFocusNode.traversalDescendants
+        .where(_isUsableDockTraversalNode)
         .toList(growable: false);
+    _cachedDockTraversalNodes = nodes;
+    _dockTraversalNodesDirty = false;
+    return nodes;
   }
 }
 

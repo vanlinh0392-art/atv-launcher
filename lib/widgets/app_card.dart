@@ -66,6 +66,9 @@ class AppCard extends StatefulWidget {
       LinkedHashMap<String, Future<Tuple2<AppImageType, ImageProvider>>>();
   static final Queue<_QueuedAppImageLoad> _pendingImageLoads =
       Queue<_QueuedAppImageLoad>();
+  static final LinkedHashMap<Object, VoidCallback> _deferredImageLoadCallbacks =
+      LinkedHashMap<Object, VoidCallback>();
+  static Timer? _deferredImageLoadBatchTimer;
   static int _activeImageLoads = 0;
 
   final App application;
@@ -166,6 +169,9 @@ class AppCard extends StatefulWidget {
     _resolvedImageCache.clear();
     _imageLoadCache.clear();
     _pendingImageLoads.clear();
+    _deferredImageLoadCallbacks.clear();
+    _deferredImageLoadBatchTimer?.cancel();
+    _deferredImageLoadBatchTimer = null;
   }
 
   static void _trimImageCaches() {
@@ -210,6 +216,36 @@ class AppCard extends StatefulWidget {
       });
     }
   }
+
+  static void _scheduleDeferredImageLoad(
+    Object token,
+    VoidCallback callback,
+  ) {
+    _deferredImageLoadCallbacks[token] = callback;
+    _deferredImageLoadBatchTimer ??=
+        Timer(_deferredImageLoadDelay, _flushDeferredImageLoads);
+  }
+
+  static void _cancelDeferredImageLoad(Object token) {
+    _deferredImageLoadCallbacks.remove(token);
+    if (_deferredImageLoadCallbacks.isEmpty) {
+      _deferredImageLoadBatchTimer?.cancel();
+      _deferredImageLoadBatchTimer = null;
+    }
+  }
+
+  static void _flushDeferredImageLoads() {
+    _deferredImageLoadBatchTimer = null;
+    if (_deferredImageLoadCallbacks.isEmpty) {
+      return;
+    }
+    final callbacks =
+        _deferredImageLoadCallbacks.values.toList(growable: false);
+    _deferredImageLoadCallbacks.clear();
+    for (final callback in callbacks) {
+      callback();
+    }
+  }
 }
 
 class _QueuedAppImageLoad {
@@ -234,8 +270,8 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   Tuple2<AppImageType, ImageProvider>? _resolvedAppImage;
   Object? _appImageLoadError;
   int? _lastSeenImageCacheRevision;
-  Timer? _deferredImageLoadTimer;
   int _imageLoadRevision = 0;
+  final Object _deferredImageLoadToken = Object();
   late final AnimationController _animation = AnimationController(
     vsync: this,
     lowerBound: 0,
@@ -279,7 +315,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     FocusManager.instance
         .removeHighlightModeListener(_focusHighlightModeChanged);
     AppImageCacheInvalidator.instance.removeListener(_syncImageCacheRevision);
-    _deferredImageLoadTimer?.cancel();
+    AppCard._cancelDeferredImageLoad(_deferredImageLoadToken);
     _cardFocusNode.dispose();
     _animation.dispose();
 
@@ -652,7 +688,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   }
 
   void _bindAppImage() {
-    _deferredImageLoadTimer?.cancel();
+    AppCard._cancelDeferredImageLoad(_deferredImageLoadToken);
     final loadRevision = ++_imageLoadRevision;
     final packageName = widget.application.packageName;
     _resolvedAppImage = AppCard._getCachedImage(packageName);
@@ -664,7 +700,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       _ensureAppImageLoaded(priority: true, loadRevision: loadRevision);
       return;
     }
-    _deferredImageLoadTimer = Timer(AppCard._deferredImageLoadDelay, () {
+    AppCard._scheduleDeferredImageLoad(_deferredImageLoadToken, () {
       if (!mounted) {
         return;
       }
@@ -697,7 +733,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     if (_resolvedAppImage != null) {
       return;
     }
-    _deferredImageLoadTimer?.cancel();
+    AppCard._cancelDeferredImageLoad(_deferredImageLoadToken);
     final packageName = widget.application.packageName;
     final expectedRevision = loadRevision ?? _imageLoadRevision;
     _appImageLoadFuture = AppCard._putImageLoadFuture(

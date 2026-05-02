@@ -282,9 +282,10 @@ class SystemBridgeService extends ChangeNotifier {
       value is Map ? value.cast<String, dynamic>() : <String, dynamic>{};
 
   bool _applyStatusSnapshot(Map<String, dynamic> snapshot) {
-    final merged = _mergeStatusMaps(_status, snapshot);
-    final changed = !_deepEquals(_status, merged);
-    _status = merged;
+    final snapshotKind = snapshot['snapshotKind']?.toString();
+    final changed = snapshotKind == null
+        ? _applyDeltaSnapshot(snapshot)
+        : _applyFullSnapshot(snapshot);
     final diagnosticsReport = snapshot['diagnosticsReport']?.toString();
     if (diagnosticsReport != null &&
         diagnosticsReport.isNotEmpty &&
@@ -293,6 +294,25 @@ class SystemBridgeService extends ChangeNotifier {
       return true;
     }
     return changed;
+  }
+
+  bool _applyFullSnapshot(Map<String, dynamic> snapshot) {
+    final merged = _mergeStatusMaps(_status, snapshot);
+    final changed = !_deepEquals(_status, merged);
+    _status = merged;
+    return changed;
+  }
+
+  bool _applyDeltaSnapshot(Map<String, dynamic> snapshot) {
+    if (snapshot.isEmpty) {
+      return false;
+    }
+    final merged = _mergeDeltaMap(_status, snapshot);
+    if (identical(merged, _status)) {
+      return false;
+    }
+    _status = merged;
+    return true;
   }
 
   static Map<String, dynamic> _mergeStatusMaps(
@@ -316,6 +336,33 @@ class SystemBridgeService extends ChangeNotifier {
       }
     });
     return merged;
+  }
+
+  static Map<String, dynamic> _mergeDeltaMap(
+    Map<String, dynamic> current,
+    Map<String, dynamic> update,
+  ) {
+    Map<String, dynamic>? merged;
+    update.forEach((key, value) {
+      final existingValue = current[key];
+      if (existingValue is Map && value is Map) {
+        final mergedChild = _mergeDeltaMap(
+          existingValue.cast<String, dynamic>(),
+          value.cast<String, dynamic>(),
+        );
+        if (!identical(mergedChild, existingValue)) {
+          merged ??= Map<String, dynamic>.from(current);
+          merged![key] = mergedChild;
+        }
+        return;
+      }
+      if (_deepEquals(existingValue, value)) {
+        return;
+      }
+      merged ??= Map<String, dynamic>.from(current);
+      merged![key] = value;
+    });
+    return merged ?? current;
   }
 
   static bool _deepEquals(dynamic left, dynamic right) {

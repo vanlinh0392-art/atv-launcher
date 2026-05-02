@@ -135,10 +135,13 @@ public class MainActivity extends FlutterActivity {
             "com.google.android.tv.settings.MainSettings";
     private static final String AOSP_SETTINGS_PACKAGE = "com.android.settings";
     private static final String AOSP_SETTINGS_ACTIVITY = "com.android.settings.Settings";
-    private static final long SYSTEM_EVENT_INTERVAL_MS = 8000L;
+    private static final long SYSTEM_EVENT_INTERVAL_MS = 15000L;
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
     private static final long APPLICATIONS_CACHE_TTL_MS = 60_000L;
-    private static final long LITE_STATUS_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
+    private static final long LITE_ADB_AUTOMATION_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
+    private static final long LITE_HOME_GUARD_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
+    private static final long LITE_PROVISIONING_CACHE_TTL_MS = 60_000L;
+    private static final long LITE_MEMORY_CACHE_TTL_MS = 30_000L;
     private static final int MAX_IMAGE_CACHE_ENTRIES = 48;
     private static final int MAX_IMAGE_CACHE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_BANNER_WIDTH = 640;
@@ -260,7 +263,8 @@ public class MainActivity extends FlutterActivity {
             if (sharedVideoWallpaperController == null) {
                 sharedVideoWallpaperController = new VideoWallpaperController(
                         getApplicationContext(),
-                        flutterEngine.getRenderer()
+                        flutterEngine.getRenderer(),
+                        this::emitWallpaperStatusDelta
                 );
             }
             bindSharedFlutterChannels(flutterEngine);
@@ -973,7 +977,7 @@ public class MainActivity extends FlutterActivity {
         synchronized (LITE_STATUS_CACHE_LOCK) {
             long now = SystemClock.elapsedRealtime();
             if (cachedLiteAdbAutomationStatus == null
-                    || now - cachedLiteAdbAutomationAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                    || now - cachedLiteAdbAutomationAtElapsedMs > LITE_ADB_AUTOMATION_CACHE_TTL_MS) {
                 cachedLiteAdbAutomationStatus = SystemBridgeCoordinator.buildAdbAutomationStatus(this);
                 cachedLiteAdbAutomationAtElapsedMs = now;
             }
@@ -988,7 +992,7 @@ public class MainActivity extends FlutterActivity {
         synchronized (LITE_STATUS_CACHE_LOCK) {
             long now = SystemClock.elapsedRealtime();
             if (cachedLiteHomeGuardStatus == null
-                    || now - cachedLiteHomeGuardAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                    || now - cachedLiteHomeGuardAtElapsedMs > LITE_HOME_GUARD_CACHE_TTL_MS) {
                 cachedLiteHomeGuardStatus = SystemBridgeCoordinator.buildHomeGuardStatus(this);
                 cachedLiteHomeGuardAtElapsedMs = now;
             }
@@ -1003,7 +1007,7 @@ public class MainActivity extends FlutterActivity {
         synchronized (LITE_STATUS_CACHE_LOCK) {
             long now = SystemClock.elapsedRealtime();
             if (cachedLiteProvisioningSummary == null
-                    || now - cachedLiteProvisioningSummaryAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                    || now - cachedLiteProvisioningSummaryAtElapsedMs > LITE_PROVISIONING_CACHE_TTL_MS) {
                 cachedLiteProvisioningSummary = buildProvisioningSummary();
                 cachedLiteProvisioningSummaryAtElapsedMs = now;
             }
@@ -1018,7 +1022,7 @@ public class MainActivity extends FlutterActivity {
         synchronized (LITE_STATUS_CACHE_LOCK) {
             long now = SystemClock.elapsedRealtime();
             if (cachedLiteMemoryStatus == null
-                    || now - cachedLiteMemoryStatusAtElapsedMs > LITE_STATUS_CACHE_TTL_MS) {
+                    || now - cachedLiteMemoryStatusAtElapsedMs > LITE_MEMORY_CACHE_TTL_MS) {
                 cachedLiteMemoryStatus = buildMemoryStatus();
                 cachedLiteMemoryStatusAtElapsedMs = now;
             }
