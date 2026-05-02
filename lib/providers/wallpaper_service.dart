@@ -10,6 +10,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/gradients.dart';
@@ -24,7 +25,8 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   final FLauncherChannel _fLauncherChannel;
   final SettingsService _settingsService;
 
-  ImageProvider? _wallpaper;
+  ImageProvider<Object>? _wallpaper;
+  String _loadedWallpaperPreviewPath = '';
   int? _videoTextureId;
   bool _videoWarmUpScheduled = false;
   bool _videoWarmUpCompleted = false;
@@ -35,7 +37,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   bool _homeVisibleAndUsable = false;
   late String _lastKnownPerformanceMode;
 
-  ImageProvider? get wallpaper => _wallpaper;
+  ImageProvider<Object>? get wallpaper => _wallpaper;
   int? get videoTextureId => _videoTextureId;
   bool get isVideoMode => _settingsService.wallpaperMode == 'video';
   bool get videoAllowedByPerformanceMode =>
@@ -182,14 +184,65 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   Future<bool> _reloadPreviewImage() async {
     final path = _settingsService.wallpaperPreviewPath;
     if (path.isNotEmpty && await File(path).exists()) {
-      _wallpaper = FileImage(File(path));
-      notifyListeners();
+      await _setWallpaperPreview(
+        _buildPreviewImageProvider(File(path)),
+        previewPath: path,
+      );
       return true;
-    } else {
-      _wallpaper = null;
     }
-    notifyListeners();
+    await _setWallpaperPreview(null, previewPath: '');
     return false;
+  }
+
+  ImageProvider<Object> _buildPreviewImageProvider(File file) {
+    final decodeTarget = _resolvePreviewDecodeTarget();
+    return ResizeImage(
+      FileImage(file),
+      width: decodeTarget.width,
+      height: decodeTarget.height,
+    );
+  }
+
+  ({int width, int height}) _resolvePreviewDecodeTarget() {
+    final view = WidgetsBinding.instance.platformDispatcher.implicitView ??
+        ui.PlatformDispatcher.instance.implicitView;
+    final physicalSize = view?.physicalSize ?? ui.Size.zero;
+    final resolvedWidth =
+        physicalSize.width > 0 ? physicalSize.width.round() : 1920;
+    final resolvedHeight =
+        physicalSize.height > 0 ? physicalSize.height.round() : 1080;
+    return (
+      width: resolvedWidth.clamp(1, 1920).toInt(),
+      height: resolvedHeight.clamp(1, 1080).toInt(),
+    );
+  }
+
+  Future<void> _setWallpaperPreview(
+    ImageProvider<Object>? nextWallpaper, {
+    required String previewPath,
+  }) async {
+    final previousWallpaper = _wallpaper;
+    final previousPreviewPath = _loadedWallpaperPreviewPath;
+    _wallpaper = nextWallpaper;
+    _loadedWallpaperPreviewPath = previewPath;
+    notifyListeners();
+    if (previousWallpaper == null) {
+      return;
+    }
+    final shouldEvict =
+        nextWallpaper == null || previousPreviewPath != previewPath;
+    if (!shouldEvict) {
+      return;
+    }
+    unawaited(_evictWallpaperPreview(previousWallpaper));
+  }
+
+  Future<void> _evictWallpaperPreview(ImageProvider<Object> provider) async {
+    try {
+      await provider.evict(cache: PaintingBinding.instance.imageCache);
+    } catch (_) {
+      // Best-effort cache cleanup only.
+    }
   }
 
   Future<void> _ensureVideoTextureId() async {
@@ -396,10 +449,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _settingsService.setWallpaperMode('gradient');
     await _settingsService.setWallpaperVideoRestoreCandidatePending(false);
     await _fLauncherChannel.setWallpaperMode('gradient');
-    _wallpaper = null;
     cancelPendingHomeVideoStart(clearHomeVisible: true);
     _markVideoNeedsWarmUp(clearTexture: true, notify: false);
-    notifyListeners();
+    await _setWallpaperPreview(null, previewPath: '');
   }
 
   Future<void> setVideoOrderMode(String value) async {
@@ -701,9 +753,8 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     }
     await _settingsService.setWallpaperMode('gradient');
     await _fLauncherChannel.setWallpaperMode('gradient');
-    _wallpaper = null;
+    await _setWallpaperPreview(null, previewPath: '');
     await syncVideoOptionsToNative(notifyFlutter: false);
-    notifyListeners();
   }
 
   Future<void> _syncCurrentNonVideoModeToNative({

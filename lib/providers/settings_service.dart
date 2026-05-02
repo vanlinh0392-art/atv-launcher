@@ -77,6 +77,7 @@ const _backupLastExportName = "backup_last_export_name";
 const _backupLastImportName = "backup_last_import_name";
 const _backupLastRestoreSummary = "backup_last_restore_summary";
 const _backupLastRestoreAt = "backup_last_restore_at";
+const _adbLocalOnboardingHandled = "adb_local_onboarding_handled";
 
 class SettingsService extends ChangeNotifier {
   static const String defaultDateFormat = "E d/M";
@@ -328,6 +329,9 @@ class SettingsService extends ChangeNotifier {
 
   int get backupLastRestoreAt =>
       _sharedPreferences.getInt(_backupLastRestoreAt) ?? 0;
+
+  bool get adbLocalOnboardingHandled =>
+      _sharedPreferences.getBool(_adbLocalOnboardingHandled) ?? false;
 
   SettingsService(this._sharedPreferences);
 
@@ -625,6 +629,11 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> setBackupLastRestoreAt(int epochMillis) async {
     await _sharedPreferences.setInt(_backupLastRestoreAt, epochMillis);
+    notifyListeners();
+  }
+
+  Future<void> setAdbLocalOnboardingHandled(bool value) async {
+    await _sharedPreferences.setBool(_adbLocalOnboardingHandled, value);
     notifyListeners();
   }
 

@@ -1,5 +1,6 @@
 import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_card_highlight_palette.dart';
+import 'package:flauncher/models/app.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
@@ -82,6 +83,66 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(appsService.getAppBanner(application.packageName)).called(2);
+  });
+
+  testWidgets(
+      'evicted resolved app images are fetched again after cache pressure',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final applications = List.generate(
+      30,
+      (index) => fakeApp(
+        packageName: 'cache.trim.$index',
+        name: 'Cache Trim $index',
+      ),
+    );
+    final category = fakeCategory()..applications.addAll(applications);
+
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+
+    Future<void> pumpCardForApp(App application) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<ProfileSecurityService?>.value(value: null),
+            ListenableProvider<AppsService>.value(value: appsService),
+            ChangeNotifierProvider<SettingsService>.value(
+              value: settingsService,
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 320,
+                child: AppCard(
+                  application: application,
+                  category: category,
+                  autofocus: true,
+                  onMove: (_, __) => false,
+                  onMoveEnd: (_, __) async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final application in applications) {
+      await pumpCardForApp(application);
+    }
+
+    await pumpCardForApp(applications.first);
+
+    verify(appsService.getAppBanner(applications.first.packageName)).called(2);
   });
 
   testWidgets(

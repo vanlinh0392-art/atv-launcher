@@ -1,6 +1,6 @@
 /*
  * FLauncher
- * Copyright (C) 2021  Étienne Fesser
+ * Copyright (C) 2021  Ã‰tienne Fesser
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
+import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +42,7 @@ class FLauncherApp extends StatefulWidget {
 
 class _FLauncherAppState extends State<FLauncherApp>
     with WidgetsBindingObserver {
+  static const int _freshInstallWindowMs = 60000;
   static const PrioritizedIntents _backIntents =
       PrioritizedIntents(orderedIntents: [DismissIntent(), BackIntent()]);
 
@@ -62,6 +64,9 @@ class _FLauncherAppState extends State<FLauncherApp>
   int _lastHandledHomeSequence = 0;
   int _lastHandledBenchmarkSequence = 0;
   bool _bridgeSnapshotPrimed = false;
+  bool _adbOnboardingCheckScheduled = false;
+  bool _adbOnboardingVisible = false;
+  bool _adbOnboardingHandledThisSession = false;
 
   @override
   void initState() {
@@ -95,6 +100,13 @@ class _FLauncherAppState extends State<FLauncherApp>
         }
         _handleBenchmarkCommand(initialBenchmark);
       });
+    } else if (nextBridgeService.initialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_systemBridgeService, nextBridgeService)) {
+          return;
+        }
+        _scheduleAdbLocalOnboardingCheck();
+      });
     }
   }
 
@@ -109,6 +121,7 @@ class _FLauncherAppState extends State<FLauncherApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _refreshDefaultLauncherState();
+      _scheduleAdbLocalOnboardingCheck();
     }
   }
 
@@ -131,7 +144,6 @@ class _FLauncherAppState extends State<FLauncherApp>
       _bridgeSnapshotPrimed = true;
       if (benchmark.sequence <= 0 || benchmark.action.isEmpty) {
         _lastHandledBenchmarkSequence = benchmark.sequence;
-        return;
       }
     }
     if (benchmark.sequence > _lastHandledBenchmarkSequence) {
@@ -139,20 +151,22 @@ class _FLauncherAppState extends State<FLauncherApp>
       _handleBenchmarkCommand(benchmark);
     }
     final nextSequence = _readHomeSequence(bridgeService);
-    if (nextSequence <= _lastHandledHomeSequence) {
+    if (nextSequence > _lastHandledHomeSequence) {
+      _lastHandledHomeSequence = nextSequence;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        final navigator = _navigatorKey.currentState;
+        if (navigator == null) {
+          return;
+        }
+        navigator.popUntil((route) => route.isFirst);
+        _scheduleAdbLocalOnboardingCheck();
+      });
       return;
     }
-    _lastHandledHomeSequence = nextSequence;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      final navigator = _navigatorKey.currentState;
-      if (navigator == null) {
-        return;
-      }
-      navigator.popUntil((route) => route.isFirst);
-    });
+    _scheduleAdbLocalOnboardingCheck();
   }
 
   void _handleBenchmarkCommand(_BenchmarkSnapshot benchmark) {
@@ -160,38 +174,226 @@ class _FLauncherAppState extends State<FLauncherApp>
       if (!mounted) {
         return;
       }
-      final navigator = _navigatorKey.currentState;
-      final rootContext = _navigatorKey.currentContext;
-      navigator?.popUntil((route) => route.isFirst);
-      if (benchmark.action != 'open_launcher_settings' ||
-          rootContext == null ||
-          !benchmark.bypassSettingsSecurity) {
-        return;
-      }
-      final wallpaperService = rootContext.read<WallpaperService>();
-      wallpaperService.cancelPendingHomeVideoStart();
-      Future<void>.microtask(() {
+      Future<void>.microtask(() async {
         if (!mounted) {
           return;
         }
-        showDialog<void>(
-          context: rootContext,
-          useRootNavigator: true,
-          builder: (_) => SettingsPanel(
-            selectedRouteOnShell: benchmark.route.isEmpty
-                ? HomeLayoutPanelPage.routeName
-                : benchmark.route,
-            autoFocusDetailOnOpen: benchmark.autoFocusDetail,
-            benchmarkSessionId: benchmark.sessionId,
-          ),
-        ).whenComplete(() {
-          if (!mounted || !rootContext.mounted) {
-            return;
-          }
-          wallpaperService.notifyHomeVisibleAndUsable();
-        });
+        _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        if (benchmark.action != 'open_launcher_settings' ||
+            !benchmark.bypassSettingsSecurity) {
+          _scheduleAdbLocalOnboardingCheck();
+          return;
+        }
+        await _showLauncherSettingsPanel(
+          selectedRouteOnShell: benchmark.route.isEmpty
+              ? HomeLayoutPanelPage.routeName
+              : benchmark.route,
+          autoFocusDetailOnOpen: benchmark.autoFocusDetail,
+          benchmarkSessionId: benchmark.sessionId,
+        );
       });
     });
+  }
+
+  void _scheduleAdbLocalOnboardingCheck() {
+    if (!mounted ||
+        _adbOnboardingCheckScheduled ||
+        _adbOnboardingVisible ||
+        _adbOnboardingHandledThisSession) {
+      return;
+    }
+    _adbOnboardingCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _adbOnboardingCheckScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      await _maybeShowAdbLocalOnboarding();
+    });
+  }
+
+  Future<void> _maybeShowAdbLocalOnboarding() async {
+    if (!mounted || _adbOnboardingVisible || _adbOnboardingHandledThisSession) {
+      return;
+    }
+    final bridgeService = _systemBridgeService;
+    final rootContext = _navigatorKey.currentContext;
+    final navigator = _navigatorKey.currentState;
+    if (bridgeService == null || rootContext == null || navigator == null) {
+      return;
+    }
+    final settingsService = rootContext.read<SettingsService>();
+    if (!_shouldShowAdbLocalOnboarding(bridgeService, settingsService) ||
+        navigator.canPop()) {
+      return;
+    }
+    _adbOnboardingVisible = true;
+    final acknowledged = await _showAdbLocalOnboardingDialog(rootContext);
+    _adbOnboardingVisible = false;
+    if (!mounted || !rootContext.mounted || acknowledged != true) {
+      return;
+    }
+    _adbOnboardingHandledThisSession = true;
+    await settingsService.setAdbLocalOnboardingHandled(true);
+    if (!mounted || !rootContext.mounted) {
+      return;
+    }
+    final result =
+        await bridgeService.runProvisioningAction(action: 'open_development');
+    if (!mounted || !rootContext.mounted || result['success'] == true) {
+      return;
+    }
+    await _showAdbLocalOnboardingFallbackDialog(rootContext);
+  }
+
+  bool _shouldShowAdbLocalOnboarding(
+    SystemBridgeService bridgeService,
+    SettingsService settingsService,
+  ) {
+    if (!bridgeService.initialized ||
+        settingsService.adbLocalOnboardingHandled) {
+      return false;
+    }
+    if (!_isFreshInstall(_readInstallStatus(bridgeService.status))) {
+      return false;
+    }
+    return _isAdbDisabled(bridgeService.provisioningStatus);
+  }
+
+  Map<String, dynamic> _readInstallStatus(Map<String, dynamic> status) {
+    final raw = status['install'];
+    return raw is Map ? raw.cast<String, dynamic>() : const <String, dynamic>{};
+  }
+
+  bool _isFreshInstall(Map<String, dynamic> installStatus) {
+    final firstInstallTime =
+        ((installStatus['firstInstallTime'] as num?) ?? 0).toInt();
+    final lastUpdateTime =
+        ((installStatus['lastUpdateTime'] as num?) ?? 0).toInt();
+    if (firstInstallTime <= 0 ||
+        lastUpdateTime <= 0 ||
+        lastUpdateTime < firstInstallTime) {
+      return false;
+    }
+    return lastUpdateTime - firstInstallTime <= _freshInstallWindowMs;
+  }
+
+  bool _isAdbDisabled(Map<String, dynamic> provisioningStatus) {
+    final requirements = provisioningStatus['requirements'];
+    if (requirements is! List) {
+      return false;
+    }
+    for (final requirement in requirements) {
+      if (requirement is! Map) {
+        continue;
+      }
+      final item = requirement.cast<String, dynamic>();
+      if (item['name']?.toString() == 'adb_enabled') {
+        return item['granted'] != true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool?> _showAdbLocalOnboardingDialog(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
+    final okLabel = MaterialLocalizations.of(context).okButtonLabel;
+    return showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(localizations.adbLocalOnboardingTitle),
+          content: Text(localizations.adbLocalOnboardingMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(okLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAdbLocalOnboardingFallbackDialog(
+    BuildContext context,
+  ) async {
+    final localizations = AppLocalizations.of(context)!;
+    final action = await showDialog<_AdbLocalOnboardingFallbackAction>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(localizations.adbLocalOnboardingFallbackTitle),
+        content: Text(localizations.adbLocalOnboardingFallbackMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(
+              _AdbLocalOnboardingFallbackAction.later,
+            ),
+            child: Text(localizations.adbLocalOnboardingLater),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(
+              _AdbLocalOnboardingFallbackAction.systemSettings,
+            ),
+            child: Text(localizations.systemSettings),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(
+              _AdbLocalOnboardingFallbackAction.permissionsPanel,
+            ),
+            child: Text(localizations.adbLocalOnboardingOpenPermissionsPanel),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case _AdbLocalOnboardingFallbackAction.systemSettings:
+        await _systemBridgeService?.openSpecificSettingsPage('system');
+        break;
+      case _AdbLocalOnboardingFallbackAction.permissionsPanel:
+        await _showLauncherSettingsPanel(
+          selectedRouteOnShell: PermissionsPanelPage.routeName,
+          autoFocusDetailOnOpen: true,
+        );
+        break;
+      case _AdbLocalOnboardingFallbackAction.later:
+        break;
+    }
+  }
+
+  Future<void> _showLauncherSettingsPanel({
+    String? selectedRouteOnShell,
+    bool autoFocusDetailOnOpen = false,
+    String? benchmarkSessionId,
+  }) async {
+    final rootContext = _navigatorKey.currentContext;
+    if (rootContext == null || !mounted) {
+      return;
+    }
+    final wallpaperService = rootContext.read<WallpaperService>();
+    wallpaperService.cancelPendingHomeVideoStart();
+    await showDialog<void>(
+      context: rootContext,
+      useRootNavigator: true,
+      builder: (_) => SettingsPanel(
+        selectedRouteOnShell: selectedRouteOnShell,
+        autoFocusDetailOnOpen: autoFocusDetailOnOpen,
+        benchmarkSessionId: benchmarkSessionId,
+      ),
+    );
+    if (!mounted || !rootContext.mounted) {
+      return;
+    }
+    wallpaperService.notifyHomeVisibleAndUsable();
+    _scheduleAdbLocalOnboardingCheck();
   }
 
   int _readHomeSequence(SystemBridgeService bridgeService) {
@@ -320,3 +522,9 @@ typedef _BenchmarkSnapshot = ({
   bool autoFocusDetail,
   bool bypassSettingsSecurity,
 });
+
+enum _AdbLocalOnboardingFallbackAction {
+  systemSettings,
+  permissionsPanel,
+  later,
+}

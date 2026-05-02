@@ -101,4 +101,28 @@ void main() {
     expect(smooth.wallpaperFilterQuality, FilterQuality.none);
     expect(smooth.appCardFilterQuality, FilterQuality.none);
   });
+
+  test('balanced mode keeps reduced dock prebuild limits for RAM savings', () {
+    final balanced = HomePerformanceProfile.resolve(
+      SettingsService.homeDockPerformanceModeBalanced,
+    );
+    final quality = HomePerformanceProfile.resolve(
+      SettingsService.homeDockPerformanceModeQuality,
+    );
+    final smooth = HomePerformanceProfile.resolve(
+      SettingsService.homeDockPerformanceModeSmooth,
+    );
+    final off = HomePerformanceProfile.resolve(
+      SettingsService.homeDockPerformanceModeOff,
+    );
+
+    expect(balanced.dockCacheRowsAhead, 1);
+    expect(balanced.dockMinimumCacheRows, 2);
+    expect(quality.dockCacheRowsAhead, 3);
+    expect(quality.dockMinimumCacheRows, 5);
+    expect(smooth.dockCacheRowsAhead, 1);
+    expect(smooth.dockMinimumCacheRows, 3);
+    expect(off.dockCacheRowsAhead, 1);
+    expect(off.dockMinimumCacheRows, 2);
+  });
 }

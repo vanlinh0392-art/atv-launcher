@@ -1,5 +1,6 @@
 import 'package:flauncher/flauncher_app.dart';
 import 'package:flauncher/flauncher.dart';
+import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/gradients.dart';
 import 'package:flauncher/models/category.dart';
 import 'package:flauncher/providers/apps_service.dart';
@@ -10,6 +11,7 @@ import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
@@ -95,6 +97,263 @@ void main() {
     await settings.setAppLocaleMode(SettingsService.appLocaleSystem);
     await tester.pumpAndSettle();
     expect(_materialApp(tester).locale, isNull);
+  });
+
+  testWidgets(
+      'fresh install with ADB disabled shows onboarding once and persists after OK',
+      (tester) async {
+    final settings = await _createSettingsService();
+    final security = await _createProfileSecurityService();
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final searchService = await _createSearchService(channel);
+    final provisioningStatus = _buildProvisioningStatus(adbEnabled: false);
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
+    when(bridgeService.initialized).thenReturn(true);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.status).thenReturn(<String, dynamic>{
+      'memory': const <String, dynamic>{},
+      'navigation': const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+      'provisioning': provisioningStatus,
+      'install': _buildInstallStatus(freshInstall: true),
+    });
+    when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
+    when(
+      bridgeService.runProvisioningAction(
+        action: anyNamed('action'),
+        suggestedPolicy: anyNamed('suggestedPolicy'),
+      ),
+    ).thenAnswer((_) async => const <String, dynamic>{'success': true});
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncherApp(
+      tester,
+      settings: settings,
+      security: security,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      searchService: searchService,
+      channel: channel,
+    );
+
+    expect(
+        find.text(
+            'Hãy bật ADB để launcher hoạt động đủ chức năng, sau đó quay lại menu cấp quyền ADB local'),
+        findsOneWidget);
+
+    final okLabel = MaterialLocalizations.of(
+      tester.element(find.byType(AlertDialog)),
+    ).okButtonLabel;
+    await tester.tap(find.text(okLabel));
+    await tester.pumpAndSettle();
+
+    expect(settings.adbLocalOnboardingHandled, isTrue);
+    verify(
+      bridgeService.runProvisioningAction(
+        action: 'open_development',
+        suggestedPolicy: null,
+      ),
+    ).called(1);
+    expect(
+      find.text(
+        'Hãy bật ADB để launcher hoạt động đủ chức năng, sau đó quay lại menu cấp quyền ADB local',
+      ),
+      findsNothing,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+
+    await _pumpLauncherApp(
+      tester,
+      settings: settings,
+      security: security,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      searchService: searchService,
+      channel: channel,
+    );
+
+    expect(
+      find.text(
+        'Hãy bật ADB để launcher hoạt động đủ chức năng, sau đó quay lại menu cấp quyền ADB local',
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('fresh install with ADB enabled skips onboarding',
+      (tester) async {
+    final settings = await _createSettingsService();
+    final security = await _createProfileSecurityService();
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final searchService = await _createSearchService(channel);
+    final provisioningStatus = _buildProvisioningStatus(adbEnabled: true);
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
+    when(bridgeService.initialized).thenReturn(true);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.status).thenReturn(<String, dynamic>{
+      'memory': const <String, dynamic>{},
+      'navigation': const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+      'provisioning': provisioningStatus,
+      'install': _buildInstallStatus(freshInstall: true),
+    });
+    when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncherApp(
+      tester,
+      settings: settings,
+      security: security,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      searchService: searchService,
+      channel: channel,
+    );
+
+    expect(
+        find.text(
+            'Hãy bật ADB để launcher hoạt động đủ chức năng, sau đó quay lại menu cấp quyền ADB local'),
+        findsNothing);
+  });
+
+  testWidgets('existing install skips onboarding even if ADB is disabled',
+      (tester) async {
+    final settings = await _createSettingsService();
+    final security = await _createProfileSecurityService();
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final searchService = await _createSearchService(channel);
+    final provisioningStatus = _buildProvisioningStatus(adbEnabled: false);
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
+    when(bridgeService.initialized).thenReturn(true);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.status).thenReturn(<String, dynamic>{
+      'memory': const <String, dynamic>{},
+      'navigation': const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+      'provisioning': provisioningStatus,
+      'install': _buildInstallStatus(freshInstall: false),
+    });
+    when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncherApp(
+      tester,
+      settings: settings,
+      security: security,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      searchService: searchService,
+      channel: channel,
+    );
+
+    expect(
+        find.text(
+            'Hãy bật ADB để launcher hoạt động đủ chức năng, sau đó quay lại menu cấp quyền ADB local'),
+        findsNothing);
+  });
+
+  testWidgets(
+      'failed developer options open shows fallback and can open permissions panel',
+      (tester) async {
+    final settings = await _createSettingsService();
+    final security = await _createProfileSecurityService();
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final searchService = await _createSearchService(channel);
+    final provisioningStatus = _buildProvisioningStatus(adbEnabled: false);
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.homeReorderModeEnabled).thenReturn(false);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    when(appsService.isDefaultLauncher()).thenAnswer((_) async => true);
+    when(bridgeService.initialized).thenReturn(true);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.status).thenReturn(<String, dynamic>{
+      'memory': const <String, dynamic>{},
+      'navigation': const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+      'provisioning': provisioningStatus,
+      'install': _buildInstallStatus(freshInstall: true),
+    });
+    when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
+    when(
+      bridgeService.runProvisioningAction(
+        action: anyNamed('action'),
+        suggestedPolicy: anyNamed('suggestedPolicy'),
+      ),
+    ).thenAnswer((_) async => const <String, dynamic>{
+          'success': false,
+          'message': 'Developer options could not be opened.',
+        });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncherApp(
+      tester,
+      settings: settings,
+      security: security,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      searchService: searchService,
+      channel: channel,
+    );
+
+    final okLabel = MaterialLocalizations.of(
+      tester.element(find.byType(AlertDialog)),
+    ).okButtonLabel;
+    await tester.tap(find.text(okLabel));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Không thể mở thẳng tùy chọn nhà phát triển'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Mở menu cấp quyền ADB local'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsPanel), findsOneWidget);
+    expect(
+      find.byType(PermissionsPanelPage, skipOffstage: false),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -388,6 +647,56 @@ void main() {
 MaterialApp _materialApp(WidgetTester tester) =>
     tester.widget<MaterialApp>(find.byType(MaterialApp));
 
+Future<void> _pumpLauncherApp(
+  WidgetTester tester, {
+  required SettingsService settings,
+  required ProfileSecurityService security,
+  required AppsService appsService,
+  required WallpaperService wallpaperService,
+  required SystemBridgeService bridgeService,
+  required SearchService searchService,
+  required FLauncherChannel channel,
+}) async {
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<WallpaperService>.value(value: wallpaperService),
+        ChangeNotifierProvider<AppsService>.value(value: appsService),
+        ChangeNotifierProvider<SettingsService>.value(value: settings),
+        ChangeNotifierProvider<ProfileSecurityService>.value(value: security),
+        ChangeNotifierProvider<SystemBridgeService>.value(value: bridgeService),
+        ChangeNotifierProvider<SearchService>.value(value: searchService),
+        ChangeNotifierProvider(create: (_) => LauncherState()),
+        ChangeNotifierProvider(create: (_) => NetworkService(channel)),
+      ],
+      child: const FLauncherApp(),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Map<String, dynamic> _buildProvisioningStatus({required bool adbEnabled}) {
+  return <String, dynamic>{
+    'health': adbEnabled ? 'healthy' : 'recommended_missing',
+    'requirements': <Map<String, dynamic>>[
+      <String, dynamic>{
+        'name': 'adb_enabled',
+        'granted': adbEnabled,
+        'importance': 'optional',
+      },
+    ],
+    'missingRequiredCount': 0,
+    'missingRecommendedCount': 0,
+  };
+}
+
+Map<String, dynamic> _buildInstallStatus({required bool freshInstall}) {
+  return <String, dynamic>{
+    'firstInstallTime': 1000,
+    'lastUpdateTime': freshInstall ? 1500 : 1000 + 61000,
+  };
+}
+
 Future<SettingsService> _createSettingsService() async {
   SharedPreferences.setMockInitialValues(const <String, Object>{});
   return SettingsService(await SharedPreferences.getInstance());
@@ -429,4 +738,6 @@ void _stubWallpaperService(MockWallpaperService wallpaperService) {
       .thenAnswer((_) async {});
   when(wallpaperService.setSettingsPlaybackSuppressed(false))
       .thenAnswer((_) async {});
+  when(wallpaperService.cancelPendingHomeVideoStart()).thenReturn(null);
+  when(wallpaperService.notifyHomeVisibleAndUsable()).thenReturn(null);
 }

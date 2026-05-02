@@ -53,6 +53,8 @@ typedef _WallpaperSnapshot = ({
 
 typedef _WallpaperStatusSnapshot = ({
   bool videoReady,
+  bool playbackSuppressed,
+  String lastError,
   double videoWidth,
   double videoHeight,
 });
@@ -134,6 +136,8 @@ class _WallpaperLayer extends StatelessWidget {
         final status = service.wallpaperStatus;
         return (
           videoReady: status['videoReady'] == true,
+          playbackSuppressed: status['playbackSuppressed'] == true,
+          lastError: status['lastError']?.toString().trim() ?? '',
           videoWidth: ((status['videoWidth'] as num?) ?? 1920).toDouble(),
           videoHeight: ((status['videoHeight'] as num?) ?? 1080).toDouble(),
         );
@@ -345,7 +349,7 @@ Widget _buildWallpaperLayer(
               height: physicalSize.height,
               width: physicalSize.width,
               filterQuality: performanceProfile.wallpaperFilterQuality,
-              gaplessPlayback: true,
+              gaplessPlayback: wallpaper.isVideoMode,
             )
           : Container(
               key: const Key('background'),
@@ -359,6 +363,13 @@ Widget _buildWallpaperLayer(
   final blurSigma = performanceProfile
       .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
   final dimOpacity = wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
+  final videoUsable = wallpaperStatus.videoReady &&
+      !wallpaperStatus.playbackSuppressed &&
+      wallpaperStatus.lastError.isEmpty;
+
+  if (!videoUsable) {
+    return RepaintBoundary(child: baseWallpaper);
+  }
 
   Widget videoLayer = SizedBox.expand(
     child: FittedBox(
@@ -381,9 +392,8 @@ Widget _buildWallpaperLayer(
   return RepaintBoundary(
     child: Stack(
       children: [
-        baseWallpaper,
-        if (wallpaperStatus.videoReady) Positioned.fill(child: videoLayer),
-        if (wallpaperStatus.videoReady && dimOpacity > 0)
+        Positioned.fill(child: videoLayer),
+        if (dimOpacity > 0)
           Positioned.fill(
             child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
           ),

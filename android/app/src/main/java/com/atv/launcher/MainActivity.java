@@ -35,8 +35,11 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.tv.TvContract;
@@ -56,6 +59,7 @@ import android.speech.RecognizerIntent;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
+import android.util.DisplayMetrics;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
@@ -135,12 +139,14 @@ public class MainActivity extends FlutterActivity {
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
     private static final long APPLICATIONS_CACHE_TTL_MS = 60_000L;
     private static final long LITE_STATUS_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
-    private static final int MAX_IMAGE_CACHE_ENTRIES = 128;
-    private static final int MAX_IMAGE_CACHE_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_IMAGE_CACHE_ENTRIES = 48;
+    private static final int MAX_IMAGE_CACHE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_BANNER_WIDTH = 640;
     private static final int MAX_BANNER_HEIGHT = 360;
     private static final int MAX_ICON_WIDTH = 256;
     private static final int MAX_ICON_HEIGHT = 256;
+    private static final int MAX_WALLPAPER_PREVIEW_WIDTH = 1920;
+    private static final int MAX_WALLPAPER_PREVIEW_HEIGHT = 1080;
     private static final String PRIVATE_DNS_SETTINGS_ACTION = "android.settings.PRIVATE_DNS_SETTINGS";
     private static final String FLUTTER_SHARED_PREFERENCES_NAME = "FlutterSharedPreferences";
     private static final String FLUTTER_PREFS_KEY_VIDEO_WALLPAPER_URIS = "flutter.video_wallpaper_uris";
@@ -939,6 +945,7 @@ public class MainActivity extends FlutterActivity {
         map.put("memory", buildLiteMemoryStatus(preferPeriodicCaches));
         map.put("fileAccess", VideoLibraryController.getFileAccessStatus(this));
         map.put("backup", buildBackupStatus());
+        map.put("install", buildInstallStatus());
         if (!firstLiteBridgeStatusLogged) {
             firstLiteBridgeStatusLogged = true;
             logPerf("time_to_lite_bridge_status", startedAt);
@@ -1086,6 +1093,20 @@ public class MainActivity extends FlutterActivity {
         map.put("lastRestoreSummary", BridgeStateStore.getLastBackupRestoreSummary(this));
         map.put("lastRestoreAt", BridgeStateStore.getLastBackupRestoreAt(this));
         map.put("lastRestoreAtText", formatTime(BridgeStateStore.getLastBackupRestoreAt(this)));
+        return map;
+    }
+
+    private Map<String, Object> buildInstallStatus() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        try {
+            PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            map.put("firstInstallTime", packageInfo.firstInstallTime);
+            map.put("lastUpdateTime", packageInfo.lastUpdateTime);
+        } catch (Exception exception) {
+            map.put("firstInstallTime", 0L);
+            map.put("lastUpdateTime", 0L);
+            map.put("error", exception.toString());
+        }
         return map;
     }
 
@@ -2322,19 +2343,130 @@ public class MainActivity extends FlutterActivity {
             return BridgeStateStore.getWallpaperPreviewPath(this);
         }
 
-        File imageFile = new File(directory, "image_wallpaper");
-        try (InputStream inputStream = getContentResolver().openInputStream(uri);
-             OutputStream outputStream = new FileOutputStream(imageFile, false)) {
-            if (inputStream == null) {
-                throw new IllegalStateException("Could not open selected asset.");
-            }
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = inputStream.read(buffer)) > 0) {
-                outputStream.write(buffer, 0, read);
-            }
+        Pair<Integer, Integer> targetSize = resolveWallpaperPreviewTargetSize();
+        Bitmap sourceBitmap = decodeScaledWallpaperBitmap(
+                uri,
+                targetSize.first,
+                targetSize.second
+        );
+        if (sourceBitmap == null) {
+            throw new IllegalStateException("Could not decode selected image wallpaper.");
+        }
+
+        Bitmap normalizedBitmap = cropAndScaleWallpaperBitmap(
+                sourceBitmap,
+                targetSize.first,
+                targetSize.second
+        );
+        sourceBitmap.recycle();
+
+        boolean opaqueBackground = !normalizedBitmap.hasAlpha();
+        Bitmap.CompressFormat format = opaqueBackground
+                ? Bitmap.CompressFormat.JPEG
+                : Bitmap.CompressFormat.PNG;
+        int quality = opaqueBackground ? 86 : 100;
+        String extension = opaqueBackground ? "jpg" : "png";
+        File imageFile = new File(directory, "image_wallpaper." + extension);
+        deleteIfExists(new File(directory, "image_wallpaper.jpg"), imageFile);
+        deleteIfExists(new File(directory, "image_wallpaper.png"), imageFile);
+
+        try (OutputStream outputStream = new FileOutputStream(imageFile, false)) {
+            normalizedBitmap.compress(format, quality, outputStream);
+        } finally {
+            normalizedBitmap.recycle();
         }
         return imageFile.getAbsolutePath();
+    }
+
+    private Pair<Integer, Integer> resolveWallpaperPreviewTargetSize() {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int longEdge = Math.max(metrics.widthPixels, metrics.heightPixels);
+        int shortEdge = Math.min(metrics.widthPixels, metrics.heightPixels);
+        int targetWidth = Math.max(1, Math.min(longEdge, MAX_WALLPAPER_PREVIEW_WIDTH));
+        int targetHeight = Math.max(1, Math.min(shortEdge, MAX_WALLPAPER_PREVIEW_HEIGHT));
+        return Pair.create(targetWidth, targetHeight);
+    }
+
+    private Bitmap decodeScaledWallpaperBitmap(Uri uri, int targetWidth, int targetHeight)
+            throws Exception {
+        BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
+        boundsOptions.inJustDecodeBounds = true;
+        try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) {
+                throw new IllegalStateException("Could not open selected image wallpaper.");
+            }
+            BitmapFactory.decodeStream(inputStream, null, boundsOptions);
+        }
+
+        if (boundsOptions.outWidth <= 0 || boundsOptions.outHeight <= 0) {
+            return null;
+        }
+
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = computeWallpaperSampleSize(
+                boundsOptions.outWidth,
+                boundsOptions.outHeight,
+                targetWidth,
+                targetHeight
+        );
+        decodeOptions.inPreferredConfig = Bitmap.Config.ARGB_8888;
+
+        try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) {
+                throw new IllegalStateException("Could not reopen selected image wallpaper.");
+            }
+            return BitmapFactory.decodeStream(inputStream, null, decodeOptions);
+        }
+    }
+
+    private int computeWallpaperSampleSize(
+            int sourceWidth,
+            int sourceHeight,
+            int targetWidth,
+            int targetHeight
+    ) {
+        int sampleSize = 1;
+        while ((sourceWidth / sampleSize) > (targetWidth * 2)
+                || (sourceHeight / sampleSize) > (targetHeight * 2)) {
+            sampleSize *= 2;
+        }
+        return Math.max(1, sampleSize);
+    }
+
+    private Bitmap cropAndScaleWallpaperBitmap(Bitmap source, int targetWidth, int targetHeight) {
+        int sourceWidth = source.getWidth();
+        int sourceHeight = source.getHeight();
+        float sourceAspect = sourceWidth / (float) sourceHeight;
+        float targetAspect = targetWidth / (float) targetHeight;
+
+        Rect srcRect;
+        if (sourceAspect > targetAspect) {
+            int croppedWidth = Math.max(1, Math.round(sourceHeight * targetAspect));
+            int left = Math.max(0, (sourceWidth - croppedWidth) / 2);
+            srcRect = new Rect(left, 0, left + croppedWidth, sourceHeight);
+        } else {
+            int croppedHeight = Math.max(1, Math.round(sourceWidth / targetAspect));
+            int top = Math.max(0, (sourceHeight - croppedHeight) / 2);
+            srcRect = new Rect(0, top, sourceWidth, top + croppedHeight);
+        }
+
+        Bitmap.Config config = source.hasAlpha() ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565;
+        Bitmap output = Bitmap.createBitmap(targetWidth, targetHeight, config);
+        Canvas canvas = new Canvas(output);
+        if (!source.hasAlpha()) {
+            canvas.drawColor(Color.BLACK);
+        }
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+        canvas.drawBitmap(source, srcRect, new Rect(0, 0, targetWidth, targetHeight), paint);
+        return output;
+    }
+
+    private void deleteIfExists(File candidate, File keepFile) {
+        if (candidate.equals(keepFile) || !candidate.exists()) {
+            return;
+        }
+        //noinspection ResultOfMethodCallIgnored
+        candidate.delete();
     }
 
     private String resolveAssetKind(String mimeType, String requestedKind) {
@@ -2681,7 +2813,12 @@ public class MainActivity extends FlutterActivity {
             case "private_dns" -> intent = new Intent(PRIVATE_DNS_SETTINGS_ACTION);
             case "notifications" -> intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
-            case "development" -> intent = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+            case "development" -> {
+                return openDevelopmentSettings();
+            }
+            case "system" -> {
+                return openSystemSettings();
+            }
             default -> {
                 return openSystemSettings();
             }
@@ -2721,6 +2858,24 @@ public class MainActivity extends FlutterActivity {
         candidates.add(new Intent().setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
         candidates.add(new Intent(Settings.ACTION_SETTINGS));
         return tryStartActivityCandidates("wifi_settings", candidates);
+    }
+
+    private boolean openDevelopmentSettings() {
+        List<Intent> candidates = new ArrayList<>();
+        candidates.add(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
+        candidates.add(new Intent(XIAOMI_TV_SETTINGS_ACTION).setPackage(XIAOMI_TV_SETTINGS_PACKAGE));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent()
+                .setClassName(XIAOMI_TV_SETTINGS_PACKAGE, XIAOMI_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(AOSP_TV_SETTINGS_PACKAGE, AOSP_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Intent.ACTION_MAIN)
+                .setClassName(GOOGLE_TV_SETTINGS_PACKAGE, GOOGLE_TV_SETTINGS_ACTIVITY));
+        candidates.add(new Intent(Settings.ACTION_SETTINGS));
+        candidates.add(new Intent()
+                .setClassName(AOSP_SETTINGS_PACKAGE, AOSP_SETTINGS_ACTIVITY));
+        return tryStartActivityCandidates("development_settings", candidates);
     }
 
     private boolean tryStartActivityCandidates(String label, List<Intent> candidates) {

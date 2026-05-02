@@ -173,10 +173,103 @@ void main() {
       channel: channel,
     );
 
-    expect(
-      tester.widget(find.byKey(const Key('background'))),
-      isA<Image>(),
+    final background =
+        tester.widget<Image>(find.byKey(const Key('background')));
+    expect(background, isA<Image>());
+    expect(background.gaplessPlayback, isFalse);
+  });
+
+  testWidgets('video wallpaper keeps poster fallback until texture is usable',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    _stubWallpaperService(
+      wallpaperService,
+      wallpaperMode: 'video',
+      wallpaper: MemoryImage(Uint8List.fromList(kTransparentImage)),
+      isVideoMode: true,
+      videoTextureId: 7,
     );
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{
+      'videoReady': false,
+      'playbackSuppressed': false,
+      'lastError': '',
+      'videoWidth': 1920,
+      'videoHeight': 1080,
+    });
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+    );
+
+    final background =
+        tester.widget<Image>(find.byKey(const Key('background')));
+    expect(background.gaplessPlayback, isTrue);
+    expect(find.byType(Texture), findsNothing);
+  });
+
+  testWidgets('video wallpaper drops poster once texture is ready',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    _stubWallpaperService(
+      wallpaperService,
+      wallpaperMode: 'video',
+      wallpaper: MemoryImage(Uint8List.fromList(kTransparentImage)),
+      isVideoMode: true,
+      videoTextureId: 11,
+      videoDimPercent: 0,
+    );
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{
+      'videoReady': true,
+      'playbackSuppressed': false,
+      'lastError': '',
+      'videoWidth': 1920,
+      'videoHeight': 1080,
+    });
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+    );
+
+    expect(find.byType(Texture), findsOneWidget);
+    expect(find.byKey(const Key('background')), findsNothing);
   });
 
   testWidgets(

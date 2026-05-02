@@ -18,7 +18,6 @@
 
 import 'dart:async';
 import 'dart:collection';
-
 import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_image_type.dart';
@@ -56,7 +55,7 @@ typedef AppCardMoveEndCallback = Future<void> Function(
 );
 
 class AppCard extends StatefulWidget {
-  static const int _maxImageCacheSize = 96;
+  static const int _maxImageCacheSize = 24;
   static const int _maxConcurrentImageLoads = 2;
   static const Duration _deferredImageLoadDelay = Duration(milliseconds: 900);
   static final LinkedHashMap<String, Tuple2<AppImageType, ImageProvider>>
@@ -115,14 +114,16 @@ class AppCard extends StatefulWidget {
     }
 
     final completer = Completer<Tuple2<AppImageType, ImageProvider>>();
-    final future = completer.future.then((image) {
+    late final Future<Tuple2<AppImageType, ImageProvider>> trackedFuture;
+    trackedFuture = completer.future.then((image) {
       _rememberImage(packageName, image);
       return image;
-    }).catchError((Object error) {
-      _imageLoadCache.remove(packageName);
-      throw error;
+    }).whenComplete(() {
+      if (identical(_imageLoadCache[packageName], trackedFuture)) {
+        _imageLoadCache.remove(packageName);
+      }
     });
-    _imageLoadCache[packageName] = future;
+    _imageLoadCache[packageName] = trackedFuture;
     final request = _QueuedAppImageLoad(
       packageName: packageName,
       loader: loader,
@@ -133,9 +134,8 @@ class AppCard extends StatefulWidget {
     } else {
       _pendingImageLoads.addLast(request);
     }
-    _trimImageCaches();
     _drainPendingImageLoads();
-    return future;
+    return trackedFuture;
   }
 
   static void _rememberImage(
@@ -170,11 +170,7 @@ class AppCard extends StatefulWidget {
 
   static void _trimImageCaches() {
     while (_resolvedImageCache.length > _maxImageCacheSize) {
-      _imageLoadCache.remove(_resolvedImageCache.keys.first);
       _resolvedImageCache.remove(_resolvedImageCache.keys.first);
-    }
-    while (_imageLoadCache.length > _maxImageCacheSize) {
-      _imageLoadCache.remove(_imageLoadCache.keys.first);
     }
   }
 
