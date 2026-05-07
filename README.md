@@ -50,13 +50,15 @@ ATV Launcher không còn là một mirror tối giản của upstream. Bản for
 
 ### Home
 
-![ATV Launcher Home](docs/screenshots/01-home-main.png)
+![ATV Launcher Home](docs/screenshots/01-home-main.jpg)
 
 ### Settings
 
-![ATV Launcher Home Layout Settings](docs/screenshots/02-settings-home-layout.png)
+![Wallpaper & Media settings](docs/screenshots/02-settings-wallpaper-media.jpg)
 
-![ATV Launcher Accessibility Settings](docs/screenshots/03-settings-accessibility.png)
+![Private DNS settings](docs/screenshots/03-settings-private-dns.jpg)
+
+![App security settings](docs/screenshots/04-settings-app-security.jpg)
 
 ## Hồ sơ kỹ thuật
 
