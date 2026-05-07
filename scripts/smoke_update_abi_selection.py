@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import urllib.request
@@ -12,9 +13,15 @@ from pathlib import Path
 from typing import Any
 
 
-GITHUB_OWNER = "xfire0392-netizen"
-GITHUB_REPO = "atv-launcher"
-OFFICIAL_CHANNEL_MARKER = "Updater-Channel: xfire0392-netizen-official"
+DEFAULT_GITHUB_OWNER = os.environ.get(
+    "LAUNCHER_UPDATE_GITHUB_OWNER",
+    "vanlinh0392-art",
+)
+DEFAULT_GITHUB_REPO = os.environ.get("LAUNCHER_UPDATE_GITHUB_REPO", "atv-launcher")
+DEFAULT_UPDATE_CHANNEL = os.environ.get(
+    "LAUNCHER_UPDATE_CHANNEL",
+    "atv-launcher-official",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,6 +43,21 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fetch the latest official GitHub release instead of reading local assets.",
     )
+    parser.add_argument(
+        "--github-owner",
+        default=DEFAULT_GITHUB_OWNER,
+        help="GitHub owner to query when --fetch-github is used.",
+    )
+    parser.add_argument(
+        "--github-repo",
+        default=DEFAULT_GITHUB_REPO,
+        help="GitHub repository to query when --fetch-github is used.",
+    )
+    parser.add_argument(
+        "--update-channel",
+        default=DEFAULT_UPDATE_CHANNEL,
+        help="Official updater channel marker expected in the release body.",
+    )
     return parser.parse_args()
 
 
@@ -47,7 +69,7 @@ def main() -> int:
         else get_device_abis(args.device)
     )
     assets = (
-        load_assets_from_github()
+        load_assets_from_github(args.github_owner, args.github_repo, args.update_channel)
         if args.fetch_github
         else load_assets_from_directory(Path(args.asset_dir))
     )
@@ -114,9 +136,13 @@ def load_assets_from_directory(directory: Path) -> list[dict[str, Any]]:
     ]
 
 
-def load_assets_from_github() -> list[dict[str, Any]]:
+def load_assets_from_github(
+    github_owner: str,
+    github_repo: str,
+    update_channel: str,
+) -> list[dict[str, Any]]:
     url = (
-        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+        f"https://api.github.com/repos/{github_owner}/{github_repo}/releases"
         "?per_page=20"
     )
     request = urllib.request.Request(
@@ -130,7 +156,7 @@ def load_assets_from_github() -> list[dict[str, Any]]:
         releases = json.loads(response.read().decode("utf-8"))
 
     for release in releases:
-        if not is_official_release(release):
+        if not is_official_release(release, update_channel):
             continue
         assets = release.get("assets") or []
         return [
@@ -141,7 +167,7 @@ def load_assets_from_github() -> list[dict[str, Any]]:
     return []
 
 
-def is_official_release(release: dict[str, Any]) -> bool:
+def is_official_release(release: dict[str, Any], update_channel: str) -> bool:
     if release.get("draft") or release.get("prerelease"):
         return False
     tag_name = str(release.get("tag_name", "")).lower()
@@ -151,7 +177,7 @@ def is_official_release(release: dict[str, Any]) -> bool:
         return False
     if "atv launcher" not in name:
         return False
-    return OFFICIAL_CHANNEL_MARKER.lower() in body
+    return f"updater-channel: {update_channel}".lower() in body
 
 
 def preferred_asset_for(

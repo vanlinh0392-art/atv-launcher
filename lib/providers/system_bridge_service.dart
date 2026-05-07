@@ -14,6 +14,8 @@ class SystemBridgeService extends ChangeNotifier {
 
   bool get initialized => _initialized;
   Map<String, dynamic> get status => _status;
+  Map<String, dynamic> get navigationStatus =>
+      _nestedMap(_status['navigation']);
   Map<String, dynamic> get voiceStatus => _nestedMap(_status['voice']);
   Map<String, dynamic> get systemCoreStatus =>
       _nestedMap(_status['systemCore']);
@@ -27,6 +29,7 @@ class SystemBridgeService extends ChangeNotifier {
   Map<String, dynamic> get provisioningStatus =>
       _nestedMap(_status['provisioning']);
   Map<String, dynamic> get updateStatus => _nestedMap(_status['updates']);
+  Map<String, dynamic> get memoryStatus => _nestedMap(_status['memory']);
   Map<String, dynamic> get fileAccessStatus =>
       _nestedMap(_status['fileAccess']);
   Map<String, dynamic> get backupStatus => _nestedMap(_status['backup']);
@@ -350,7 +353,7 @@ class SystemBridgeService extends ChangeNotifier {
           existingValue.cast<String, dynamic>(),
           value.cast<String, dynamic>(),
         );
-        if (!identical(mergedChild, existingValue)) {
+        if (!_deepEquals(mergedChild, existingValue)) {
           merged ??= Map<String, dynamic>.from(current);
           merged![key] = mergedChild;
         }

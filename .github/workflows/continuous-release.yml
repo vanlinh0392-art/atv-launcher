@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  LAUNCHER_UPDATE_CHANNEL: atv-launcher-official
+
 jobs:
   build-release:
     name: Build and Publish Official APK Release
@@ -49,7 +52,12 @@ jobs:
           rm -f build/app/outputs/flutter-apk/*release*.apk || true
           rm -f build/app/outputs/apk/release/*release*.apk || true
           set +e
-          flutter build apk --release --target-platform android-arm --no-pub
+          flutter build apk --release --target-platform android-arm --no-pub \
+            --dart-define=LAUNCHER_UPDATE_GITHUB_OWNER="${GITHUB_REPOSITORY_OWNER}" \
+            --dart-define=LAUNCHER_UPDATE_GITHUB_REPO="${GITHUB_REPOSITORY#*/}" \
+            --dart-define=LAUNCHER_UPDATE_CHANNEL="${LAUNCHER_UPDATE_CHANNEL}" \
+            --dart-define=LAUNCHER_SOURCE_REPO_URL="https://github.com/${GITHUB_REPOSITORY}" \
+            --dart-define=LAUNCHER_LEGALESE_OWNER="${GITHUB_REPOSITORY_OWNER}"
           status=$?
           set -e
           apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*armeabi-v7a*release*.apk' | head -n 1)"
@@ -86,7 +94,12 @@ jobs:
           rm -f build/app/outputs/flutter-apk/*release*.apk || true
           rm -f build/app/outputs/apk/release/*release*.apk || true
           set +e
-          flutter build apk --release --target-platform android-arm64 --no-pub
+          flutter build apk --release --target-platform android-arm64 --no-pub \
+            --dart-define=LAUNCHER_UPDATE_GITHUB_OWNER="${GITHUB_REPOSITORY_OWNER}" \
+            --dart-define=LAUNCHER_UPDATE_GITHUB_REPO="${GITHUB_REPOSITORY#*/}" \
+            --dart-define=LAUNCHER_UPDATE_CHANNEL="${LAUNCHER_UPDATE_CHANNEL}" \
+            --dart-define=LAUNCHER_SOURCE_REPO_URL="https://github.com/${GITHUB_REPOSITORY}" \
+            --dart-define=LAUNCHER_LEGALESE_OWNER="${GITHUB_REPOSITORY_OWNER}"
           status=$?
           set -e
           apk_path="$(find build/app/outputs/flutter-apk -maxdepth 1 -name '*arm64-v8a*release*.apk' | head -n 1)"
@@ -136,7 +149,7 @@ jobs:
           tag_name="v${version_name}-release"
           echo "version_name=${version_name}" >> "${GITHUB_OUTPUT}"
           echo "tag_name=${tag_name}" >> "${GITHUB_OUTPUT}"
-          echo "release_name=ATV Launcher xfire0392-netizen v${version_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_name=ATV Launcher v${version_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Build release notes from changelog
         id: release_notes
@@ -168,7 +181,7 @@ jobs:
               "- `atv-launcher-armeabi-v7a-release.apk`",
               "- `atv-launcher-arm64-v8a-release.apk`",
               "",
-              "Updater-Channel: xfire0392-netizen-official",
+              "Updater-Channel: atv-launcher-official",
               "Launcher updater chi nhan official release va bo qua debug build.",
           ]
           Path("build/release_notes.md").write_text(

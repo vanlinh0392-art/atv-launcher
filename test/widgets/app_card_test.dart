@@ -145,6 +145,174 @@ void main() {
     verify(appsService.getAppBanner(applications.first.packageName)).called(2);
   });
 
+  testWidgets('app images request decode size for displayed card bounds',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final application = fakeApp(
+      packageName: 'decode.size.banner',
+      name: 'Decode Size Banner',
+    );
+    final category = fakeCategory()..applications.add(application);
+
+    when(appsService.getAppBanner(application.packageName))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ProfileSecurityService?>.value(value: null),
+          ListenableProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<SettingsService>.value(value: settingsService),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 320,
+                child: AppCard(
+                  application: application,
+                  category: category,
+                  autofocus: true,
+                  onMove: (_, __) => false,
+                  onMoveEnd: (_, __) async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(find.byType(Image).first);
+    expect(image.image, isA<ResizeImage>());
+    final resizedProvider = image.image as ResizeImage;
+    expect(resizedProvider.width, isNotNull);
+    expect(resizedProvider.height, isNotNull);
+    expect(resizedProvider.width, greaterThan(0));
+    expect(resizedProvider.height, greaterThan(0));
+  });
+
+  testWidgets(
+      'non-autofocus cards defer image loading until shared delay elapses',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final applications = [
+      fakeApp(
+        packageName: 'deferred.load.first',
+        name: 'Deferred First',
+      ),
+      fakeApp(
+        packageName: 'deferred.load.second',
+        name: 'Deferred Second',
+      ),
+    ];
+    final category = fakeCategory()..applications.addAll(applications);
+
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ProfileSecurityService?>.value(value: null),
+          ListenableProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<SettingsService>.value(value: settingsService),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Row(
+              children: applications
+                  .map(
+                    (application) => Expanded(
+                      child: AppCard(
+                        application: application,
+                        category: category,
+                        autofocus: false,
+                        onMove: (_, __) => false,
+                        onMoveEnd: (_, __) async {},
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    verifyNever(appsService.getAppBanner(any));
+
+    await tester.pump(const Duration(milliseconds: 899));
+    verifyNever(appsService.getAppBanner(any));
+
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pumpAndSettle();
+
+    verify(appsService.getAppBanner('deferred.load.first')).called(1);
+    verify(appsService.getAppBanner('deferred.load.second')).called(1);
+  });
+
+  testWidgets('disposing a deferred app card cancels its pending image load',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final application = fakeApp(
+      packageName: 'deferred.dispose.cancel',
+      name: 'Deferred Dispose',
+    );
+    final category = fakeCategory()..applications.add(application);
+
+    when(appsService.getAppBanner(application.packageName))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ProfileSecurityService?>.value(value: null),
+          ListenableProvider<AppsService>.value(value: appsService),
+          ChangeNotifierProvider<SettingsService>.value(value: settingsService),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: AppCard(
+                application: application,
+                category: category,
+                autofocus: false,
+                onMove: (_, __) => false,
+                onMoveEnd: (_, __) async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1000));
+
+    verifyNever(appsService.getAppBanner(application.packageName));
+  });
+
   testWidgets(
       'long press opens app management menu when home reorder mode is disabled',
       (tester) async {

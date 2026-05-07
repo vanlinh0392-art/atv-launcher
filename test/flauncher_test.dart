@@ -87,6 +87,62 @@ void main() {
     expect(find.byKey(const Key('home_bottom_dock')), findsOneWidget);
   });
 
+  testWidgets('balanced image wallpaper dock avoids live backdrop blur',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final favorites =
+        fakeCategory(name: 'Favorites', order: 0, type: CategoryType.row);
+    favorites.applications.add(
+      fakeApp(packageName: 'balanced.blur.app', name: 'Balanced Blur App'),
+    );
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([favorites]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+    await settingsService.setHomeDockPerformanceMode(
+      SettingsService.homeDockPerformanceModeBalanced,
+    );
+    await settingsService.setHomeDockGlassIntensityPercent(80);
+    await settingsService.setHomeDockAutoCollapseEnabled(false);
+    await settingsService.setShowCategoryTitles(true);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    expect(find.byKey(const Key('home_bottom_dock')), findsOneWidget);
+    expect(find.text('Favorites'), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
+  });
+
   testWidgets('status bar reorder button toggles home reorder mode',
       (tester) async {
     _prepareView(tester);
@@ -703,6 +759,80 @@ void main() {
   });
 
   testWidgets(
+      'dock rescans traversal nodes when DPAD reaches lazily built rows',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final sections = List<LauncherSection>.generate(7, (index) {
+      final category = fakeCategory(
+        name: 'Lazy Vertical $index',
+        order: index,
+        type: CategoryType.row,
+      );
+      category.applications.add(
+        fakeApp(
+          packageName: 'lazy.vertical.app.$index',
+          name: 'Lazy Vertical App $index',
+        ),
+      );
+      return category;
+    });
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn(sections);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setShowCategoryTitles(true);
+    await settingsService.setHomeDockRowsPreset(2);
+    await settingsService.setHomeDockAutoCollapseEnabled(false);
+    await settingsService.setHomeDockPerformanceMode(
+      SettingsService.homeDockPerformanceModeBalanced,
+    );
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    for (var index = 1; index < sections.length; index += 1) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 420));
+      expect(
+        tester.binding.focusManager.primaryFocus?.debugLabel,
+        contains('lazy.vertical.app.$index'),
+      );
+    }
+  });
+
+  testWidgets(
       'long press on home opens app management menu when reorder mode is off',
       (tester) async {
     _prepareView(tester);
@@ -1013,6 +1143,8 @@ Future<void> _pumpLauncher(
       'memory': <String, dynamic>{},
       'provisioning': <String, dynamic>{},
     });
+    when(bridgeService.navigationStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
   }
 
   await tester.pumpWidget(

@@ -21,6 +21,15 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class FLauncherAboutDialog extends StatelessWidget {
+  static const String _legaleseOwner = String.fromEnvironment(
+    'LAUNCHER_LEGALESE_OWNER',
+    defaultValue: 'ATV Launcher',
+  );
+  static const String _sourceRepoUrl = String.fromEnvironment(
+    'LAUNCHER_SOURCE_REPO_URL',
+    defaultValue: 'https://github.com/vanlinh0392-art/atv-launcher',
+  );
+
   final PackageInfo packageInfo;
 
   const FLauncherAboutDialog({
@@ -36,12 +45,10 @@ class FLauncherAboutDialog extends StatelessWidget {
       applicationName: packageInfo.appName,
       applicationVersion: "${packageInfo.version} (${packageInfo.buildNumber})",
       applicationIcon: Image.asset("assets/logo.png", height: 72),
-      applicationLegalese: "© 2026 xfire0392-netizen",
+      applicationLegalese: "© 2026 $_legaleseOwner",
       children: [
         const SizedBox(height: 24),
-        Text(localizations.textAboutDialog(
-          "https://github.com/xfire0392-netizen/atv-launcher",
-        )),
+        Text(localizations.textAboutDialog(_sourceRepoUrl)),
       ],
     );
   }

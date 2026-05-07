@@ -32,12 +32,10 @@ void main() {
     when(settings.autoHideAppBarEnabled).thenReturn(false);
     when(settings.homeDockGlassIntensityPercent).thenReturn(20);
     when(apps.homeReorderModeEnabled).thenReturn(false);
-    when(bridge.status).thenReturn(<String, dynamic>{
-      'memory': <String, dynamic>{
-        'availBytes': 11811160064,
-        'totalBytes': 137438953472,
-        'lowMemory': false,
-      },
+    when(bridge.memoryStatus).thenReturn(<String, dynamic>{
+      'availBytes': 11811160064,
+      'totalBytes': 137438953472,
+      'lowMemory': false,
     });
 
     await tester.pumpWidget(
@@ -84,7 +82,7 @@ void main() {
     when(settings.timeFormat).thenReturn('HH:mm');
     when(settings.statusBarClockScalePercent).thenReturn(100);
     when(apps.homeReorderModeEnabled).thenReturn(false);
-    when(bridge.status).thenReturn(const <String, dynamic>{});
+    when(bridge.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridge.provisioningStatus).thenReturn(const <String, dynamic>{
       'health': 'healthy',
       'missingRequiredCount': 0,
@@ -151,7 +149,7 @@ void main() {
     when(settings.timeFormat).thenReturn('HH:mm');
     when(settings.statusBarClockScalePercent).thenReturn(100);
     when(apps.homeReorderModeEnabled).thenReturn(false);
-    when(bridge.status).thenReturn(const <String, dynamic>{});
+    when(bridge.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridge.provisioningStatus).thenReturn(const <String, dynamic>{
       'health': 'healthy',
       'missingRequiredCount': 0,

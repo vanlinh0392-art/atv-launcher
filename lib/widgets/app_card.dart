@@ -18,6 +18,7 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_image_type.dart';
@@ -575,6 +576,13 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final iconLaneWidth = constraints.maxWidth * layout.iconLaneFactor;
+            final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+            final cacheWidth =
+                _decodeCacheDimension(iconLaneWidth, devicePixelRatio);
+            final cacheHeight = _decodeCacheDimension(
+              constraints.maxHeight,
+              devicePixelRatio,
+            );
             return Padding(
               padding: EdgeInsets.all(layout.contentPadding),
               child: Row(
@@ -588,7 +596,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                           child: Transform.scale(
                             scale: layout.iconVisualScale,
                             child: Image(
-                              image: tuple.item2,
+                              image: _resizeImageProvider(
+                                tuple.item2,
+                                cacheWidth,
+                                cacheHeight,
+                              ),
                               fit: BoxFit.contain,
                               width: iconLaneWidth,
                               height: constraints.maxHeight,
@@ -668,23 +680,63 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     final shrinkFactor = mediaScale < 1 ? mediaScale : 1.0;
     final zoomScale = mediaScale > 1 ? mediaScale : 1.0;
 
-    return ClipRect(
-      child: Center(
-        child: Transform.scale(
-          scale: zoomScale,
-          child: FractionallySizedBox(
-            widthFactor: shrinkFactor,
-            heightFactor: shrinkFactor,
-            child: Image(
-              image: imageProvider,
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              filterQuality: performanceProfile.appCardFilterQuality,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+        final cacheWidth = _decodeCacheDimension(
+          constraints.maxWidth * math.max(shrinkFactor, zoomScale),
+          devicePixelRatio,
+        );
+        final cacheHeight = _decodeCacheDimension(
+          constraints.maxHeight * math.max(shrinkFactor, zoomScale),
+          devicePixelRatio,
+        );
+        return ClipRect(
+          child: Center(
+            child: Transform.scale(
+              scale: zoomScale,
+              child: FractionallySizedBox(
+                widthFactor: shrinkFactor,
+                heightFactor: shrinkFactor,
+                child: Image(
+                  image: _resizeImageProvider(
+                    imageProvider,
+                    cacheWidth,
+                    cacheHeight,
+                  ),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  filterQuality: performanceProfile.appCardFilterQuality,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  ImageProvider _resizeImageProvider(
+    ImageProvider imageProvider,
+    int? cacheWidth,
+    int? cacheHeight,
+  ) {
+    return ResizeImage.resizeIfNeeded(
+      cacheWidth,
+      cacheHeight,
+      imageProvider,
+    );
+  }
+
+  int? _decodeCacheDimension(double logicalPixels, double devicePixelRatio) {
+    if (!logicalPixels.isFinite || logicalPixels <= 0) {
+      return null;
+    }
+    final physicalPixels = logicalPixels * devicePixelRatio;
+    if (!physicalPixels.isFinite || physicalPixels <= 0) {
+      return null;
+    }
+    return math.max(1, physicalPixels.ceil());
   }
 
   void _bindAppImage() {

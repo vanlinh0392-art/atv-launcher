@@ -397,9 +397,8 @@ class _FLauncherAppState extends State<FLauncherApp>
   }
 
   int _readHomeSequence(SystemBridgeService bridgeService) {
-    final navigation = bridgeService.status['navigation'];
-    final map = navigation is Map ? navigation.cast<String, dynamic>() : null;
-    return ((map?['homeSequence'] as num?) ?? 0).toInt();
+    final navigation = bridgeService.navigationStatus;
+    return ((navigation['homeSequence'] as num?) ?? 0).toInt();
   }
 
   _BenchmarkSnapshot _readBenchmarkCommand(

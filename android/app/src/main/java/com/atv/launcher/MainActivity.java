@@ -142,8 +142,9 @@ public class MainActivity extends FlutterActivity {
     private static final long LITE_HOME_GUARD_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
     private static final long LITE_PROVISIONING_CACHE_TTL_MS = 60_000L;
     private static final long LITE_MEMORY_CACHE_TTL_MS = 30_000L;
-    private static final int MAX_IMAGE_CACHE_ENTRIES = 48;
-    private static final int MAX_IMAGE_CACHE_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_IMAGE_CACHE_ENTRIES = 24;
+    private static final int MAX_IMAGE_CACHE_BYTES = 4 * 1024 * 1024;
+    private static final int MAX_IMAGE_CACHE_ITEM_BYTES = 512 * 1024;
     private static final int MAX_BANNER_WIDTH = 640;
     private static final int MAX_BANNER_HEIGHT = 360;
     private static final int MAX_ICON_WIDTH = 256;
@@ -209,7 +210,7 @@ public class MainActivity extends FlutterActivity {
             }
             MainActivity activity = activeActivity;
             if (activity != null) {
-                sharedSystemEventSink.success(activity.buildSystemBridgeStatusLite(true));
+                sharedSystemEventSink.success(activity.buildSystemBridgeStatusHot(true));
             }
             SHARED_SYSTEM_EVENT_HANDLER.postDelayed(this, SYSTEM_EVENT_INTERVAL_MS);
         }
@@ -722,7 +723,7 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void putCachedAppImage(String cacheKey, byte[] imageBytes) {
-        if (imageBytes.length > MAX_IMAGE_CACHE_BYTES / 2) {
+        if (imageBytes.length == 0 || imageBytes.length > MAX_IMAGE_CACHE_ITEM_BYTES) {
             return;
         }
         synchronized (APP_IMAGE_CACHE) {
@@ -954,6 +955,23 @@ public class MainActivity extends FlutterActivity {
             firstLiteBridgeStatusLogged = true;
             logPerf("time_to_lite_bridge_status", startedAt);
         }
+        return map;
+    }
+
+    private Map<String, Object> buildSystemBridgeStatusHot(boolean preferPeriodicCaches) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("snapshotKind", "hot");
+        map.put("navigation", buildNavigationStatus());
+        if (isDebuggableBuild()) {
+            map.put("benchmarkCommand", buildBenchmarkCommandStatus());
+        }
+        map.put(
+                "wallpaper",
+                sharedVideoWallpaperController != null
+                        ? sharedVideoWallpaperController.getStatus()
+                        : new LinkedHashMap<>()
+        );
+        map.put("memory", buildLiteMemoryStatus(preferPeriodicCaches));
         return map;
     }
 
@@ -3032,11 +3050,17 @@ public class MainActivity extends FlutterActivity {
             return new byte[0];
         }
         Bitmap bitmap = drawableToBitmap(drawable, maxWidth, maxHeight, opaqueBackground);
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        Bitmap.CompressFormat format = opaqueBackground ? Bitmap.CompressFormat.JPEG : Bitmap.CompressFormat.PNG;
-        int quality = opaqueBackground ? 86 : 100;
-        bitmap.compress(format, quality, stream);
-        return stream.toByteArray();
+        try {
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            Bitmap.CompressFormat format = opaqueBackground ? Bitmap.CompressFormat.JPEG : Bitmap.CompressFormat.PNG;
+            int quality = opaqueBackground ? 86 : 100;
+            bitmap.compress(format, quality, stream);
+            return stream.toByteArray();
+        } finally {
+            if (shouldRecycleRenderedBitmap(drawable, bitmap)) {
+                bitmap.recycle();
+            }
+        }
     }
 
     private Bitmap drawableToBitmap(Drawable drawable, int maxWidth, int maxHeight, boolean opaqueBackground) {
@@ -3060,6 +3084,16 @@ public class MainActivity extends FlutterActivity {
         drawable.setBounds(0, 0, targetWidth, targetHeight);
         drawable.draw(canvas);
         return bitmap;
+    }
+
+    private boolean shouldRecycleRenderedBitmap(Drawable drawable, Bitmap bitmap) {
+        if (bitmap.isRecycled()) {
+            return false;
+        }
+        if (drawable instanceof BitmapDrawable bitmapDrawable && bitmapDrawable.getBitmap() == bitmap) {
+            return false;
+        }
+        return true;
     }
 
     private void emitSystemSnapshot() {

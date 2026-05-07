@@ -323,6 +323,12 @@
             "error": {}
         }
     },
+    "launcherUpdateRepositoryUnavailable": "Update repository is not reachable from this TV (GitHub HTTP {statusCode}). The GitHub account/repository may be private, renamed, suspended, or blocked; publish the release from a public reachable repository and rebuild the launcher with that source.",
+    "@launcherUpdateRepositoryUnavailable": {
+        "placeholders": {
+            "statusCode": {}
+        }
+    },
     "launcherUpdateDownloadStarted": "Downloading {fileName}...",
     "@launcherUpdateDownloadStarted": {
         "placeholders": {
@@ -840,7 +846,7 @@
     "ambientModeAction": "Start ambient mode",
     "actionStartAmbientModeSubtitle": "Start the built-in screensaver or ambient mode immediately.",
     "actionRepairAccessibilitySubtitle": "Run the launcher accessibility repair flow now.",
-    "textAboutDialog": "ATV Launcher is a personal Android TV launcher maintained by xfire0392-netizen.\nSource code available at {repoUrl}.\n\nBuilt on top of FLauncher by Etienne Fesser and the Flutter fork by osrosal. Logo by Katie (@fureturoe), original design by @FXCostanzo.",
+    "textAboutDialog": "ATV Launcher is a personal Android TV launcher.\nSource code available at {repoUrl}.\n\nBuilt on top of FLauncher by Etienne Fesser and the Flutter fork by osrosal. Logo by Katie (@fureturoe), original design by @FXCostanzo.",
     "@textAboutDialog": {
         "placeholders": {
             "repoUrl": {

@@ -54,7 +54,7 @@ void main() {
       final releases = <LauncherUpdateRelease>[
         LauncherUpdateRelease.fromGitHubJson({
           'tag_name': 'v2026.05.001-release',
-          'name': 'ATV Launcher xfire0392-netizen v2026.05.001',
+          'name': 'ATV Launcher v2026.05.001',
           'html_url': 'https://example.com/release-001',
           'published_at': '2026-04-30T18:20:01Z',
           'body': officialMarker,
@@ -70,7 +70,7 @@ void main() {
         }),
         LauncherUpdateRelease.fromGitHubJson({
           'tag_name': 'v2026.05.002-release',
-          'name': 'ATV Launcher xfire0392-netizen v2026.05.002',
+          'name': 'ATV Launcher v2026.05.002',
           'html_url': 'https://example.com/release-002',
           'published_at': '2026-04-30T23:18:39Z',
           'body': officialMarker,
@@ -98,7 +98,7 @@ void main() {
         'tag_name': 'v2026.04.30-release',
         'name': 'ATV Launcher Release',
         'html_url':
-            'https://github.com/xfire0392-netizen/atv-launcher/releases/tag/v2026.04.30-release',
+            'https://github.com/example-owner/atv-launcher/releases/tag/v2026.04.30-release',
         'published_at': '2026-04-30T10:00:00Z',
         'body': 'Release notes\n$officialMarker',
         'assets': [
@@ -379,11 +379,11 @@ void main() {
     test('accepts markdown formatted updater-channel markers', () {
       final release = LauncherUpdateRelease.fromGitHubJson({
         'tag_name': 'v2026.05.003-release',
-        'name': 'ATV Launcher xfire0392-netizen v2026.05.003',
+        'name': 'ATV Launcher v2026.05.003',
         'html_url': 'https://example.com/release',
         'published_at': '2026-05-01T03:57:16Z',
         'body':
-            'Updater-Channel: `xfire0392-netizen-official`\nOfficial release',
+            'Updater-Channel: `atv-launcher-official`\nOfficial release',
         'assets': [
           {
             'name': 'atv-launcher-armeabi-v7a-release.apk',
@@ -463,7 +463,7 @@ void main() {
 
       final client = LauncherUpdateClient(
         releasesBaseUri: Uri.parse(
-          'http://127.0.0.1:${server.port}/repos/xfire0392-netizen/atv-launcher/releases',
+          'http://127.0.0.1:${server.port}/repos/example-owner/atv-launcher/releases',
         ),
       );
 
@@ -471,6 +471,36 @@ void main() {
 
       expect(release?.tagName, 'v2024.11.001-release');
       expect(requestedPages, ['1', '2']);
+    });
+
+    test('reports unavailable GitHub release repository clearly', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        request.response.statusCode = HttpStatus.notFound;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode(<String, dynamic>{
+          'message': 'Not Found',
+        }));
+        await request.response.close();
+      });
+
+      final client = LauncherUpdateClient(
+        releasesBaseUri: Uri.parse(
+          'http://127.0.0.1:${server.port}/repos/example-owner/atv-launcher/releases',
+        ),
+      );
+
+      await expectLater(
+        client.fetchLatestOfficialRelease(),
+        throwsA(
+          isA<LauncherUpdateRepositoryUnavailableException>()
+              .having((error) => error.statusCode, 'statusCode', 404),
+        ),
+      );
     });
   });
 

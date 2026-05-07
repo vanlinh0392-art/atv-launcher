@@ -52,7 +52,7 @@ void main() {
       tagName: 'v2026.04.12-release',
       name: 'ATV Launcher Release',
       htmlUrl:
-          'https://github.com/xfire0392-netizen/atv-launcher/releases/tag/v2026.04.12-release',
+          'https://github.com/example-owner/atv-launcher/releases/tag/v2026.04.12-release',
       publishedAt: DateTime(2026, 4, 29, 20, 0),
       body: 'Release notes',
       isDraft: false,

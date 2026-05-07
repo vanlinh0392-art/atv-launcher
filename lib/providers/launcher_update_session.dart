@@ -121,6 +121,10 @@ class LauncherUpdateSession extends ChangeNotifier {
                   : release.displayName,
             );
       notifyListeners();
+    } on LauncherUpdateRepositoryUnavailableException catch (error) {
+      _lastMessage =
+          localizations.launcherUpdateRepositoryUnavailable(error.statusCode);
+      notifyListeners();
     } catch (error) {
       _lastMessage = localizations.launcherUpdateCheckFailed(error.toString());
       notifyListeners();

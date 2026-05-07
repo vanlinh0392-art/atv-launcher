@@ -55,6 +55,9 @@ void main() {
       'memory': <String, dynamic>{},
       'provisioning': <String, dynamic>{},
     });
+    when(bridgeService.navigationStatus)
+        .thenReturn(const <String, dynamic>{});
+    when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
       'health': 'healthy',
       'requirements': <Map<String, dynamic>>[],
@@ -124,6 +127,10 @@ void main() {
       'provisioning': provisioningStatus,
       'install': _buildInstallStatus(freshInstall: true),
     });
+    when(bridgeService.navigationStatus).thenReturn(
+      const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+    );
+    when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
     when(
       bridgeService.runProvisioningAction(
@@ -217,6 +224,10 @@ void main() {
       'provisioning': provisioningStatus,
       'install': _buildInstallStatus(freshInstall: true),
     });
+    when(bridgeService.navigationStatus).thenReturn(
+      const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+    );
+    when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
     when(channel.addNetworkChangedListener(any)).thenReturn(null);
     when(channel.getActiveNetworkInformation())
@@ -263,6 +274,10 @@ void main() {
       'provisioning': provisioningStatus,
       'install': _buildInstallStatus(freshInstall: false),
     });
+    when(bridgeService.navigationStatus).thenReturn(
+      const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+    );
+    when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
     when(channel.addNetworkChangedListener(any)).thenReturn(null);
     when(channel.getActiveNetworkInformation())
@@ -310,6 +325,10 @@ void main() {
       'provisioning': provisioningStatus,
       'install': _buildInstallStatus(freshInstall: true),
     });
+    when(bridgeService.navigationStatus).thenReturn(
+      const <String, dynamic>{'homeSequence': 0, 'reason': ''},
+    );
+    when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
     when(bridgeService.provisioningStatus).thenReturn(provisioningStatus);
     when(
       bridgeService.runProvisioningAction(

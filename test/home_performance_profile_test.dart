@@ -48,6 +48,10 @@ void main() {
       smooth.wallpaperVideoWarmUpDelay,
       lessThan(off.wallpaperVideoWarmUpDelay),
     );
+    expect(quality.dockBackdropBlurEnabled, isTrue);
+    expect(balanced.dockBackdropBlurEnabled, isFalse);
+    expect(smooth.dockBackdropBlurEnabled, isFalse);
+    expect(off.dockBackdropBlurEnabled, isFalse);
   });
 
   test(

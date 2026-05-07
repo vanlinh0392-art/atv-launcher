@@ -94,6 +94,46 @@ void main() {
       'atv-launcher-armeabi-v7a-release.apk',
     );
   });
+
+  test('shows a specific message when the GitHub release repository is unavailable',
+      () async {
+    final tempDirectory =
+        await _createTempTestDirectory('launcher-update-session-unavailable');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(
+        error: LauncherUpdateRepositoryUnavailableException(
+          statusCode: HttpStatus.notFound,
+          uri: Uri.parse(
+            'https://api.github.com/repos/example-owner/atv-launcher/releases',
+          ),
+        ),
+      ),
+      launcherChannel: _SequencedAbiFLauncherChannel(
+        responses: const [
+          ['arm64-v8a'],
+        ],
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await session.initialize();
+
+    final localizations =
+        await AppLocalizations.delegate.load(const Locale('vi'));
+    await session.checkLatestRelease(localizations);
+
+    expect(session.latestRelease, isNull);
+    expect(session.lastMessage, contains('HTTP 404'));
+    expect(session.lastMessage, contains('private'));
+    expect(session.lastMessage, contains('suspend'));
+  });
 }
 
 LauncherUpdateRelease _officialRelease() => LauncherUpdateRelease(
@@ -126,11 +166,24 @@ LauncherUpdateRelease _officialRelease() => LauncherUpdateRelease(
 
 class _FakeLauncherUpdateClient extends LauncherUpdateClient {
   final LauncherUpdateRelease? release;
+  final Object? error;
 
-  _FakeLauncherUpdateClient({required this.release});
+  _FakeLauncherUpdateClient({this.release, this.error});
 
   @override
-  Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async => release;
+  Future<LauncherUpdateRelease?> fetchLatestOfficialRelease() async {
+    final resolvedError = error;
+    if (resolvedError != null) {
+      if (resolvedError is Exception) {
+        throw resolvedError;
+      }
+      if (resolvedError is Error) {
+        throw resolvedError;
+      }
+      throw StateError(resolvedError.toString());
+    }
+    return release;
+  }
 }
 
 class _SequencedAbiFLauncherChannel extends FLauncherChannel {

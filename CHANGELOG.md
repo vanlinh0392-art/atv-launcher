@@ -1,9 +1,29 @@
 # Changelog
 
-ATV Launcher là một public fork cá nhân của `xfire0392-netizen`, xây trên nền:
+ATV Launcher là một public fork cá nhân, xây trên nền:
 
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
+
+## 2026-05-07 - Official release 2026.05.010 chuyển GitHub mới và tối ưu RAM/CPU an toàn
+
+### GitHub release mới
+
+- Chuyển nguồn cập nhật chính thức sang repo public `vanlinh0392-art/atv-launcher`
+- Updater không còn hardcode tài khoản GitHub cũ; workflow release tự lấy owner/repo từ `GITHUB_REPOSITORY`
+- Khi TV không truy cập được repo cập nhật, màn cập nhật báo rõ trường hợp repo private, đổi tên, bị suspend hoặc bị chặn
+
+### Tối ưu HOME không đổi trải nghiệm
+
+- Balanced/Smooth giảm live backdrop blur trên HOME để hạ chi phí GPU/CPU idle, Quality vẫn giữ đường hiển thị đẹp nhất
+- System bridge tách nhịp snapshot nóng/lạnh để HOME ít rebuild do các dữ liệu settings/provisioning không liên quan
+- App card siết cache ảnh và decode theo kích thước hiển thị thực tế để giảm double-cache/double-decode
+
+### Kiểm chứng
+
+- `flutter analyze --no-pub`: pass
+- Targeted updater tests: pass
+- Release chính thức tiếp tục publish đúng 2 asset `atv-launcher-armeabi-v7a-release.apk` và `atv-launcher-arm64-v8a-release.apk`
 
 ## 2026-05-02 - Official release 2026.05.009 tối ưu CPU HOME, bridge hệ thống và tải ảnh app
 

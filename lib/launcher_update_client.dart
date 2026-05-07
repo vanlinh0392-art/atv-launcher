@@ -2,9 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 
 class LauncherUpdateClient {
-  static const String githubOwner = 'xfire0392-netizen';
-  static const String githubRepo = 'atv-launcher';
-  static const String officialChannelSlug = 'xfire0392-netizen-official';
+  static const String githubOwner = String.fromEnvironment(
+    'LAUNCHER_UPDATE_GITHUB_OWNER',
+    defaultValue: 'vanlinh0392-art',
+  );
+  static const String githubRepo = String.fromEnvironment(
+    'LAUNCHER_UPDATE_GITHUB_REPO',
+    defaultValue: 'atv-launcher',
+  );
+  static const String officialChannelSlug = String.fromEnvironment(
+    'LAUNCHER_UPDATE_CHANNEL',
+    defaultValue: 'atv-launcher-official',
+  );
   static const String officialChannelMarker =
       'Updater-Channel: $officialChannelSlug';
   static const int releasePageSize = 50;
@@ -148,6 +157,14 @@ class LauncherUpdateClient {
       final response = await request.close();
       final body = await utf8.decodeStream(response);
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (response.statusCode == HttpStatus.forbidden ||
+            response.statusCode == HttpStatus.notFound) {
+          throw LauncherUpdateRepositoryUnavailableException(
+            statusCode: response.statusCode,
+            uri: uri,
+            responseBody: body,
+          );
+        }
         throw HttpException(
           'GitHub release check failed with HTTP ${response.statusCode}.',
           uri: uri,
@@ -157,6 +174,25 @@ class LauncherUpdateClient {
     } finally {
       client.close(force: true);
     }
+  }
+}
+
+class LauncherUpdateRepositoryUnavailableException implements Exception {
+  final int statusCode;
+  final Uri uri;
+  final String responseBody;
+
+  const LauncherUpdateRepositoryUnavailableException({
+    required this.statusCode,
+    required this.uri,
+    this.responseBody = '',
+  });
+
+  @override
+  String toString() {
+    return 'GitHub update repository is unavailable (HTTP $statusCode). '
+        'It may be private, renamed, suspended, or blocked. '
+        'Make the release repository public/reachable or update the app to a new release source.';
   }
 }
 

@@ -1,6 +1,6 @@
 # ATV Launcher
 
-ATV Launcher là dự án launcher Android TV cá nhân mình đang duy trì dưới tài khoản `xfire0392-netizen`, tập trung cho TV không có Google, Xiaomi TV / Mi Box và các thiết bị Android TV 9+ cần nhiều quyền hệ thống hơn launcher thông thường.
+ATV Launcher là dự án launcher Android TV cá nhân mình đang duy trì, tập trung cho TV không có Google, Xiaomi TV / Mi Box và các thiết bị Android TV 9+ cần nhiều quyền hệ thống hơn launcher thông thường.
 
 Fork này lấy nền từ [`osrosal/flauncher`](https://github.com/osrosal/flauncher) tag `v2025.07.001`, sau đó mở rộng thành một APK launcher tích hợp cho:
 

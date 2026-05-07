@@ -290,12 +290,8 @@ class _MemoryStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     return Selector<SystemBridgeService, Map<String, dynamic>>(
-      selector: (_, service) => service.status,
-      builder: (context, status, _) {
-        final memory = status['memory'];
-        final map = memory is Map
-            ? memory.cast<String, dynamic>()
-            : <String, dynamic>{};
+      selector: (_, service) => service.memoryStatus,
+      builder: (context, map, _) {
         final num? availableBytes = map['availBytes'] as num?;
         final num? totalBytes = map['totalBytes'] as num?;
         final bool lowMemory = map['lowMemory'] == true;

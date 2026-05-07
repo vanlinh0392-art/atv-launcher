@@ -202,10 +202,7 @@ class _HomeContentState extends State<_HomeContent> {
     );
     final navigation =
         context.select<SystemBridgeService, _NavigationSnapshot>((service) {
-      final rawNavigation = service.status['navigation'];
-      final map = rawNavigation is Map
-          ? rawNavigation.cast<String, dynamic>()
-          : const <String, dynamic>{};
+      final map = service.navigationStatus;
       return (
         homeSequence: ((map['homeSequence'] as num?) ?? 0).toInt(),
         reason: map['reason']?.toString() ?? '',
@@ -772,7 +769,30 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     if (current == null) {
       return false;
     }
-    final nodes = _dockTraversalNodes(current: current);
+    if (_moveFocusWithinDockNodes(
+      direction,
+      current,
+      _dockTraversalNodes(current: current),
+    )) {
+      return true;
+    }
+    // Lazily built dock rows can make the cached traversal list stale.
+    _invalidateDockTraversalCache();
+    if (_moveFocusWithinDockNodes(
+      direction,
+      current,
+      _dockTraversalNodes(current: current),
+    )) {
+      return true;
+    }
+    return _advanceDockViewport(direction, current);
+  }
+
+  bool _moveFocusWithinDockNodes(
+    TraversalDirection direction,
+    FocusNode current,
+    List<FocusNode> nodes,
+  ) {
     if (nodes.isEmpty || !nodes.contains(current)) {
       return false;
     }
@@ -783,6 +803,63 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       return false;
     }
     searcher.findBestFocusNode(candidates, current).requestFocus();
+    return true;
+  }
+
+  bool _advanceDockViewport(TraversalDirection direction, FocusNode current) {
+    if ((direction != TraversalDirection.down &&
+            direction != TraversalDirection.up) ||
+        !_dockScrollController.hasClients) {
+      return false;
+    }
+    final currentContext = current.context;
+    final dockContext = _dockListKey.currentContext;
+    if (currentContext == null || dockContext == null) {
+      return false;
+    }
+    final viewport = dockContext.findRenderObject();
+    final item = currentContext.findRenderObject();
+    if (viewport is! RenderBox ||
+        item is! RenderBox ||
+        !viewport.attached ||
+        !item.attached) {
+      return false;
+    }
+    final currentOffset = _dockScrollController.offset;
+    final scrollStep = math.max(
+      item.size.height + widget.rowSpacing,
+      viewport.size.height * 0.35,
+    );
+    final signedScrollStep =
+        direction == TraversalDirection.down ? scrollStep : -scrollStep;
+    final targetOffset = (currentOffset + signedScrollStep).clamp(
+      _dockScrollController.position.minScrollExtent,
+      _dockScrollController.position.maxScrollExtent,
+    );
+    if ((targetOffset - currentOffset).abs() < 1.0) {
+      return false;
+    }
+    _dockScrollController.jumpTo(targetOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _invalidateDockTraversalCache();
+      final refreshedCurrent = FocusManager.instance.primaryFocus ?? current;
+      if (_moveFocusWithinDockNodes(
+        direction,
+        refreshedCurrent,
+        _dockTraversalNodes(current: refreshedCurrent),
+      )) {
+        return;
+      }
+      final nodes = _dockTraversalNodes();
+      if (nodes.isEmpty) {
+        return;
+      }
+      (direction == TraversalDirection.down ? nodes.last : nodes.first)
+          .requestFocus();
+    });
     return true;
   }
 

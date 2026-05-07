@@ -500,6 +500,15 @@ class MockFLauncherChannel extends _i1.Mock implements _i10.FLauncherChannel {
       ) as _i2.Future<Map<String, dynamic>>);
 
   @override
+  _i2.Future<List<String>> getSupportedAbis() => (super.noSuchMethod(
+        Invocation.method(
+          #getSupportedAbis,
+          [],
+        ),
+        returnValue: _i2.Future<List<String>>.value(<String>[]),
+      ) as _i2.Future<List<String>>);
+
+  @override
   _i2.Future<Map<String, dynamic>> getProvisioningChecklist() =>
       (super.noSuchMethod(
         Invocation.method(
@@ -2695,6 +2704,12 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as int);
 
   @override
+  bool get adbLocalOnboardingHandled => (super.noSuchMethod(
+        Invocation.getter(#adbLocalOnboardingHandled),
+        returnValue: false,
+      ) as bool);
+
+  @override
   bool get hasListeners => (super.noSuchMethod(
         Invocation.getter(#hasListeners),
         returnValue: false,
@@ -3244,6 +3259,17 @@ class MockSettingsService extends _i1.Mock implements _i18.SettingsService {
       ) as _i2.Future<void>);
 
   @override
+  _i2.Future<void> setAdbLocalOnboardingHandled(bool? value) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setAdbLocalOnboardingHandled,
+          [value],
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
   Map<String, dynamic> toBackupMap() => (super.noSuchMethod(
         Invocation.method(
           #toBackupMap,
@@ -3322,6 +3348,12 @@ class MockSystemBridgeService extends _i1.Mock
       ) as Map<String, dynamic>);
 
   @override
+  Map<String, dynamic> get navigationStatus => (super.noSuchMethod(
+        Invocation.getter(#navigationStatus),
+        returnValue: <String, dynamic>{},
+      ) as Map<String, dynamic>);
+
+  @override
   Map<String, dynamic> get voiceStatus => (super.noSuchMethod(
         Invocation.getter(#voiceStatus),
         returnValue: <String, dynamic>{},
@@ -3372,6 +3404,12 @@ class MockSystemBridgeService extends _i1.Mock
   @override
   Map<String, dynamic> get updateStatus => (super.noSuchMethod(
         Invocation.getter(#updateStatus),
+        returnValue: <String, dynamic>{},
+      ) as Map<String, dynamic>);
+
+  @override
+  Map<String, dynamic> get memoryStatus => (super.noSuchMethod(
+        Invocation.getter(#memoryStatus),
         returnValue: <String, dynamic>{},
       ) as Map<String, dynamic>);
 

@@ -428,6 +428,12 @@
             "error": {}
         }
     },
+    "launcherUpdateRepositoryUnavailable": "TV không truy cập được kho cập nhật trên GitHub (HTTP {statusCode}). Tài khoản/kho GitHub có thể đang private, đổi tên, bị suspend hoặc bị chặn; hãy publish release ở một kho public truy cập được rồi build lại launcher với nguồn đó.",
+    "@launcherUpdateRepositoryUnavailable": {
+        "placeholders": {
+            "statusCode": {}
+        }
+    },
     "launcherUpdateDownloadStarted": "Đang tải {fileName}...",
     "@launcherUpdateDownloadStarted": {
         "placeholders": {
@@ -811,7 +817,7 @@
     "videoBlurLow": "Thấp",
     "videoBlurMedium": "Trung bình",
     "videoBlurHigh": "Cao",
-    "textAboutDialog": "ATV Launcher là launcher Android TV cá nhân do xfire0392-netizen duy trì.\nMã nguồn tại {repoUrl}.\n\nDự án được xây trên FLauncher của Etienne Fesser và bản fork Flutter của osrosal. Logo bởi Katie (@fureturoe), thiết kế gốc bởi @FXCostanzo.",
+    "textAboutDialog": "ATV Launcher là launcher Android TV cá nhân.\nMã nguồn tại {repoUrl}.\n\nDự án được xây trên FLauncher của Etienne Fesser và bản fork Flutter của osrosal. Logo bởi Katie (@fureturoe), thiết kế gốc bởi @FXCostanzo.",
     "@textAboutDialog": {
         "placeholders": {
             "repoUrl": {
