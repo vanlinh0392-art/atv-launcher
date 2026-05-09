@@ -4,15 +4,12 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.NetworkInfo;
 import android.net.TelephonyNetworkSpecifier;
 import android.net.TransportInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.telephony.TelephonyManager;
-
-import androidx.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -81,10 +78,17 @@ public class NetworkUtils
 
     public static Map<String, Object> getNetworkInformation(Context context, Network network)
     {
+        if (network == null) {
+            return emptyNetworkInformation();
+        }
+
         Map<String, Object> map = null;
         int wirelessNetworkSignalLevel = 0;
 
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) {
+            return emptyNetworkInformation();
+        }
         NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
 
         if (capabilities != null) {
@@ -108,38 +112,13 @@ public class NetworkUtils
         return map;
     }
 
-    public static Map<String, Object> getNetworkInformation(Context context, @Nullable NetworkInfo networkInfo)
+    private static Map<String, Object> emptyNetworkInformation()
     {
-        boolean hasNetworkAccess = false;
-        int networkType = NETWORK_TYPE_UNKNOWN, networkInfoType, wirelessSignalLevel = 0;
-
-        if (networkInfo != null) {
-            hasNetworkAccess = networkInfo.isConnected();
-            networkInfoType = networkInfo.getType();
-
-            if (networkInfoType == ConnectivityManager.TYPE_MOBILE) {
-                networkType = NETWORK_TYPE_CELLULAR;
-            }
-            if (networkInfoType == ConnectivityManager.TYPE_WIFI) {
-                WifiManager wifiManager = (WifiManager) context
-                        .getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-
-                networkType = networkInfoType;
-                wirelessSignalLevel = getWifiSignalLevel(wifiManager.getConnectionInfo());
-            }
-            else if (networkInfoType == ConnectivityManager.TYPE_VPN) {
-                networkType = NETWORK_TYPE_VPN;
-            }
-            else if (networkInfoType == ConnectivityManager.TYPE_ETHERNET) {
-                networkType = NETWORK_TYPE_WIRED;
-            }
-        }
-
         Map<String, Object> map = new HashMap<>();
-        map.put(KEY_NETWORK_TYPE, networkType);
-        map.put(KEY_NETWORK_ACCESS, hasNetworkAccess);
-        map.put(KEY_INTERNET_ACCESS, hasNetworkAccess);
-        map.put(KEY_WIRELESS_SIGNAL_LEVEL, wirelessSignalLevel);
+        map.put(KEY_NETWORK_TYPE, NETWORK_TYPE_UNKNOWN);
+        map.put(KEY_NETWORK_ACCESS, false);
+        map.put(KEY_INTERNET_ACCESS, false);
+        map.put(KEY_WIRELESS_SIGNAL_LEVEL, 0);
         return map;
     }
 

@@ -1,6 +1,7 @@
 package com.atv.launcher.systembridge.density;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.IBinder;
 import android.os.Parcel;
@@ -32,6 +33,24 @@ final class DensityController {
     private static final Pattern OVERRIDE_PATTERN = Pattern.compile("Override density:\\s*(\\d+)");
 
     private DensityController() {
+    }
+
+    private static void logDebugInfo(Context context, String message) {
+        if (isDebuggable(context)) {
+            Log.i(TAG, message);
+        }
+    }
+
+    private static void logAttemptFailure(Context context, AttemptResult attemptResult) {
+        if (isDebuggable(context)) {
+            Log.w(TAG, "Attempt failed: " + attemptResult.label + " detail=" + attemptResult.detail);
+            return;
+        }
+        Log.w(TAG, "Attempt failed: " + attemptResult.label);
+    }
+
+    private static boolean isDebuggable(Context context) {
+        return (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
     static Snapshot loadSnapshot(Context context) {
@@ -129,7 +148,9 @@ final class DensityController {
         List<CommandAttempt> attempts = buildShellAttempts(before.rootAvailable, requestedDensity, resetToFactory);
         for (CommandAttempt attempt : attempts) {
             CommandResult commandResult = runCommand(attempt.command);
-            Log.i(TAG, "Shell attempt " + attempt.label + " -> success=" + commandResult.success + " output=" + commandResult.output);
+            logDebugInfo(context, "Shell attempt " + attempt.label
+                    + " -> success=" + commandResult.success
+                    + " output=" + commandResult.output);
             if (!commandResult.success) {
                 continue;
             }
@@ -147,7 +168,9 @@ final class DensityController {
         LocalAdbBridge.Result localAdbResult = resetToFactory
                 ? LocalAdbBridge.executeShell(context, "wm density reset")
                 : LocalAdbBridge.executeShell(context, "wm density " + requestedDensity);
-        Log.i(TAG, "Local ADB attempt -> success=" + localAdbResult.success + " output=" + localAdbResult.output + " detail=" + localAdbResult.detail);
+        logDebugInfo(context, "Local ADB attempt -> success=" + localAdbResult.success
+                + " output=" + localAdbResult.output
+                + " detail=" + localAdbResult.detail);
         ActionResult localAdbVerified = verifyAttemptResult(
                 context,
                 localAdbResult.success
@@ -184,7 +207,7 @@ final class DensityController {
     ) {
         if (attemptResult == null || !attemptResult.success) {
             if (attemptResult != null) {
-                Log.w(TAG, "Attempt failed: " + attemptResult.label + " detail=" + attemptResult.detail);
+                logAttemptFailure(context, attemptResult);
             }
             return null;
         }
@@ -193,7 +216,10 @@ final class DensityController {
         boolean verified = resetToFactory
                 ? after.overrideDensity == null || after.currentDensity == after.factoryDensity
                 : after.currentDensity == requestedDensity;
-        Log.i(TAG, "Verify after " + attemptResult.label + " -> current=" + after.currentDensity + " factory=" + after.factoryDensity + " override=" + after.overrideDensity);
+        logDebugInfo(context, "Verify after " + attemptResult.label
+                + " -> current=" + after.currentDensity
+                + " factory=" + after.factoryDensity
+                + " override=" + after.overrideDensity);
         if (!verified) {
             return null;
         }

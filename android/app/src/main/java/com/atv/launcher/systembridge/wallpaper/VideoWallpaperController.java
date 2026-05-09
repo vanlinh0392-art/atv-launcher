@@ -96,7 +96,7 @@ public final class VideoWallpaperController {
                 cancelWakePlaylistRetry();
                 return;
             }
-            Log.i(TAG, "wallpaper_wake_rearm_retry reason=" + pendingWakeReason
+            logWakeInfo("wallpaper_wake_rearm_retry reason=" + pendingWakeReason
                     + " attempt=" + pendingWakePlaylistRetryCount);
             maybeStartPlayback(true, true);
         }
@@ -172,12 +172,25 @@ public final class VideoWallpaperController {
     }
 
     public void onScreenWake(String reason) {
+        onScreenWake(reason, foregroundActive);
+    }
+
+    public void onScreenWake(String reason, boolean hostWakeEligible) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(() -> onScreenWake(reason));
+            mainHandler.post(() -> onScreenWake(reason, hostWakeEligible));
             return;
         }
 
         String resolvedReason = TextUtils.isEmpty(reason) ? "screen_wake" : reason;
+        if (!hostWakeEligible) {
+            cancelWakePlaylistRetry();
+            return;
+        }
+        if (!shouldAutoResumeFromWake()) {
+            cancelWakePlaylistRetry();
+            return;
+        }
+
         long now = SystemClock.elapsedRealtime();
         if (lastWakeRearmAtElapsedMs > 0L
                 && now - lastWakeRearmAtElapsedMs < WAKE_REARM_DEBOUNCE_MS) {
@@ -185,12 +198,7 @@ public final class VideoWallpaperController {
         }
         lastWakeRearmAtElapsedMs = now;
 
-        if (!shouldAutoResumeFromWake()) {
-            cancelWakePlaylistRetry();
-            return;
-        }
-
-        Log.i(TAG, "wallpaper_wake_rearm reason=" + resolvedReason);
+        logWakeInfo("wallpaper_wake_rearm reason=" + resolvedReason);
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
         foregroundActive = true;
         startupWarmupReady = true;
@@ -675,7 +683,7 @@ public final class VideoWallpaperController {
             return;
         }
         if (pendingWakePlaylistRetryCount >= MAX_WAKE_PLAYLIST_RETRIES) {
-            Log.i(TAG, "wallpaper_wake_rearm_retry_exhausted reason=" + pendingWakeReason);
+            logWakeInfo("wallpaper_wake_rearm_retry_exhausted reason=" + pendingWakeReason);
             return;
         }
         pendingWakePlaylistRetryCount += 1;
@@ -709,11 +717,21 @@ public final class VideoWallpaperController {
         if (startedAtNanos == 0L) {
             return;
         }
-        if ((appContext.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+        if (!isDebuggableBuild()) {
             return;
         }
         long elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
         Log.d(TAG, label + " elapsedMs=" + elapsedMs);
+    }
+
+    private void logWakeInfo(String message) {
+        if (isDebuggableBuild()) {
+            Log.i(TAG, message);
+        }
+    }
+
+    private boolean isDebuggableBuild() {
+        return (appContext.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
     private boolean resolveDesiredAudioRendererEnabled() {

@@ -5,6 +5,34 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-05-09 - Official release 2026.05.012 tối ưu ổn định, bảo mật và log release
+
+### Bảo mật và provisioning
+
+- Tắt Android OS full-backup cho launcher để tránh backup ngoài luồng export/import có kiểm soát của app.
+- Luồng `Cấp qua local ADB` không còn tự đưa launcher vào battery/device-idle whitelist; mục này chỉ còn là khuyến nghị cho Android box khi automation nền không ổn định.
+- Trên TV tích hợp/live-TV, battery optimization được hạ xuống mức optional để người dùng không hiểu nhầm đây là quyền bắt buộc.
+
+### RAM/CPU và hình nền
+
+- Poster preview của video wallpaper giờ được trích bằng frame đã scale theo kích thước HOME, crop về 1080p tương đương và recycle bitmap native để giảm spike RAM với video 4K.
+- App không có banner được cache negative riêng, tránh gọi native/PackageManager lặp lại khi HOME rebuild, focus hoặc scroll.
+- Log wake-rearm video và log ADB/shell chi tiết được gate theo debug build, giảm spam logcat và tránh lộ command nội bộ ở release.
+
+### Ổn định native và build
+
+- Query danh sách app không còn nuốt `InterruptedException` / `ExecutionException`; lỗi được log rõ và không cache kết quả query dở.
+- Network bridge chuyển khỏi API `NetworkInfo/getActiveNetworkInfo` cũ, dùng `NetworkCapabilities` cho trạng thái mạng hiện tại.
+- Gradle khai báo Kotlin plugin đúng thứ tự trước Flutter plugin để loại cảnh báo KGP khi build.
+- Thêm smoke script kiểm tra video wallpaper sau sleep/wake qua ADB.
+
+### Kiểm chứng
+
+- `flutter analyze --no-pub`: pass.
+- `flutter test --no-pub`: pass toàn bộ suite.
+- `flutter build apk --debug --target-platform android-arm --no-pub`: pass native compile, không còn warning KGP/deprecated.
+- Release chính thức tiếp tục publish đúng 2 asset `atv-launcher-armeabi-v7a-release.apk` và `atv-launcher-arm64-v8a-release.apk`.
+
 ## 2026-05-09 - Official release 2026.05.011 sửa video nền sau sleep/wake
 
 ### Video wallpaper

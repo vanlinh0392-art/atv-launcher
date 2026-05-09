@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,9 +28,19 @@ public class NetworkChangeReceiver extends BroadcastReceiver
             _eventSink.success(eventMap("NETWORK_UNAVAILABLE", null));
         }
         else {
-            //noinspection deprecation
-            NetworkInfo networkInfo = intent.getParcelableExtra(ConnectivityManager.EXTRA_NETWORK_INFO);
-            _eventSink.success(eventMap("NETWORK_AVAILABLE", NetworkUtils.getNetworkInformation(context, networkInfo)));
+            ConnectivityManager connectivityManager =
+                    (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            Map<String, Object> networkInformation = NetworkUtils.getNetworkInformation(
+                    context,
+                    connectivityManager == null ? null : connectivityManager.getActiveNetwork()
+            );
+            boolean networkAvailable = Boolean.TRUE.equals(
+                    networkInformation.get(NetworkUtils.KEY_NETWORK_ACCESS)
+            );
+            _eventSink.success(eventMap(
+                    networkAvailable ? "NETWORK_AVAILABLE" : "NETWORK_UNAVAILABLE",
+                    networkAvailable ? networkInformation : null
+            ));
         }
     }
 
