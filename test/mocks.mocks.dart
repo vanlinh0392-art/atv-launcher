@@ -1543,6 +1543,19 @@ class MockWallpaperService extends _i1.Mock implements _i13.WallpaperService {
       );
 
   @override
+  _i2.Future<void> recoverVideoPlaybackAfterHomeFrame(
+          {required String? reason}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #recoverVideoPlaybackAfterHomeFrame,
+          [],
+          {#reason: reason},
+        ),
+        returnValue: _i2.Future<void>.value(),
+        returnValueForMissingStub: _i2.Future<void>.value(),
+      ) as _i2.Future<void>);
+
+  @override
   void cancelPendingHomeVideoStart({bool? clearHomeVisible = false}) =>
       super.noSuchMethod(
         Invocation.method(

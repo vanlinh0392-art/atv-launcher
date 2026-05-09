@@ -78,6 +78,7 @@ class AppCard extends StatefulWidget {
   final Category category;
   final bool autofocus;
   final bool eagerImageLoad;
+  final int imageWarmupSequence;
   final String? focusId;
   final AppCardFocusCallback? onFocused;
   final AppCardMoveStartCallback? onMoveStart;
@@ -91,6 +92,7 @@ class AppCard extends StatefulWidget {
     required this.category,
     required this.autofocus,
     this.eagerImageLoad = false,
+    this.imageWarmupSequence = 0,
     this.focusId,
     this.onFocused,
     this.onMoveStart,
@@ -390,6 +392,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     }
     if (!oldWidget.eagerImageLoad && widget.eagerImageLoad) {
       _ensureAppImageLoaded(priority: true);
+    }
+    if (oldWidget.imageWarmupSequence != widget.imageWarmupSequence &&
+        widget.imageWarmupSequence > 0 &&
+        _resolvedAppImage == null) {
+      _ensureAppImageLoaded(priority: widget.eagerImageLoad);
     }
   }
 
@@ -847,10 +854,14 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     if (_resolvedAppImage != null) {
       return;
     }
-    if (widget.autofocus ||
+    if (widget.imageWarmupSequence > 0 ||
+        widget.autofocus ||
         widget.eagerImageLoad ||
         AppCard._hasPendingImageLoad(packageName)) {
-      _ensureAppImageLoaded(priority: true, loadRevision: loadRevision);
+      _ensureAppImageLoaded(
+        priority: widget.autofocus || widget.eagerImageLoad,
+        loadRevision: loadRevision,
+      );
       return;
     }
     AppCard._scheduleDeferredImageLoad(_deferredImageLoadToken, () {

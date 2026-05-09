@@ -82,8 +82,23 @@ typedef _NavigationSnapshot = ({
   String reason,
 });
 
-class FLauncher extends StatelessWidget {
+class FLauncher extends StatefulWidget {
   const FLauncher({super.key});
+
+  @override
+  State<FLauncher> createState() => _FLauncherState();
+}
+
+class _FLauncherState extends State<FLauncher> {
+  final FocusNode _statusBarPrimaryFocusNode = FocusNode(
+    debugLabel: 'status_bar_primary_search',
+  );
+
+  @override
+  void dispose() {
+    _statusBarPrimaryFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => FocusTraversalGroup(
@@ -99,10 +114,14 @@ class FLauncher extends StatelessWidget {
               ),
               child: Scaffold(
                 backgroundColor: Colors.transparent,
-                appBar: FocusAwareAppBar(),
+                appBar: FocusAwareAppBar(
+                  primaryFocusNode: _statusBarPrimaryFocusNode,
+                ),
                 body: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  child: const _HomeContent(),
+                  child: _HomeContent(
+                    statusBarPrimaryFocusNode: _statusBarPrimaryFocusNode,
+                  ),
                 ),
               ),
             ),
@@ -154,7 +173,11 @@ class _WallpaperLayer extends StatelessWidget {
 }
 
 class _HomeContent extends StatefulWidget {
-  const _HomeContent();
+  final FocusNode statusBarPrimaryFocusNode;
+
+  const _HomeContent({
+    required this.statusBarPrimaryFocusNode,
+  });
 
   @override
   State<_HomeContent> createState() => _HomeContentState();
@@ -164,7 +187,11 @@ class _HomeContentState extends State<_HomeContent> {
   String? _lastScheduledHomeUsableKey;
   String? _pendingHomeUsableKey;
 
-  void _scheduleHomeUsableSignal(BuildContext context, String key) {
+  void _scheduleHomeUsableSignal(
+    BuildContext context,
+    String key, {
+    required String reason,
+  }) {
     if (_lastScheduledHomeUsableKey == key || _pendingHomeUsableKey == key) {
       return;
     }
@@ -175,9 +202,24 @@ class _HomeContentState extends State<_HomeContent> {
       }
       _pendingHomeUsableKey = null;
       _lastScheduledHomeUsableKey = key;
-      context.read<WallpaperService>().notifyHomeVisibleAndUsable();
+      final wallpaperService = context.read<WallpaperService>();
+      wallpaperService.notifyHomeVisibleAndUsable();
+      if (_isHomeRecoveryReason(reason)) {
+        unawaited(
+          wallpaperService.recoverVideoPlaybackAfterHomeFrame(
+            reason: reason,
+          ),
+        );
+      }
     });
   }
+
+  bool _isHomeRecoveryReason(String reason) =>
+      reason == 'screen_wake' ||
+      reason == 'activity_start' ||
+      reason == 'activity_resume' ||
+      reason == 'home_reentry' ||
+      reason == 'launcher_reentry';
 
   @override
   Widget build(BuildContext context) {
@@ -244,6 +286,7 @@ class _HomeContentState extends State<_HomeContent> {
           _scheduleHomeUsableSignal(
             context,
             '${identityHashCode(homeSections.sectionsIdentity)}|${navigation.homeSequence}',
+            reason: navigation.reason,
           );
         }
 
@@ -264,6 +307,7 @@ class _HomeContentState extends State<_HomeContent> {
             homeSequence: navigation.homeSequence,
             homeNavigationReason: navigation.reason,
             homeReorderModeEnabled: homeReorderModeEnabled,
+            statusBarPrimaryFocusNode: widget.statusBarPrimaryFocusNode,
           ),
         );
       },
@@ -403,6 +447,7 @@ class _HomeDockViewport extends StatefulWidget {
   final int homeSequence;
   final String homeNavigationReason;
   final bool homeReorderModeEnabled;
+  final FocusNode statusBarPrimaryFocusNode;
 
   const _HomeDockViewport({
     required this.sections,
@@ -420,6 +465,7 @@ class _HomeDockViewport extends StatefulWidget {
     required this.homeSequence,
     required this.homeNavigationReason,
     required this.homeReorderModeEnabled,
+    required this.statusBarPrimaryFocusNode,
   });
 
   @override
@@ -445,10 +491,12 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       HomePerformanceProfile.resolve(widget.performanceMode);
 
   bool get _shouldWarmHomeImages =>
-      widget.homeSequence > 0 &&
+      widget.homeSequence == 0 ||
       (widget.homeNavigationReason == 'home_reentry' ||
           widget.homeNavigationReason == 'launcher_reentry' ||
-          widget.homeNavigationReason == 'screen_wake');
+          widget.homeNavigationReason == 'screen_wake' ||
+          widget.homeNavigationReason == 'activity_start' ||
+          widget.homeNavigationReason == 'activity_resume');
 
   @override
   void initState() {
@@ -463,7 +511,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     super.didUpdateWidget(oldWidget);
     if (widget.homeSequence != oldWidget.homeSequence &&
         widget.homeSequence > 0 &&
-        widget.homeNavigationReason == 'home_reentry') {
+        _shouldResetDockForHomeRecovery(widget.homeNavigationReason)) {
       _handleHomeReentry();
     }
     if (!identical(widget.sections, oldWidget.sections) ||
@@ -507,9 +555,6 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         context.read<AppsService>().setHomeReorderModeEnabled(false);
       });
     }
-    if (_isAlreadyAtHomeTop()) {
-      return;
-    }
     _collapseTimer?.cancel();
     if (mounted) {
       setState(() {
@@ -522,20 +567,12 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     _resetDockToStart();
   }
 
-  bool _isAlreadyAtHomeTop() {
-    final nodes = _dockTraversalNodes();
-    if (nodes.isEmpty) {
-      return false;
-    }
-    final firstNode = nodes.first;
-    final currentFocus = FocusManager.instance.primaryFocus;
-    final atTop = !_dockScrollController.hasClients ||
-        (_dockScrollController.offset -
-                    _dockScrollController.position.minScrollExtent)
-                .abs() <
-            1;
-    return atTop && identical(currentFocus, firstNode);
-  }
+  bool _shouldResetDockForHomeRecovery(String reason) =>
+      reason == 'home_reentry' ||
+      reason == 'launcher_reentry' ||
+      reason == 'screen_wake' ||
+      reason == 'activity_start' ||
+      reason == 'activity_resume';
 
   @override
   void dispose() {
@@ -641,6 +678,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     final eagerImagePackageNames = _shouldWarmHomeImages
         ? _leadingVisiblePackageNames()
         : const <String>{};
+    final imageWarmupSequence = _shouldWarmHomeImages ? widget.homeSequence : 0;
 
     for (final section in widget.sections) {
       final sectionKey = Key(section.id.toString());
@@ -682,6 +720,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             deferVerticalNavigationToParent:
                 widget.autoCollapseEnabled && _collapsed,
             eagerImagePackageNames: eagerImagePackageNames,
+            imageWarmupSequence: imageWarmupSequence,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
             onApplicationReorder: onReorder,
@@ -694,6 +733,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             deferVerticalNavigationToParent:
                 widget.autoCollapseEnabled && _collapsed,
             eagerImagePackageNames: eagerImagePackageNames,
+            imageWarmupSequence: imageWarmupSequence,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
             onApplicationReorder: onReorder,
@@ -756,19 +796,22 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       return KeyEventResult.ignored;
     }
     final direction = _traversalDirectionForKey(event.logicalKey);
-    if (direction != null &&
-        (direction == TraversalDirection.up ||
-            direction == TraversalDirection.down)) {
-      final expanded = _expandForInteraction();
-      if (_moveFocusWithinDock(direction)) {
+    if (direction == TraversalDirection.up) {
+      if (_moveFocusWithinDock(TraversalDirection.up)) {
         return KeyEventResult.handled;
       }
-      if (direction == TraversalDirection.up &&
-          _moveFocusOutOfDock(direction)) {
+      if (_requestStatusBarFocus()) {
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+    if (direction == TraversalDirection.down) {
+      final expanded = _expandForInteraction();
+      if (_moveFocusWithinDock(TraversalDirection.down)) {
         return KeyEventResult.handled;
       }
       if (expanded) {
-        _moveFocusAfterDockExpansion(direction);
+        _moveFocusAfterDockExpansion(TraversalDirection.down);
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -1016,17 +1059,19 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     });
   }
 
-  bool _moveFocusOutOfDock(TraversalDirection direction) {
+  bool _requestStatusBarFocus() {
+    final statusBarFocusNode = widget.statusBarPrimaryFocusNode;
+    if (statusBarFocusNode.context != null &&
+        statusBarFocusNode.canRequestFocus &&
+        !statusBarFocusNode.skipTraversal) {
+      statusBarFocusNode.requestFocus();
+      return true;
+    }
     final current = FocusManager.instance.primaryFocus;
-    final dockContext = _dockListKey.currentContext;
-    final currentContext = current?.context;
-    if (current == null ||
-        currentContext == null ||
-        dockContext == null ||
-        !_isDockDescendant(currentContext, dockContext)) {
+    if (current == null) {
       return false;
     }
-    final moved = current.focusInDirection(direction);
+    final moved = current.focusInDirection(TraversalDirection.up);
     return moved && !identical(FocusManager.instance.primaryFocus, current);
   }
 

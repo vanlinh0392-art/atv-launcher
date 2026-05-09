@@ -198,6 +198,8 @@ public class MainActivity extends FlutterActivity {
     private static long homeNavigationSequence;
     private static String lastNavigationReason = "";
     private static long lastWakeNavigationAtElapsedMs;
+    private static long lastForegroundWakeFallbackAtElapsedMs;
+    private static boolean hasStartedAtLeastOnce;
     private static long benchmarkCommandSequence;
     private static String lastBenchmarkAction = "";
     private static String lastBenchmarkRoute = "";
@@ -299,11 +301,7 @@ public class MainActivity extends FlutterActivity {
         BinaryMessenger messenger = flutterEngine.getDartExecutor().getBinaryMessenger();
 
         new MethodChannel(messenger, METHOD_CHANNEL).setMethodCallHandler((call, result) -> {
-            MainActivity activity = activeActivity;
-            if (activity == null) {
-                result.error("activity_unavailable", "Launcher activity is not attached", null);
-                return;
-            }
+            MainActivity activity = activeActivity != null ? activeActivity : MainActivity.this;
             try {
                 activity.handleMethodCall(call, result);
             } catch (Exception exception) {
@@ -344,13 +342,15 @@ public class MainActivity extends FlutterActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        boolean returningToForeground = hasStartedAtLeastOnce;
+        hasStartedAtLeastOnce = true;
         activityStarted = true;
-        wakeRearmAllowedAfterStop = false;
         activeActivity = this;
         if (sharedVideoWallpaperController != null) {
             sharedVideoWallpaperController.onStart();
         }
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_start");
+        handleForegroundWakeFallback("activity_start", returningToForeground);
         scheduleSystemEventPollingIfActive();
     }
 
@@ -358,20 +358,23 @@ public class MainActivity extends FlutterActivity {
     protected void onResume() {
         super.onResume();
         activityStarted = true;
-        wakeRearmAllowedAfterStop = false;
         activeActivity = this;
         if (sharedVideoWallpaperController != null) {
             sharedVideoWallpaperController.onStart();
         }
         pruneBackgroundLauncherTasks("onResume");
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_resume");
+        recordHomeNavigation("activity_resume");
+        handleForegroundWakeFallback("activity_resume", true);
         scheduleSystemEventPollingIfActive();
     }
 
     @Override
     protected void onStop() {
         activityStarted = false;
-        wakeRearmAllowedAfterStop = wakeRearmAllowedAfterStop || !isDeviceInteractive();
+        wakeRearmAllowedAfterStop = wakeRearmAllowedAfterStop
+                || !isDeviceInteractive()
+                || isHomeIntent(getIntent());
         if (activeActivity == this) {
             activeActivity = null;
         }
@@ -416,13 +419,17 @@ public class MainActivity extends FlutterActivity {
             public void onReceive(Context context, Intent intent) {
                 String action = intent != null ? intent.getAction() : "screen_wake";
                 if (isWallpaperSleepAction(action)) {
-                    wakeRearmAllowedAfterStop = activityStarted;
+                    wakeRearmAllowedAfterStop = wakeRearmAllowedAfterStop
+                            || activityStarted
+                            || isHomeIntent(getIntent());
                     return;
                 }
                 VideoWallpaperController controller = sharedVideoWallpaperController;
                 boolean allowWakeRearm = activityStarted || wakeRearmAllowedAfterStop;
                 if (allowWakeRearm) {
-                    recordWakeHomeNavigation();
+                    if (recordWakeHomeNavigation()) {
+                        emitSystemSnapshot();
+                    }
                 }
                 if (controller != null) {
                     if (allowWakeRearm) {
@@ -472,13 +479,31 @@ public class MainActivity extends FlutterActivity {
                 || TextUtils.equals(Intent.ACTION_DREAMING_STARTED, action);
     }
 
-    private void recordWakeHomeNavigation() {
+    private boolean recordWakeHomeNavigation() {
         long now = SystemClock.elapsedRealtime();
         if (now - lastWakeNavigationAtElapsedMs < 1500L) {
-            return;
+            return false;
         }
         lastWakeNavigationAtElapsedMs = now;
         recordHomeNavigation("screen_wake");
+        return true;
+    }
+
+    private void handleForegroundWakeFallback(String reason, boolean returningToForeground) {
+        if (!returningToForeground || !wakeRearmAllowedAfterStop) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastForegroundWakeFallbackAtElapsedMs < 1500L) {
+            return;
+        }
+        lastForegroundWakeFallbackAtElapsedMs = now;
+        wakeRearmAllowedAfterStop = false;
+        recordHomeNavigation(reason);
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onScreenWake(reason, true);
+        }
+        emitSystemSnapshot();
     }
 
     private boolean isDeviceInteractive() {

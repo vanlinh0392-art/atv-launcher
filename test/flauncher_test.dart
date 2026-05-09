@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flauncher/flauncher.dart';
 import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/gradients.dart';
@@ -663,6 +665,246 @@ void main() {
     );
   });
 
+  testWidgets(
+      'HOME re-entry collapses expanded dock when first app is already focused',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final channel = MockFLauncherChannel();
+    when(channel.addSystemChangedListener(any))
+        .thenReturn(const Stream<dynamic>.empty().listen((_) {}));
+    final bridgeService = _MutableSystemBridgeService(
+      channel,
+      const <String, dynamic>{
+        'memory': <String, dynamic>{},
+        'navigation': <String, dynamic>{
+          'homeSequence': 1,
+          'reason': 'home_reentry',
+        },
+        'provisioning': <String, dynamic>{
+          'health': 'healthy',
+          'requirements': <Map<String, dynamic>>[],
+          'missingRequiredCount': 0,
+          'missingRecommendedCount': 0,
+        },
+        'wallpaper': <String, dynamic>{},
+      },
+    );
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Home Reset',
+      order: 0,
+      type: CategoryType.row,
+      columnsCount: 3,
+    );
+    category.applications.addAll(
+      List.generate(
+        9,
+        (index) => fakeApp(
+          packageName: 'home.reset.app.$index',
+          name: 'Home Reset App $index',
+        ),
+      ),
+    );
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setShowCategoryTitles(true);
+    await settingsService.setHomeDockRowsPreset(3);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockAutoCollapseDelaySeconds(5);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    final dockFinder = find.byKey(const Key('home_bottom_dock'));
+    final collapsedHeight = tester.getSize(dockFinder).height;
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    final expandedHeight = tester.getSize(dockFinder).height;
+    expect(expandedHeight, greaterThan(collapsedHeight));
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('home.reset.app.3'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    expect(tester.getSize(dockFinder).height, greaterThan(collapsedHeight));
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('home.reset.app.0'),
+    );
+
+    bridgeService.setNavigationStatus(const <String, dynamic>{
+      'homeSequence': 2,
+      'reason': 'home_reentry',
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    expect(
+      tester.getSize(dockFinder).height,
+      lessThanOrEqualTo(collapsedHeight + 1),
+    );
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('home.reset.app.0'),
+    );
+  });
+
+  testWidgets('screen wake restores dock focus and retries visible app images',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final channel = MockFLauncherChannel();
+    when(channel.addSystemChangedListener(any))
+        .thenReturn(const Stream<dynamic>.empty().listen((_) {}));
+    final bridgeService = _MutableSystemBridgeService(
+      channel,
+      const <String, dynamic>{
+        'memory': <String, dynamic>{},
+        'navigation': <String, dynamic>{
+          'homeSequence': 1,
+          'reason': 'home_reentry',
+        },
+        'provisioning': <String, dynamic>{
+          'health': 'healthy',
+          'requirements': <Map<String, dynamic>>[],
+          'missingRequiredCount': 0,
+          'missingRecommendedCount': 0,
+        },
+        'wallpaper': <String, dynamic>{},
+      },
+    );
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Wake Focus',
+      order: 0,
+      type: CategoryType.row,
+    );
+    category.applications.add(
+      fakeApp(packageName: 'wake.focus.app.0', name: 'Wake Focus App 0'),
+    );
+
+    var bannerAttempts = 0;
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner('wake.focus.app.0')).thenAnswer((_) async {
+      bannerAttempts += 1;
+      if (bannerAttempts == 1) {
+        throw StateError('temporary wake image miss');
+      }
+      return kTransparentImage;
+    });
+    when(appsService.getAppBanner(argThat(isNot('wake.focus.app.0'))))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockRowsPreset(3);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+    await tester.pump();
+
+    expect(bannerAttempts, 1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+
+    expect(_primaryFocusIsDescendantOf(tester, find.byType(AppBar)), isTrue);
+
+    bridgeService.setNavigationStatus(const <String, dynamic>{
+      'homeSequence': 2,
+      'reason': 'screen_wake',
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    expect(bannerAttempts, 2);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('wake.focus.app.0'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+
+    expect(_primaryFocusIsDescendantOf(tester, find.byType(AppBar)), isTrue);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('status_bar_primary_search'),
+    );
+
+    for (var index = 0; index < 20; index += 1) {
+      bridgeService.setNavigationStatus(<String, dynamic>{
+        'homeSequence': index + 3,
+        'reason': index.isEven ? 'screen_wake' : 'home_reentry',
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 420));
+
+      expect(
+        tester.binding.focusManager.primaryFocus?.debugLabel,
+        contains('wake.focus.app.0'),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pump();
+
+      expect(
+        tester.binding.focusManager.primaryFocus?.debugLabel,
+        contains('status_bar_primary_search'),
+      );
+    }
+  });
+
   testWidgets('DPAD up from dock top moves focus to status bar',
       (tester) async {
     _prepareView(tester);
@@ -720,11 +962,18 @@ void main() {
       tester.binding.focusManager.primaryFocus?.debugLabel,
       contains('top.exit.app.0'),
     );
+    final dockFinder = find.byKey(const Key('home_bottom_dock'));
+    final collapsedHeight = tester.getSize(dockFinder).height;
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pump();
 
     expect(_primaryFocusIsDescendantOf(tester, find.byType(AppBar)), isTrue);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('status_bar_primary_search'),
+    );
+    expect(tester.getSize(dockFinder).height, collapsedHeight);
   });
 
   testWidgets('dock collapse resets scroll to top and focus back to first app',
@@ -972,7 +1221,72 @@ void main() {
     }
   });
 
-  testWidgets('screen wake eagerly reloads visible app images without delay',
+  testWidgets('initial HOME eagerly reloads visible app images',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Initial Warmup',
+      order: 0,
+      type: CategoryType.row,
+      columnsCount: 3,
+    );
+    category.applications.addAll(
+      List.generate(
+        9,
+        (index) => fakeApp(
+          packageName: 'initial.warmup.app.$index',
+          name: 'Initial Warmup App $index',
+        ),
+      ),
+    );
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockRowsPreset(4);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+      navigationStatus: const <String, dynamic>{
+        'homeSequence': 0,
+        'reason': '',
+      },
+    );
+    await tester.pump();
+
+    verify(appsService.getAppBanner('initial.warmup.app.0')).called(1);
+    verify(appsService.getAppBanner('initial.warmup.app.5')).called(1);
+    verifyNever(appsService.getAppBanner('initial.warmup.app.8'));
+  });
+
+  testWidgets('screen wake eagerly reloads built home app images without delay',
       (tester) async {
     _prepareView(tester);
     final appsService = MockAppsService();
@@ -1039,7 +1353,77 @@ void main() {
 
     verify(appsService.getAppBanner('wake.warmup.app.0')).called(1);
     verify(appsService.getAppBanner('wake.warmup.app.5')).called(1);
-    verifyNever(appsService.getAppBanner('wake.warmup.app.8'));
+    verify(appsService.getAppBanner('wake.warmup.app.8')).called(1);
+  });
+
+  testWidgets('activity resume fallback eagerly reloads built home app images',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Resume Warmup',
+      order: 0,
+      type: CategoryType.row,
+      columnsCount: 3,
+    );
+    category.applications.addAll(
+      List.generate(
+        9,
+        (index) => fakeApp(
+          packageName: 'resume.warmup.app.$index',
+          name: 'Resume Warmup App $index',
+        ),
+      ),
+    );
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockRowsPreset(4);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+      navigationStatus: const <String, dynamic>{
+        'homeSequence': 8,
+        'reason': 'activity_resume',
+      },
+    );
+    await tester.pump();
+
+    verify(appsService.getAppBanner('resume.warmup.app.0')).called(1);
+    verify(appsService.getAppBanner('resume.warmup.app.5')).called(1);
+    verify(appsService.getAppBanner('resume.warmup.app.8')).called(1);
   });
 
   testWidgets(
@@ -1435,6 +1819,9 @@ void _stubWallpaperService(
   when(wallpaperService.videoFit).thenReturn(videoFit);
   when(wallpaperService.videoBlur).thenReturn(videoBlur);
   when(wallpaperService.videoDimPercent).thenReturn(videoDimPercent);
+  when(wallpaperService.recoverVideoPlaybackAfterHomeFrame(
+    reason: anyNamed('reason'),
+  )).thenAnswer((_) async {});
 }
 
 Future<SearchService> _createSearchService(FLauncherChannel channel) async {
@@ -1447,4 +1834,57 @@ void _prepareView(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+class _MutableSystemBridgeService extends SystemBridgeService {
+  _MutableSystemBridgeService(
+    FLauncherChannel channel,
+    Map<String, dynamic> initialStatus,
+  )   : _status = Map<String, dynamic>.from(initialStatus),
+        super(channel);
+
+  Map<String, dynamic> _status;
+
+  @override
+  bool get initialized => true;
+
+  @override
+  Map<String, dynamic> get status => _status;
+
+  @override
+  Map<String, dynamic> get navigationStatus => _nestedStatus('navigation');
+
+  @override
+  Map<String, dynamic> get provisioningStatus => _nestedStatus('provisioning');
+
+  @override
+  Map<String, dynamic> get wallpaperStatus => _nestedStatus('wallpaper');
+
+  @override
+  Map<String, dynamic> get memoryStatus => _nestedStatus('memory');
+
+  void setNavigationStatus(Map<String, dynamic> navigation) {
+    _status = <String, dynamic>{
+      ..._status,
+      'navigation': Map<String, dynamic>.from(navigation),
+    };
+    notifyListeners();
+  }
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<void> refreshLite() async {}
+
+  @override
+  Future<void> refreshFull() async {}
+
+  Map<String, dynamic> _nestedStatus(String key) {
+    final value = _status[key];
+    if (value is Map) {
+      return value.cast<String, dynamic>();
+    }
+    return const <String, dynamic>{};
+  }
 }

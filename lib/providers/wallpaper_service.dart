@@ -21,6 +21,9 @@ import 'package:flutter/foundation.dart';
 
 class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   static const bool fastStartupEnabled = true;
+  static const int _homeRecoveryWarmUpMaxRetries = 2;
+  static const Duration _homeRecoveryWarmUpRetryDelay =
+      Duration(milliseconds: 650);
 
   final FLauncherChannel _fLauncherChannel;
   final SettingsService _settingsService;
@@ -303,6 +306,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     final startedAt = DateTime.now().millisecondsSinceEpoch;
+    await _fLauncherChannel.setWallpaperMode(wallpaperMode);
     await _ensureVideoTextureId();
     await syncVideoOptionsToNative(notifyFlutter: false);
     _videoWarmUpCompleted = true;
@@ -567,6 +571,59 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
         unawaited(_warmUpVideoController());
       }
     }
+  }
+
+  Future<void> recoverVideoPlaybackAfterHomeFrame({
+    required String reason,
+  }) async {
+    await _recoverVideoPlaybackAfterHomeFrame(reason: reason, attempt: 0);
+  }
+
+  Future<void> _recoverVideoPlaybackAfterHomeFrame({
+    required String reason,
+    required int attempt,
+  }) async {
+    _homeVisibleAndUsable = true;
+    if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
+      return;
+    }
+    cancelPendingHomeVideoStart();
+    _logRuntimeEvent(
+      'wallpaper_home_recovery reason=$reason mode=${_settingsService.homeDockPerformanceMode}',
+    );
+    try {
+      await _warmUpVideoController();
+    } catch (error, stackTrace) {
+      if (_isTransientHomeRecoveryBridgeError(error) &&
+          attempt < _homeRecoveryWarmUpMaxRetries) {
+        Timer(_homeRecoveryWarmUpRetryDelay, () {
+          if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
+            return;
+          }
+          unawaited(
+            _recoverVideoPlaybackAfterHomeFrame(
+              reason: reason,
+              attempt: attempt + 1,
+            ),
+          );
+        });
+        return;
+      }
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'wallpaper_service',
+          context: ErrorDescription('while recovering video wallpaper on HOME'),
+        ),
+      );
+    }
+  }
+
+  bool _isTransientHomeRecoveryBridgeError(Object error) {
+    final message = error.toString();
+    return message.contains('activity_unavailable') ||
+        message.contains('Launcher activity is not attached');
   }
 
   void cancelPendingHomeVideoStart({bool clearHomeVisible = false}) {

@@ -5,6 +5,55 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-05-09 - Official release 2026.05.018 sửa wake HOME/focus/icon
+
+### Sleep/Wake HOME
+
+- Sau khi TV ngủ dậy, native đánh dấu lại HOME wake cả khi Activity đã bị `onStop` trước broadcast `SCREEN_OFF`, giúp video wallpaper có cơ hội rearm/play lại.
+- Wake và foreground fallback giờ emit lại snapshot lite đầy đủ, tránh trạng thái biểu tượng khiên giữ dữ liệu quyền cũ dù `WRITE_SECURE_SETTINGS` vẫn đang được cấp.
+- MethodChannel native vẫn phục vụ các lệnh đọc app/icon/wallpaper trong khoảng Activity vừa wake, tránh `activity_unavailable` làm live sync icon hoặc video rearm bị fail.
+- Flutter reset HOME dock cho các tín hiệu `screen_wake/activity_start/activity_resume`, đưa focus về app đầu tiên để D-pad lên thanh trạng thái hoạt động lại.
+- App card nhận `imageWarmupSequence` theo HOME recovery; các card đã build nhưng còn placeholder/error sẽ retry load ngay, kể cả vài icon ở hàng phía dưới không nằm trong nhóm eager đầu tiên.
+- Video recovery có retry ngắn nếu bridge vừa wake chưa sẵn sàng, tránh unhandled exception và tự thử lại thay vì đứng yên.
+- Giữ nguyên policy video theo mode Cân bằng/Mượt/Đẹp; không đổi UX chính và không tăng cache ảnh dài hạn.
+
+### Kiểm chứng
+
+- `flutter analyze --no-pub`: pass.
+- `flutter test --no-pub test/flauncher_test.dart`: pass.
+- `flutter test --no-pub test/widgets/app_card_test.dart`: pass.
+- `flutter test --no-pub test/native_policy_static_test.dart`: pass.
+- `flutter test --no-pub test/providers/wallpaper_service_test.dart`: pass.
+
+## 2026-05-09 - Official release 2026.05.017 sửa video/icon sau sleep wake
+
+### Sleep/Wake
+
+- Ép Flutter đồng bộ lại `wallpaperMode=video` sang native trước mọi lần warm-up/rearm, tránh lệch state làm video nền không tự phát sau khi TV ngủ dậy hoặc launcher bị restart.
+- HOME recovery sau `activity_start/activity_resume/screen_wake` tiếp tục gọi warm-up explicit để video tự phát lại mà không cần chọn lại thư mục video.
+- Cold start ở mode Cân bằng vẫn giữ delayed-home-settle, không đổi policy mode Mượt/Đẹp.
+- Bật log wake rearm trong release với tần suất hẹp để kiểm tra được bằng logcat nếu TV còn lỗi sleep/wake.
+- Warm icon/banner vùng đầu HOME ngay cả khi `homeSequence=0`, giảm trường hợp icon trống cho tới khi bấm biểu tượng khiên.
+
+### Kiểm chứng
+
+- Thêm regression test đảm bảo warm-up video luôn `setWallpaperMode('video')` trước khi xin texture/play native.
+- Thêm static test khóa fallback `activity_resume` và log wake release.
+
+## 2026-05-09 - Official release 2026.05.016 sửa sleep/wake HOME
+
+### Sleep/Wake
+
+- Thêm fallback rearm khi Activity quay lại `onStart/onResume` sau lúc TV ngủ, phòng trường hợp thiết bị không gửi hoặc không giao `SCREEN_ON/DREAMING_STOPPED` cho wake receiver.
+- Khi fallback wake chạy, native gọi lại video wallpaper explicit rearm để video nền tự phát lại mà không cần chọn lại thư mục video.
+- Flutter coi `activity_start/activity_resume` là tín hiệu warm HOME để eager-load icon/banner vùng đầu dock sau sleep/wake.
+- Fallback chỉ chạy sau một lần background do thiết bị không interactive, không áp vào cold start để giữ nguyên nhịp khởi động video hiện tại.
+
+### Kiểm chứng
+
+- Thêm static test khóa native foreground wake fallback.
+- Thêm widget test cho icon/banner warmup theo `activity_resume`.
+
 ## 2026-05-09 - Official release 2026.05.015 sửa điều hướng dock thu gọn
 
 ### Điều hướng D-pad HOME

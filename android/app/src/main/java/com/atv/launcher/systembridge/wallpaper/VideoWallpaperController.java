@@ -725,9 +725,7 @@ public final class VideoWallpaperController {
     }
 
     private void logWakeInfo(String message) {
-        if (isDebuggableBuild()) {
-            Log.i(TAG, message);
-        }
+        Log.i(TAG, message);
     }
 
     private boolean isDebuggableBuild() {

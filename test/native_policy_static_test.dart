@@ -99,13 +99,12 @@ void main() {
     expect(mainActivity, contains('requestPermissions('));
   });
 
-  test('video wake logs are gated behind debug builds', () {
+  test('video wake rearm logs stay narrow and indirect', () {
     final controller = File(
       'android/app/src/main/java/com/atv/launcher/systembridge/wallpaper/VideoWallpaperController.java',
     ).readAsStringSync();
 
     expect(controller, contains('logWakeInfo("wallpaper_wake_rearm'));
-    expect(controller, contains('isDebuggableBuild()'));
     expect(controller, isNot(contains('Log.i(TAG, "wallpaper_wake_rearm')));
   });
 
@@ -118,8 +117,83 @@ void main() {
     expect(mainActivity, contains('lastWakeNavigationAtElapsedMs'));
     expect(mainActivity, contains('recordWakeHomeNavigation()'));
     expect(mainActivity, contains('recordHomeNavigation("screen_wake")'));
+    expect(mainActivity, contains('if (recordWakeHomeNavigation())'));
+    expect(mainActivity, contains('emitSystemSnapshot();'));
+    expect(mainActivity, contains('|| isHomeIntent(getIntent())'));
     expect(
         mainActivity, contains('now - lastWakeNavigationAtElapsedMs < 1500L'));
+  });
+
+  test('method channel keeps read calls available while activity is waking',
+      () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
+
+    expect(
+      mainActivity,
+      contains('activeActivity != null ? activeActivity : MainActivity.this'),
+    );
+    expect(
+      mainActivity,
+      isNot(contains('result.error("activity_unavailable"')),
+    );
+  });
+
+  test(
+      'foreground resume after sleep falls back to wake rearm and image warmup',
+      () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
+    final launcher = File('lib/flauncher.dart').readAsStringSync();
+
+    expect(mainActivity, contains('wakeRearmAllowedAfterStop'));
+    expect(mainActivity, contains('handleForegroundWakeFallback('));
+    expect(mainActivity, contains('lastForegroundWakeFallbackAtElapsedMs'));
+    expect(mainActivity, contains('recordHomeNavigation(reason)'));
+    expect(
+      mainActivity,
+      contains('sharedVideoWallpaperController.onScreenWake(reason, true)'),
+    );
+    expect(
+        launcher, contains("widget.homeNavigationReason == 'activity_start'"));
+    expect(
+        launcher, contains("widget.homeNavigationReason == 'activity_resume'"));
+  });
+
+  test('video warm-up resyncs native wallpaper mode before texture request',
+      () {
+    final wallpaperService =
+        File('lib/providers/wallpaper_service.dart').readAsStringSync();
+    final warmUpIndex =
+        wallpaperService.indexOf('Future<void> _warmUpVideoController()');
+    final setModeIndex = wallpaperService.indexOf(
+        'setWallpaperMode(wallpaperMode)', warmUpIndex);
+    final textureIndex =
+        wallpaperService.indexOf('_ensureVideoTextureId()', warmUpIndex);
+
+    expect(warmUpIndex, isNonNegative);
+    expect(setModeIndex, isNonNegative);
+    expect(textureIndex, isNonNegative);
+    expect(setModeIndex, lessThan(textureIndex));
+  });
+
+  test('wake rearm logs are available in release builds', () {
+    final controller = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/wallpaper/VideoWallpaperController.java',
+    ).readAsStringSync();
+
+    expect(controller, contains('private void logWakeInfo(String message)'));
+    expect(controller, contains('Log.i(TAG, message);'));
+    expect(
+      controller,
+      isNot(
+        contains(
+          'if (isDebuggableBuild()) {\n            Log.i(TAG, message);\n        }',
+        ),
+      ),
+    );
   });
 
   test('launcher app query failures are logged instead of ignored', () {

@@ -37,6 +37,7 @@ class AppsGrid extends StatelessWidget {
   final bool autofocusFirstItem;
   final bool deferVerticalNavigationToParent;
   final Set<String> eagerImagePackageNames;
+  final int imageWarmupSequence;
   final double rowSpacing;
   final void Function(
     String categoryName,
@@ -52,6 +53,7 @@ class AppsGrid extends StatelessWidget {
     this.autofocusFirstItem = false,
     this.deferVerticalNavigationToParent = false,
     this.eagerImagePackageNames = const <String>{},
+    this.imageWarmupSequence = 0,
     this.rowSpacing = homeRowSpacingDefault,
     this.onApplicationFocused,
     this.onApplicationReorder,
@@ -103,6 +105,7 @@ class AppsGrid extends StatelessWidget {
                       autofocus: autofocusFirstItem && index == 0,
                       eagerImageLoad: eagerImagePackageNames
                           .contains(applications[index].packageName),
+                      imageWarmupSequence: imageWarmupSequence,
                       onFocused: (itemContext) {
                         _prefetchAround(context, index);
                         onApplicationFocused?.call(

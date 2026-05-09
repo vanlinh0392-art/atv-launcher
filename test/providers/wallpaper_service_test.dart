@@ -111,6 +111,57 @@ void main() {
     verify(channel.getVideoWallpaperTextureId()).called(1);
   });
 
+  test('balanced home warm-up syncs native video mode before texture request',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/native-drift',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 18);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    clearInteractions(channel);
+
+    service.notifyHomeVisibleAndUsable();
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    expect(service.videoTextureId, 18);
+    verifyInOrder([
+      channel.setWallpaperMode('video'),
+      channel.getVideoWallpaperTextureId(),
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+        videoAllowedByPerformanceMode: anyNamed(
+          'videoAllowedByPerformanceMode',
+        ),
+        disableAudioRendererWhenMuted: anyNamed(
+          'disableAudioRendererWhenMuted',
+        ),
+        deferForegroundResume: true,
+      ),
+    ]);
+  });
+
   test('restoreFromSettings defers video warm-up until home becomes usable',
       () async {
     final settings = await _createSettingsService(<String, Object>{
@@ -208,6 +259,60 @@ void main() {
 
     expect(service.videoTextureId, 31);
     verify(channel.getVideoWallpaperTextureId()).called(1);
+  });
+
+  test('balanced home recovery resyncs native video mode before rearm',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/recovery',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 32);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    service.notifyHomeVisibleAndUsable();
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    clearInteractions(channel);
+
+    await service.recoverVideoPlaybackAfterHomeFrame(
+      reason: 'activity_resume',
+    );
+
+    expect(service.videoTextureId, 32);
+    verifyInOrder([
+      channel.setWallpaperMode('video'),
+      channel.getVideoWallpaperTextureId(),
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+        videoAllowedByPerformanceMode: anyNamed(
+          'videoAllowedByPerformanceMode',
+        ),
+        disableAudioRendererWhenMuted: anyNamed(
+          'disableAudioRendererWhenMuted',
+        ),
+        deferForegroundResume: true,
+      ),
+    ]);
   });
 
   test('balanced starts pending video immediately after settings release',

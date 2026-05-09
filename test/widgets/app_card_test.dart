@@ -267,6 +267,66 @@ void main() {
     verify(appsService.getAppBanner('deferred.load.second')).called(1);
   });
 
+  testWidgets('home recovery warmup loads built non-eager cards immediately',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final application = fakeApp(
+      packageName: 'wake.non.eager.retry',
+      name: 'Wake Non Eager Retry',
+    );
+    final category = fakeCategory()..applications.add(application);
+
+    when(appsService.getAppBanner(application.packageName))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+    when(appsService.addListener(any)).thenReturn(null);
+    when(appsService.removeListener(any)).thenReturn(null);
+
+    Future<void> pumpCard(int imageWarmupSequence) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<ProfileSecurityService?>.value(value: null),
+            ListenableProvider<AppsService>.value(value: appsService),
+            ChangeNotifierProvider<SettingsService>.value(
+              value: settingsService,
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 320,
+                child: AppCard(
+                  application: application,
+                  category: category,
+                  autofocus: false,
+                  eagerImageLoad: false,
+                  imageWarmupSequence: imageWarmupSequence,
+                  onMove: (_, __) => false,
+                  onMoveEnd: (_, __) async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpCard(0);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    verifyNever(appsService.getAppBanner(application.packageName));
+
+    await pumpCard(9);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    verify(appsService.getAppBanner(application.packageName)).called(1);
+  });
+
   testWidgets('disposing a deferred app card cancels its pending image load',
       (tester) async {
     final settingsService = await _createSettingsService();

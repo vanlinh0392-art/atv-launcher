@@ -13,6 +13,13 @@ import 'date_time_widget.dart';
 import 'network_widget.dart';
 
 class FocusAwareAppBar extends StatefulWidget implements PreferredSizeWidget {
+  final FocusNode? primaryFocusNode;
+
+  const FocusAwareAppBar({
+    super.key,
+    this.primaryFocusNode,
+  });
+
   @override
   State<StatefulWidget> createState() {
     return _FocusAwareAppBarState();
@@ -128,6 +135,7 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _StatusBarIconButton(
+                    focusNode: widget.primaryFocusNode,
                     icon: Icons.search_rounded,
                     tooltip: AppLocalizations.of(context)!.searchHint,
                     onPressed: () => _startVoiceSearch(context),
@@ -408,6 +416,7 @@ class _StatusBarChipButton extends StatelessWidget {
 }
 
 class _StatusBarIconButton extends StatelessWidget {
+  final FocusNode? focusNode;
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
@@ -415,6 +424,7 @@ class _StatusBarIconButton extends StatelessWidget {
   final Color? badgeColor;
 
   const _StatusBarIconButton({
+    this.focusNode,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
@@ -425,6 +435,7 @@ class _StatusBarIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _StatusBarActionSurface(
+      focusNode: focusNode,
       tooltip: tooltip,
       onPressed: onPressed,
       badgeColor: badgeColor,
@@ -438,12 +449,14 @@ class _StatusBarIconButton extends StatelessWidget {
 }
 
 class _StatusBarActionSurface extends StatefulWidget {
+  final FocusNode? focusNode;
   final Widget child;
   final VoidCallback? onPressed;
   final String? tooltip;
   final Color? badgeColor;
 
   const _StatusBarActionSurface({
+    this.focusNode,
     required this.child,
     this.onPressed,
     this.tooltip,
@@ -475,6 +488,7 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
           Positioned.fill(
             child: widget.onPressed != null
                 ? TextButton(
+                    focusNode: widget.focusNode,
                     onPressed: widget.onPressed,
                     style: _statusBarCompactButtonStyle(intensityFactor),
                     child: widget.child,
