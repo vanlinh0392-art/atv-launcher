@@ -26,7 +26,9 @@ import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
@@ -224,6 +226,7 @@ public class MainActivity extends FlutterActivity {
     private MethodChannel.Result pendingBackupImportResult;
     private MethodChannel.Result pendingMediaPermissionResult;
     private MethodChannel.Result pendingSpeechRecognizerResult;
+    private BroadcastReceiver wallpaperWakeReceiver;
     private String pendingWallpaperAssetKind = "mixed";
     private String pendingBackupExportContent = "";
     private String pendingBackupExportFileName = "atv-launcher-backup.json";
@@ -240,6 +243,7 @@ public class MainActivity extends FlutterActivity {
             return;
         }
         super.onCreate(savedInstanceState);
+        registerWallpaperWakeReceiver();
     }
 
     @Override
@@ -379,10 +383,50 @@ public class MainActivity extends FlutterActivity {
 
     @Override
     protected void onDestroy() {
+        unregisterWallpaperWakeReceiver();
         if (activeActivity == this) {
             activeActivity = null;
         }
         super.onDestroy();
+    }
+
+    private void registerWallpaperWakeReceiver() {
+        if (wallpaperWakeReceiver != null) {
+            return;
+        }
+        wallpaperWakeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent != null ? intent.getAction() : "screen_wake";
+                VideoWallpaperController controller = sharedVideoWallpaperController;
+                if (controller != null) {
+                    controller.onScreenWake(action);
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        filter.addAction(Intent.ACTION_DREAMING_STOPPED);
+        filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_ON");
+        filter.addAction("com.xiaomi.tv.ACTION_OPEN_CLOSE_SCREEN_SAVER");
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(wallpaperWakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(wallpaperWakeReceiver, filter);
+        }
+    }
+
+    private void unregisterWallpaperWakeReceiver() {
+        if (wallpaperWakeReceiver == null) {
+            return;
+        }
+        try {
+            unregisterReceiver(wallpaperWakeReceiver);
+        } catch (Exception ignored) {
+        }
+        wallpaperWakeReceiver = null;
     }
 
     @Override

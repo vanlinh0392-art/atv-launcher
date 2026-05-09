@@ -5,6 +5,23 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-05-09 - Official release 2026.05.011 sửa video nền sau sleep/wake
+
+### Video wallpaper
+
+- Native video wallpaper giờ nhận trực tiếp tín hiệu `SCREEN_ON`, `USER_PRESENT`, `DREAMING_STOPPED` và các wake action của Xiaomi TV để rearm playback khi TV thức dậy
+- Luồng wake rearm gọi warm-up explicit để vượt guard `deferForegroundResume`, giúp Balanced/Smooth tự phát lại video nền mà không cần chọn lại thư mục video
+- Thêm debounce wake event để tránh `SCREEN_ON` và `USER_PRESENT` kích hoạt nhiều lần liên tiếp
+- Nếu playlist folder tạm thời trả rỗng ngay sau wake, controller retry có giới hạn để chờ MediaStore/SAF sẵn sàng thay vì đứng yên
+- Vẫn tôn trọng `autoResume`, mode `Off`, video bị chặn bởi performance mode và suppression khi Settings đang mở
+
+### Kiểm chứng
+
+- `flutter analyze --no-pub`: pass
+- `flutter test --no-pub test/providers/wallpaper_service_test.dart`: pass
+- `flutter test --no-pub`: pass toàn bộ suite
+- `flutter build apk --debug --target-platform android-arm --no-pub`: pass native compile
+
 ## 2026-05-07 - Official release 2026.05.010 chuyển GitHub mới và tối ưu RAM/CPU an toàn
 
 ### GitHub release mới

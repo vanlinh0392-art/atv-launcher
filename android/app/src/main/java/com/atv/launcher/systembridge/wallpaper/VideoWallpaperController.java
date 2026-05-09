@@ -4,6 +4,7 @@ import android.content.Context;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Surface;
@@ -30,6 +31,9 @@ public final class VideoWallpaperController {
     private static final String TAG = "FLauncherPerf";
     private static final boolean FAST_STARTUP_ENABLED = true;
     private static final long BACKGROUND_PLAYER_RELEASE_DELAY_MS = 60000L;
+    private static final long WAKE_REARM_DEBOUNCE_MS = 1500L;
+    private static final long WAKE_PLAYLIST_RETRY_DELAY_MS = 750L;
+    private static final int MAX_WAKE_PLAYLIST_RETRIES = 4;
 
     private final Context appContext;
     private final TextureRegistry textureRegistry;
@@ -57,6 +61,9 @@ public final class VideoWallpaperController {
     private boolean startupWarmupReady = !FAST_STARTUP_ENABLED;
     private long videoWarmupStartedAtNanos = 0L;
     private String activePlaybackConfigSignature = "";
+    private long lastWakeRearmAtElapsedMs = 0L;
+    private int pendingWakePlaylistRetryCount = 0;
+    private String pendingWakeReason = "";
 
     private final Runnable advanceRunnable = new Runnable() {
         @Override
@@ -78,6 +85,22 @@ public final class VideoWallpaperController {
     };
 
     private final Runnable backgroundReleaseRunnable = this::releasePlayer;
+
+    private final Runnable wakePlaylistRetryRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (pendingWakePlaylistRetryCount <= 0) {
+                return;
+            }
+            if (!shouldAutoResumeFromWake()) {
+                cancelWakePlaylistRetry();
+                return;
+            }
+            Log.i(TAG, "wallpaper_wake_rearm_retry reason=" + pendingWakeReason
+                    + " attempt=" + pendingWakePlaylistRetryCount);
+            maybeStartPlayback(true, true);
+        }
+    };
 
     public VideoWallpaperController(
             Context context,
@@ -148,9 +171,38 @@ public final class VideoWallpaperController {
         maybeStartPlayback(false);
     }
 
+    public void onScreenWake(String reason) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(() -> onScreenWake(reason));
+            return;
+        }
+
+        String resolvedReason = TextUtils.isEmpty(reason) ? "screen_wake" : reason;
+        long now = SystemClock.elapsedRealtime();
+        if (lastWakeRearmAtElapsedMs > 0L
+                && now - lastWakeRearmAtElapsedMs < WAKE_REARM_DEBOUNCE_MS) {
+            return;
+        }
+        lastWakeRearmAtElapsedMs = now;
+
+        if (!shouldAutoResumeFromWake()) {
+            cancelWakePlaylistRetry();
+            return;
+        }
+
+        Log.i(TAG, "wallpaper_wake_rearm reason=" + resolvedReason);
+        mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        foregroundActive = true;
+        startupWarmupReady = true;
+        pendingWakePlaylistRetryCount = 0;
+        pendingWakeReason = resolvedReason;
+        maybeStartPlayback(true, true);
+    }
+
     public void onStop() {
         foregroundActive = false;
         stopIntervalAdvance();
+        cancelWakePlaylistRetry();
         if (player != null) {
             try {
                 player.pause();
@@ -168,11 +220,13 @@ public final class VideoWallpaperController {
 
     public void onDestroy() {
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        cancelWakePlaylistRetry();
         releasePlayer();
         releaseSurface();
     }
 
     public void onWallpaperModeChanged() {
+        cancelWakePlaylistRetry();
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
             boolean changed = setVideoReady(false) | setLastError("");
             releasePlayer();
@@ -183,6 +237,7 @@ public final class VideoWallpaperController {
     }
 
     public void onVideoConfigChanged() {
+        cancelWakePlaylistRetry();
         startupWarmupReady = true;
         onVideoPlaylistTopologyChanged();
         onVideoPlayerPolicyChanged();
@@ -190,6 +245,7 @@ public final class VideoWallpaperController {
     }
 
     public void onVideoPlaylistTopologyChanged() {
+        cancelWakePlaylistRetry();
         startupWarmupReady = true;
         activePlaybackConfigSignature = "";
         if (player != null) {
@@ -281,6 +337,7 @@ public final class VideoWallpaperController {
             return;
         }
         if (suppressed) {
+            cancelWakePlaylistRetry();
             wasPlayingBeforeSuppression = player != null
                     ? player.isPlaying() || player.getPlayWhenReady()
                     : shouldResumeWhenUnsuppressed();
@@ -313,6 +370,10 @@ public final class VideoWallpaperController {
     }
 
     private void maybeStartPlayback(boolean explicitWarmup) {
+        maybeStartPlayback(explicitWarmup, false);
+    }
+
+    private void maybeStartPlayback(boolean explicitWarmup, boolean retryEmptyPlaylist) {
         if (!foregroundActive) {
             return;
         }
@@ -336,6 +397,7 @@ public final class VideoWallpaperController {
                 surfaceTextureEntry != null &&
                 surface != null &&
                 TextUtils.equals(activePlaybackConfigSignature, desiredConfigSignature)) {
+            cancelWakePlaylistRetry();
             applyPlayerPolicySettings();
             applyPresentationSettings();
             if (BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)
@@ -352,9 +414,13 @@ public final class VideoWallpaperController {
             boolean changed = setVideoReady(false)
                     | setLastError("No playable wallpaper videos were resolved.");
             notifyStatusChangedIf(changed);
+            if (retryEmptyPlaylist) {
+                scheduleWakePlaylistRetryIfNeeded();
+            }
             return;
         }
 
+        cancelWakePlaylistRetry();
         ensureSurface();
         releasePlayer();
         boolean resetStatusChanged = setVideoReady(false)
@@ -593,6 +659,34 @@ public final class VideoWallpaperController {
                 && videoAllowedByPerformanceMode
                 && TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))
                 && BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext);
+    }
+
+    private boolean shouldAutoResumeFromWake() {
+        return TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))
+                && BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext)
+                && videoAllowedByPerformanceMode
+                && !playbackSuppressed;
+    }
+
+    private void scheduleWakePlaylistRetryIfNeeded() {
+        if (!BridgeStateStore.WALLPAPER_SOURCE_FOLDER.equals(
+                BridgeStateStore.getWallpaperVideoSourceType(appContext))
+        ) {
+            return;
+        }
+        if (pendingWakePlaylistRetryCount >= MAX_WAKE_PLAYLIST_RETRIES) {
+            Log.i(TAG, "wallpaper_wake_rearm_retry_exhausted reason=" + pendingWakeReason);
+            return;
+        }
+        pendingWakePlaylistRetryCount += 1;
+        mainHandler.removeCallbacks(wakePlaylistRetryRunnable);
+        mainHandler.postDelayed(wakePlaylistRetryRunnable, WAKE_PLAYLIST_RETRY_DELAY_MS);
+    }
+
+    private void cancelWakePlaylistRetry() {
+        pendingWakePlaylistRetryCount = 0;
+        pendingWakeReason = "";
+        mainHandler.removeCallbacks(wakePlaylistRetryRunnable);
     }
 
     private String buildPlaybackTopologySignature() {
