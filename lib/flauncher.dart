@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -443,6 +444,12 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
   HomePerformanceProfile get _performanceProfile =>
       HomePerformanceProfile.resolve(widget.performanceMode);
 
+  bool get _shouldWarmHomeImages =>
+      widget.homeSequence > 0 &&
+      (widget.homeNavigationReason == 'home_reentry' ||
+          widget.homeNavigationReason == 'launcher_reentry' ||
+          widget.homeNavigationReason == 'screen_wake');
+
   @override
   void initState() {
     super.initState();
@@ -631,6 +638,9 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     final children = <Widget>[];
     var autofocusAssigned = false;
     var insertedCategory = false;
+    final eagerImagePackageNames = _shouldWarmHomeImages
+        ? _leadingVisiblePackageNames()
+        : const <String>{};
 
     for (final section in widget.sections) {
       final sectionKey = Key(section.id.toString());
@@ -669,6 +679,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             category: category,
             applications: category.applications,
             autofocusFirstItem: shouldAutofocus,
+            eagerImagePackageNames: eagerImagePackageNames,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
             onApplicationReorder: onReorder,
@@ -678,6 +689,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             category: category,
             applications: category.applications,
             autofocusFirstItem: shouldAutofocus,
+            eagerImagePackageNames: eagerImagePackageNames,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
             onApplicationReorder: onReorder,
@@ -693,6 +705,33 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     }
 
     return children;
+  }
+
+  Set<String> _leadingVisiblePackageNames() {
+    final packageNames = LinkedHashSet<String>();
+    var remainingRows = math.max(1, _visibleRows + 1);
+    for (final section in widget.sections) {
+      if (remainingRows <= 0) {
+        break;
+      }
+      if (section is! Category || section.applications.isEmpty) {
+        continue;
+      }
+      final columnsCount = math.max(1, section.columnsCount);
+      final rowsToWarm = math.min(
+        remainingRows,
+        (section.applications.length / columnsCount).ceil(),
+      );
+      final appsToWarm = math.min(
+        section.applications.length,
+        rowsToWarm * columnsCount,
+      );
+      for (var index = 0; index < appsToWarm; index += 1) {
+        packageNames.add(section.applications[index].packageName);
+      }
+      remainingRows -= rowsToWarm;
+    }
+    return packageNames;
   }
 
   void _handleDockFocusChange(bool hasFocus) {

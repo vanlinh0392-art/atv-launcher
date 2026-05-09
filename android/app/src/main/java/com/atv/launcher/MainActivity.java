@@ -197,6 +197,7 @@ public class MainActivity extends FlutterActivity {
     private static int appImageCacheBytes = 0;
     private static long homeNavigationSequence;
     private static String lastNavigationReason = "";
+    private static long lastWakeNavigationAtElapsedMs;
     private static long benchmarkCommandSequence;
     private static String lastBenchmarkAction = "";
     private static String lastBenchmarkRoute = "";
@@ -419,8 +420,11 @@ public class MainActivity extends FlutterActivity {
                     return;
                 }
                 VideoWallpaperController controller = sharedVideoWallpaperController;
+                boolean allowWakeRearm = activityStarted || wakeRearmAllowedAfterStop;
+                if (allowWakeRearm) {
+                    recordWakeHomeNavigation();
+                }
                 if (controller != null) {
-                    boolean allowWakeRearm = activityStarted || wakeRearmAllowedAfterStop;
                     if (allowWakeRearm) {
                         wakeRearmAllowedAfterStop = false;
                     }
@@ -466,6 +470,15 @@ public class MainActivity extends FlutterActivity {
     private boolean isWallpaperSleepAction(String action) {
         return TextUtils.equals(Intent.ACTION_SCREEN_OFF, action)
                 || TextUtils.equals(Intent.ACTION_DREAMING_STARTED, action);
+    }
+
+    private void recordWakeHomeNavigation() {
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastWakeNavigationAtElapsedMs < 1500L) {
+            return;
+        }
+        lastWakeNavigationAtElapsedMs = now;
+        recordHomeNavigation("screen_wake");
     }
 
     private boolean isDeviceInteractive() {

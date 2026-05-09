@@ -54,6 +54,7 @@ typedef AppCardMoveEndCallback = Future<void> Function(
   BuildContext itemContext,
   bool committed,
 );
+typedef AppCardNavigateCallback = bool Function(AxisDirection direction);
 
 class AppCard extends StatefulWidget {
   static const int _maxImageCacheSize = 24;
@@ -69,26 +70,33 @@ class AppCard extends StatefulWidget {
       Queue<_QueuedAppImageLoad>();
   static final LinkedHashMap<Object, VoidCallback> _deferredImageLoadCallbacks =
       LinkedHashMap<Object, VoidCallback>();
+  static final Map<String, FocusNode> _focusNodesById = <String, FocusNode>{};
   static Timer? _deferredImageLoadBatchTimer;
   static int _activeImageLoads = 0;
 
   final App application;
   final Category category;
   final bool autofocus;
+  final bool eagerImageLoad;
+  final String? focusId;
   final AppCardFocusCallback? onFocused;
   final AppCardMoveStartCallback? onMoveStart;
   final AppCardMoveCallback onMove;
   final AppCardMoveEndCallback onMoveEnd;
+  final AppCardNavigateCallback? onNavigate;
 
   const AppCard({
     super.key,
     required this.application,
     required this.category,
     required this.autofocus,
+    this.eagerImageLoad = false,
+    this.focusId,
     this.onFocused,
     this.onMoveStart,
     required this.onMove,
     required this.onMoveEnd,
+    this.onNavigate,
   });
 
   @override
@@ -102,6 +110,12 @@ class AppCard extends StatefulWidget {
     }
     return image;
   }
+
+  static bool _hasCachedImage(String packageName) =>
+      _resolvedImageCache.containsKey(packageName);
+
+  static bool _hasPendingImageLoad(String packageName) =>
+      _imageLoadCache.containsKey(packageName);
 
   static Future<Tuple2<AppImageType, ImageProvider>> _putImageLoadFuture(
     String packageName,
@@ -173,6 +187,47 @@ class AppCard extends StatefulWidget {
     _deferredImageLoadCallbacks.clear();
     _deferredImageLoadBatchTimer?.cancel();
     _deferredImageLoadBatchTimer = null;
+  }
+
+  static bool requestFocusForId(String focusId) {
+    final node = _focusNodesById[focusId];
+    if (node == null ||
+        node.context == null ||
+        !node.canRequestFocus ||
+        node.skipTraversal) {
+      return false;
+    }
+    node.requestFocus();
+    return true;
+  }
+
+  static void prefetchAppImages(
+    BuildContext context,
+    Iterable<String> packageNames, {
+    required bool priority,
+  }) {
+    final appsService = context.read<AppsService>();
+    final uniquePackageNames = LinkedHashSet<String>.from(
+      packageNames.where((packageName) => packageName.trim().isNotEmpty),
+    );
+    for (final packageName in uniquePackageNames) {
+      if (_hasCachedImage(packageName)) {
+        continue;
+      }
+      final prefetchFuture = _putImageLoadFuture(
+        packageName,
+        () => _loadAppBannerOrIconForPackage(appsService, packageName),
+        priority: priority,
+      );
+      unawaited(
+        prefetchFuture.then<void>(
+          (_) {},
+          onError: (_, __) {
+            // Prefetch is opportunistic; the focused card will surface failures.
+          },
+        ),
+      );
+    }
   }
 
   static void _trimImageCaches() {
@@ -247,6 +302,32 @@ class AppCard extends StatefulWidget {
       callback();
     }
   }
+
+  static Future<Tuple2<AppImageType, ImageProvider>>
+      _loadAppBannerOrIconForPackage(
+    AppsService service,
+    String packageName,
+  ) async {
+    var bytes = await service.getAppBanner(packageName);
+    var type = AppImageType.Banner;
+
+    if (bytes.isEmpty) {
+      type = AppImageType.Icon;
+      bytes = await service.getAppIcon(packageName);
+    }
+
+    return Tuple2(type, MemoryImage(bytes));
+  }
+
+  static void _registerFocusNode(String focusId, FocusNode node) {
+    _focusNodesById[focusId] = node;
+  }
+
+  static void _unregisterFocusNode(String focusId, FocusNode node) {
+    if (identical(_focusNodesById[focusId], node)) {
+      _focusNodesById.remove(focusId);
+    }
+  }
 }
 
 class _QueuedAppImageLoad {
@@ -262,7 +343,10 @@ class _QueuedAppImageLoad {
 }
 
 class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
+  static const Duration _focusBurstCooldown = Duration(milliseconds: 280);
+
   bool _moving = false;
+  bool _focusBurstActive = false;
   bool? _lastObservedHomeReorderModeEnabled;
   late final FocusNode _cardFocusNode =
       FocusNode(debugLabel: 'app_card_${widget.application.packageName}');
@@ -273,6 +357,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   int? _lastSeenImageCacheRevision;
   int _imageLoadRevision = 0;
   final Object _deferredImageLoadToken = Object();
+  Timer? _focusBurstTimer;
   late final AnimationController _animation = AnimationController(
     vsync: this,
     lowerBound: 0,
@@ -284,6 +369,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    AppCard._registerFocusNode(_focusRegistryId, _cardFocusNode);
     FocusManager.instance.addHighlightModeListener(_focusHighlightModeChanged);
     _lastSeenImageCacheRevision = AppImageCacheInvalidator.instance.revision;
     AppImageCacheInvalidator.instance.addListener(_syncImageCacheRevision);
@@ -293,8 +379,17 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   @override
   void didUpdateWidget(covariant AppCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final oldFocusId = oldWidget.focusId ?? oldWidget.application.packageName;
+    if (oldFocusId != _focusRegistryId) {
+      AppCard._unregisterFocusNode(oldFocusId, _cardFocusNode);
+      AppCard._registerFocusNode(_focusRegistryId, _cardFocusNode);
+    }
     if (oldWidget.application.packageName != widget.application.packageName) {
       _bindAppImage();
+      return;
+    }
+    if (!oldWidget.eagerImageLoad && widget.eagerImageLoad) {
+      _ensureAppImageLoaded(priority: true);
     }
   }
 
@@ -316,7 +411,9 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     FocusManager.instance
         .removeHighlightModeListener(_focusHighlightModeChanged);
     AppImageCacheInvalidator.instance.removeListener(_syncImageCacheRevision);
+    AppCard._unregisterFocusNode(_focusRegistryId, _cardFocusNode);
     AppCard._cancelDeferredImageLoad(_deferredImageLoadToken);
+    _focusBurstTimer?.cancel();
     _cardFocusNode.dispose();
     _animation.dispose();
 
@@ -374,7 +471,9 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                     width: constraints.maxWidth,
                     height: constraints.maxHeight,
                     child: AnimatedContainer(
-                      duration: performanceProfile.appCardTransformDuration,
+                      duration: _focusBurstActive
+                          ? const Duration(milliseconds: 36)
+                          : performanceProfile.appCardTransformDuration,
                       curve: Curves.easeOutCubic,
                       transformAlignment: Alignment.center,
                       transform: _scaleTransform(
@@ -438,6 +537,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                 cornerRadius: cornerRadius,
                                 highlightColor: highlightColor,
                                 performanceProfile: performanceProfile,
+                                focusBurstActive: _focusBurstActive,
                               ),
                               if (locked) _lockBadge(),
                             ],
@@ -458,6 +558,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     required double cornerRadius,
     required Color highlightColor,
     required HomePerformanceProfile performanceProfile,
+    required bool focusBurstActive,
   }) {
     if (!enabled) {
       _animation.stop();
@@ -465,13 +566,14 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     }
 
     _animation.duration = performanceProfile.appCardHighlightPulseDuration;
-    if (!performanceProfile.appCardHighlightPulseEnabled) {
+    if (focusBurstActive || !performanceProfile.appCardHighlightPulseEnabled) {
       _animation.stop();
       return _buildHighlightFrameDecoration(
         cornerRadius: cornerRadius,
         highlightColor: highlightColor,
         performanceProfile: performanceProfile,
         pulse: 0,
+        suppressGlow: focusBurstActive,
       );
     }
 
@@ -485,6 +587,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           highlightColor: highlightColor,
           performanceProfile: performanceProfile,
           pulse: pulse,
+          suppressGlow: false,
         );
       },
     );
@@ -495,11 +598,14 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     required Color highlightColor,
     required HomePerformanceProfile performanceProfile,
     required double pulse,
+    required bool suppressGlow,
   }) {
     final borderOpacity = performanceProfile.appCardHighlightBorderBaseOpacity +
         (pulse * performanceProfile.appCardHighlightBorderPulseOpacityDelta);
-    final glowOpacity = performanceProfile.appCardHighlightGlowBaseOpacity +
-        (pulse * performanceProfile.appCardHighlightGlowPulseOpacityDelta);
+    final glowOpacity = suppressGlow
+        ? 0.0
+        : performanceProfile.appCardHighlightGlowBaseOpacity +
+            (pulse * performanceProfile.appCardHighlightGlowPulseOpacityDelta);
     final glowBlur = performanceProfile.appCardHighlightGlowBaseBlur +
         (pulse * performanceProfile.appCardHighlightGlowPulseBlurDelta);
     final glowSpread = performanceProfile.appCardHighlightGlowBaseSpread +
@@ -531,17 +637,10 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
   Future<Tuple2<AppImageType, ImageProvider>> _loadAppBannerOrIcon(
       AppsService service) async {
-    Uint8List bytes = Uint8List(0);
-
-    bytes = await service.getAppBanner(widget.application.packageName);
-    AppImageType type = AppImageType.Banner;
-
-    if (bytes.isEmpty) {
-      type = AppImageType.Icon;
-      bytes = await service.getAppIcon(widget.application.packageName);
-    }
-
-    return Tuple2(type, MemoryImage(bytes));
+    return AppCard._loadAppBannerOrIconForPackage(
+      service,
+      widget.application.packageName,
+    );
   }
 
   Widget _appImage(
@@ -748,7 +847,9 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     if (_resolvedAppImage != null) {
       return;
     }
-    if (widget.autofocus) {
+    if (widget.autofocus ||
+        widget.eagerImageLoad ||
+        AppCard._hasPendingImageLoad(packageName)) {
       _ensureAppImageLoaded(priority: true, loadRevision: loadRevision);
       return;
     }
@@ -895,6 +996,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   KeyEventResult _onPressed(BuildContext context, LogicalKeyboardKey? key) {
     final homeReorderModeEnabled =
         context.read<AppsService>().homeReorderModeEnabled;
+    final navigationDirection = _navigationDirectionForKey(key);
     if (_moving) {
       var moved = false;
       if (key == LogicalKeyboardKey.arrowLeft) {
@@ -920,6 +1022,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       }
 
       return KeyEventResult.handled;
+    } else if (navigationDirection != null) {
+      _markFocusNavigationBurst();
+      return (widget.onNavigate?.call(navigationDirection) ?? false)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
     } else if (homeReorderModeEnabled && _validationKeys.contains(key)) {
       _enterMoveMode(context);
       return KeyEventResult.handled;
@@ -934,6 +1041,35 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  AxisDirection? _navigationDirectionForKey(LogicalKeyboardKey? key) {
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      return AxisDirection.left;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      return AxisDirection.up;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      return AxisDirection.right;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      return AxisDirection.down;
+    }
+    return null;
+  }
+
+  void _markFocusNavigationBurst() {
+    _focusBurstTimer?.cancel();
+    if (!_focusBurstActive && mounted) {
+      setState(() => _focusBurstActive = true);
+    }
+    _focusBurstTimer = Timer(_focusBurstCooldown, () {
+      if (!mounted || !_focusBurstActive) {
+        return;
+      }
+      setState(() => _focusBurstActive = false);
+    });
   }
 
   KeyEventResult _onLongPress(BuildContext context, LogicalKeyboardKey? key) {
@@ -1074,6 +1210,9 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
   double _lerpDouble(double from, double to, double t) =>
       from + ((to - from) * t.clamp(0.0, 1.0));
+
+  String get _focusRegistryId =>
+      widget.focusId ?? widget.application.packageName;
 }
 
 class _AppCardLayout {

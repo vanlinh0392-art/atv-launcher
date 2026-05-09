@@ -35,6 +35,7 @@ class CategoryRow extends StatelessWidget {
   final Category category;
   final List<App> applications;
   final bool autofocusFirstItem;
+  final Set<String> eagerImagePackageNames;
   final double rowSpacing;
   final void Function(
     String categoryName,
@@ -48,6 +49,7 @@ class CategoryRow extends StatelessWidget {
     required this.category,
     required this.applications,
     this.autofocusFirstItem = false,
+    this.eagerImagePackageNames = const <String>{},
     this.rowSpacing = homeRowSpacingDefault,
     this.onApplicationFocused,
     this.onApplicationReorder,
@@ -91,20 +93,30 @@ class CategoryRow extends StatelessWidget {
                     alignment: Alignment.center,
                     child: AppCard(
                       key: Key(applications[index].packageName),
+                      focusId: _focusIdForPackage(
+                        applications[index].packageName,
+                      ),
                       category: category,
                       application: applications[index],
                       autofocus: autofocusFirstItem && index == 0,
-                      onFocused: (itemContext) => onApplicationFocused?.call(
-                        category.name,
-                        itemContext,
-                        index ~/ category.columnsCount,
-                      ),
+                      eagerImageLoad: eagerImagePackageNames
+                          .contains(applications[index].packageName),
+                      onFocused: (itemContext) {
+                        _prefetchAround(context, index);
+                        onApplicationFocused?.call(
+                          category.name,
+                          itemContext,
+                          index ~/ category.columnsCount,
+                        );
+                      },
                       onMoveStart: (itemContext) =>
                           _onMoveStart(context, itemContext),
                       onMove: (itemContext, direction) =>
                           _onMove(context, itemContext, direction, index),
                       onMoveEnd: (itemContext, committed) =>
                           _onMoveEnd(context, itemContext, committed),
+                      onNavigate: (direction) =>
+                          _onNavigate(context, direction, index),
                     ),
                   ),
                 ),
@@ -126,6 +138,71 @@ class CategoryRow extends StatelessWidget {
 
   static String _slotKeyForPackage(String packageName) =>
       '$_slotKeyPrefix$packageName';
+
+  String _focusIdForPackage(String packageName) =>
+      'category:${category.id}:$packageName';
+
+  bool _onNavigate(
+    BuildContext context,
+    AxisDirection direction,
+    int index,
+  ) {
+    final targetIndex = _targetIndexForDirection(direction, index);
+    if (targetIndex == null) {
+      return false;
+    }
+    final targetPackageName = applications[targetIndex].packageName;
+    AppCard.prefetchAppImages(
+      context,
+      [targetPackageName],
+      priority: true,
+    );
+    _prefetchAround(context, targetIndex);
+    return AppCard.requestFocusForId(_focusIdForPackage(targetPackageName));
+  }
+
+  int? _targetIndexForDirection(AxisDirection direction, int index) {
+    final columnsCount = category.columnsCount;
+    if (columnsCount <= 0 || index < 0 || index >= applications.length) {
+      return null;
+    }
+    final column = index % columnsCount;
+    final row = index ~/ columnsCount;
+    final lastRow = (applications.length - 1) ~/ columnsCount;
+
+    switch (direction) {
+      case AxisDirection.left:
+        return column > 0 ? index - 1 : null;
+      case AxisDirection.right:
+        return column < columnsCount - 1 && index < applications.length - 1
+            ? index + 1
+            : null;
+      case AxisDirection.up:
+        return row > 0 ? index - columnsCount : null;
+      case AxisDirection.down:
+        return row < lastRow
+            ? min(index + columnsCount, applications.length - 1)
+            : null;
+    }
+  }
+
+  void _prefetchAround(BuildContext context, int index) {
+    final indexes = <int>{
+      index - 1,
+      index + 1,
+      index - category.columnsCount,
+      index + category.columnsCount,
+    }..removeWhere(
+        (candidate) => candidate < 0 || candidate >= applications.length);
+    if (indexes.isEmpty) {
+      return;
+    }
+    AppCard.prefetchAppImages(
+      context,
+      indexes.map((candidate) => applications[candidate].packageName),
+      priority: false,
+    );
+  }
 
   bool _onMoveStart(BuildContext context, BuildContext itemContext) {
     final appsService = context.read<AppsService>();

@@ -1,10 +1,12 @@
 import 'package:flauncher/app_image_cache_invalidator.dart';
 import 'package:flauncher/app_card_highlight_palette.dart';
 import 'package:flauncher/models/app.dart';
+import 'package:flauncher/models/category.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/app_card.dart';
+import 'package:flauncher/widgets/category_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -742,6 +744,82 @@ void main() {
     expect(moveEndedCommitted, isTrue);
     expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
   });
+
+  testWidgets('category row navigates within the row by index before fallback',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final applications = [
+      fakeApp(packageName: 'dpad.index.first', name: 'Dpad First'),
+      fakeApp(packageName: 'dpad.index.second', name: 'Dpad Second'),
+    ];
+    final category = fakeCategory(columnsCount: 2, type: CategoryType.row)
+      ..applications.addAll(applications);
+
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+
+    await _pumpCategoryRowHarness(
+      tester,
+      settingsService: settingsService,
+      appsService: appsService,
+      category: category,
+      autofocusFirstItem: true,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('dpad.index.first'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('dpad.index.second'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('dpad.index.first'),
+    );
+  });
+
+  testWidgets('category row prefetches neighbor images around focused card',
+      (tester) async {
+    final settingsService = await _createSettingsService();
+    final appsService = MockAppsService();
+    _stubAppsServiceDefaults(appsService);
+    final applications = [
+      fakeApp(packageName: 'focus.prefetch.first', name: 'Prefetch First'),
+      fakeApp(packageName: 'focus.prefetch.second', name: 'Prefetch Second'),
+      fakeApp(packageName: 'focus.prefetch.third', name: 'Prefetch Third'),
+    ];
+    final category = fakeCategory(columnsCount: 2, type: CategoryType.row)
+      ..applications.addAll(applications);
+
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => Uint8List.fromList(kTransparentImage));
+
+    await _pumpCategoryRowHarness(
+      tester,
+      settingsService: settingsService,
+      appsService: appsService,
+      category: category,
+      autofocusFirstItem: true,
+    );
+    await tester.pumpAndSettle();
+
+    verify(appsService.getAppBanner('focus.prefetch.first')).called(1);
+    verify(appsService.getAppBanner('focus.prefetch.second')).called(1);
+    verify(appsService.getAppBanner('focus.prefetch.third')).called(1);
+  });
 }
 
 Future<SettingsService> _createSettingsService() async {
@@ -751,4 +829,36 @@ Future<SettingsService> _createSettingsService() async {
 
 void _stubAppsServiceDefaults(MockAppsService appsService) {
   when(appsService.homeReorderModeEnabled).thenReturn(false);
+}
+
+Future<void> _pumpCategoryRowHarness(
+  WidgetTester tester, {
+  required SettingsService settingsService,
+  required MockAppsService appsService,
+  required Category category,
+  required bool autofocusFirstItem,
+}) async {
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        Provider<ProfileSecurityService?>.value(value: null),
+        ListenableProvider<AppsService>.value(value: appsService),
+        ChangeNotifierProvider<SettingsService>.value(value: settingsService),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: SizedBox(
+            width: 480,
+            child: CategoryRow(
+              category: category,
+              applications: category.applications,
+              autofocusFirstItem: autofocusFirstItem,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

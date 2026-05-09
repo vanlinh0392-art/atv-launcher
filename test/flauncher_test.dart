@@ -832,6 +832,76 @@ void main() {
     }
   });
 
+  testWidgets('screen wake eagerly reloads visible app images without delay',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Wake Warmup',
+      order: 0,
+      type: CategoryType.row,
+      columnsCount: 3,
+    );
+    category.applications.addAll(
+      List.generate(
+        9,
+        (index) => fakeApp(
+          packageName: 'wake.warmup.app.$index',
+          name: 'Wake Warmup App $index',
+        ),
+      ),
+    );
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockRowsPreset(4);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+      navigationStatus: const <String, dynamic>{
+        'homeSequence': 7,
+        'reason': 'screen_wake',
+      },
+    );
+    await tester.pump();
+
+    verify(appsService.getAppBanner('wake.warmup.app.0')).called(1);
+    verify(appsService.getAppBanner('wake.warmup.app.5')).called(1);
+    verifyNever(appsService.getAppBanner('wake.warmup.app.8'));
+  });
+
   testWidgets(
       'long press on home opens app management menu when reorder mode is off',
       (tester) async {
@@ -1133,6 +1203,7 @@ Future<void> _pumpLauncher(
   required SystemBridgeService bridgeService,
   required FLauncherChannel channel,
   SettingsService? settingsService,
+  Map<String, dynamic> navigationStatus = const <String, dynamic>{},
 }) async {
   final resolvedSettings = settingsService ?? await _createSettingsService();
   if (appsService is MockAppsService) {
@@ -1143,7 +1214,7 @@ Future<void> _pumpLauncher(
       'memory': <String, dynamic>{},
       'provisioning': <String, dynamic>{},
     });
-    when(bridgeService.navigationStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.navigationStatus).thenReturn(navigationStatus);
     when(bridgeService.memoryStatus).thenReturn(const <String, dynamic>{});
   }
 

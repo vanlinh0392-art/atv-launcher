@@ -5,6 +5,26 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-05-09 - Official release 2026.05.014 tối ưu độ mượt HOME và wake
+
+### Độ mượt HOME / D-pad
+
+- D-pad trong cùng row/grid dùng điều hướng theo index thay vì quét toàn bộ focus tree, giảm độ trễ khi bấm nhanh qua nhiều app.
+- Khi người dùng bấm D-pad liên tục, card tạm dùng highlight nhẹ/static để giảm spike GPU từ hiệu ứng pulse/glow, sau khi dừng sẽ tự trả lại hiệu ứng đầy đủ.
+- App card prefetch ảnh các app lân cận quanh vị trí focus để giảm tình trạng icon/banner trễ khi di chuyển.
+
+### Quay lại HOME và sleep/wake
+
+- Khi quay lại HOME từ app khác, launcher eager-load ảnh app vùng đầu dock ngay thay vì chờ deferred image load.
+- Khi TV ngủ dậy, native emit tín hiệu `screen_wake` có debounce để Flutter warm lại ảnh app vùng đang nhìn thấy, tránh HOME hiện placeholder quá lâu.
+- Giữ giới hạn concurrency/cache ảnh hiện tại để cải thiện cảm giác mượt nhưng không tăng tải RAM/CPU quá mức.
+
+### Kiểm chứng
+
+- `flutter analyze --no-pub`: pass.
+- `flutter test --no-pub`: pass toàn bộ suite.
+- `flutter build apk --debug --target-platform android-arm --no-pub`: pass native compile.
+
 ## 2026-05-09 - Official release 2026.05.013 sửa chữ ký update debug
 
 ### Cập nhật và chữ ký APK

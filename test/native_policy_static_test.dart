@@ -109,6 +109,19 @@ void main() {
     expect(controller, isNot(contains('Log.i(TAG, "wallpaper_wake_rearm')));
   });
 
+  test('screen wake emits a debounced HOME navigation signal for image warmup',
+      () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
+
+    expect(mainActivity, contains('lastWakeNavigationAtElapsedMs'));
+    expect(mainActivity, contains('recordWakeHomeNavigation()'));
+    expect(mainActivity, contains('recordHomeNavigation("screen_wake")'));
+    expect(
+        mainActivity, contains('now - lastWakeNavigationAtElapsedMs < 1500L'));
+  });
+
   test('launcher app query failures are logged instead of ignored', () {
     final mainActivity = File(
       'android/app/src/main/java/com/atv/launcher/MainActivity.java',
