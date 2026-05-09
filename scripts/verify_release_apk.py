@@ -270,7 +270,10 @@ def inspect_signer_info(apk_path: Path) -> dict[str, Any]:
         combined_output = "\n".join(
             part for part in [completed.stdout, completed.stderr] if part
         )
-        if completed.returncode == 0 and "certificate SHA-256 digest" in combined_output:
+        if (
+            completed.returncode == 0
+            and re.search(r"certificate SHA-256 digest", combined_output, re.IGNORECASE)
+        ):
             output = combined_output
             tool = " ".join(command)
             break
@@ -285,8 +288,9 @@ def inspect_signer_info(apk_path: Path) -> dict[str, Any]:
         )
 
     digest_match = re.search(
-        r"Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]+)",
+        r"certificate SHA-256 digest(?:[^:\n]*)?:\s*([0-9a-fA-F:]+)",
         output,
+        re.IGNORECASE,
     )
     dn_match = re.search(r"Signer #1 certificate DN:\s*(.+)", output)
     return {
