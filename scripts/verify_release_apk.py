@@ -248,28 +248,49 @@ def inspect_packaged_abis(apk_path: Path) -> list[str]:
 
 
 def inspect_signer_info(apk_path: Path) -> dict[str, Any]:
-    apksigner_path = find_apksigner()
-    if apksigner_path is None:
+    apksigner_commands = find_apksigner_commands()
+    if not apksigner_commands:
         raise RuntimeError(
             "Could not find Android build-tools apksigner. "
             "Set ANDROID_HOME/ANDROID_SDK_ROOT or add apksigner to PATH.",
         )
-    completed = subprocess.run(
-        [str(apksigner_path), "verify", "--print-certs", str(apk_path)],
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    output = completed.stdout
+
+    errors: list[str] = []
+    output = ""
+    tool = ""
+    for command in apksigner_commands:
+        completed = subprocess.run(
+            command + ["verify", "--print-certs", str(apk_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        combined_output = "\n".join(
+            part for part in [completed.stdout, completed.stderr] if part
+        )
+        if completed.returncode == 0 and "certificate SHA-256 digest" in combined_output:
+            output = combined_output
+            tool = " ".join(command)
+            break
+        errors.append(
+            f"{' '.join(command)} exited {completed.returncode}: "
+            f"{combined_output.strip()[:500]}",
+        )
+    else:
+        raise RuntimeError(
+            "Could not inspect APK signer certificate. Attempts: "
+            + " | ".join(errors),
+        )
+
     digest_match = re.search(
         r"Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]+)",
         output,
     )
     dn_match = re.search(r"Signer #1 certificate DN:\s*(.+)", output)
     return {
-        "tool": str(apksigner_path),
+        "tool": tool,
         "dn": dn_match.group(1).strip() if dn_match else None,
         "sha256Digest": (
             digest_match.group(1).replace(":", "").lower()
@@ -305,21 +326,23 @@ def find_aapt() -> Path | None:
     return None
 
 
-def find_apksigner() -> Path | None:
+def find_apksigner_commands() -> list[list[str]]:
+    commands: list[list[str]] = []
+
     direct = shutil.which("apksigner")
     if direct:
-        return Path(direct)
+        commands.append([str(Path(direct))])
     direct_bat = shutil.which("apksigner.bat")
     if direct_bat:
-        return Path(direct_bat)
+        commands.append([str(Path(direct_bat))])
 
     sdk_root = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
     if not sdk_root:
-        return None
+        return commands
 
     build_tools_dir = Path(sdk_root) / "build-tools"
     if not build_tools_dir.is_dir():
-        return None
+        return commands
 
     candidates: list[Path] = []
     for child in build_tools_dir.iterdir():
@@ -327,11 +350,25 @@ def find_apksigner() -> Path | None:
             continue
         candidates.append(child / "apksigner")
         candidates.append(child / "apksigner.bat")
+        candidates.append(child / "lib" / "apksigner.jar")
 
     for candidate in sorted(candidates, reverse=True):
-        if candidate.is_file():
-            return candidate
-    return None
+        if not candidate.is_file():
+            continue
+        if candidate.suffix == ".jar":
+            java = shutil.which("java")
+            if java:
+                commands.append(
+                    [
+                        str(Path(java)),
+                        "-cp",
+                        str(candidate),
+                        "com.android.apksigner.ApkSignerTool",
+                    ],
+                )
+        else:
+            commands.append([str(candidate)])
+    return commands
 
 
 def read_pubspec_version(pubspec_path: Path) -> str:
