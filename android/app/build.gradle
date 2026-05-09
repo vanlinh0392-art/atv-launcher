@@ -52,6 +52,18 @@ def hasReleaseSigningCredentials =
         secretProperties['signing_key_password'] != 'null' &&
         secretProperties['signing_key_alias'] &&
         secretProperties['signing_key_alias'] != 'null'
+def bundledDebugReleaseKeystoreFile = file("upload-keystore.jks")
+def forceDebugReleaseSigning =
+        (project.findProperty('forceDebugReleaseSigning')
+                ?: System.getenv('FLAUNCHER_FORCE_DEBUG_RELEASE_SIGNING')
+                ?: 'true')
+                .toString()
+                .toBoolean()
+if (forceDebugReleaseSigning && !bundledDebugReleaseKeystoreFile.exists()) {
+    throw new GradleException(
+            "Release debug signing is forced, but android/app/upload-keystore.jks is missing."
+    )
+}
 
 def configuredReleaseAbis = []
 def flutterTargetPlatforms = project.findProperty('target-platform')
@@ -92,6 +104,12 @@ android {
 
     signingConfigs {
         debug {}
+        debugRelease {
+            storeFile bundledDebugReleaseKeystoreFile
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
         release {
             storeFile file("upload-keystore.jks")
             storePassword "${secretProperties['signing_keystore_password']}"
@@ -108,7 +126,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig hasReleaseSigningCredentials
+            signingConfig forceDebugReleaseSigning && bundledDebugReleaseKeystoreFile.exists()
+                    ? signingConfigs.debugRelease
+                    : hasReleaseSigningCredentials
                     ? signingConfigs.release
                     : signingConfigs.debug
         }

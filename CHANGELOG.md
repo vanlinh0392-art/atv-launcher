@@ -5,6 +5,19 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-05-09 - Official release 2026.05.013 sửa chữ ký update debug
+
+### Cập nhật và chữ ký APK
+
+- Release APK giờ dùng cố định debug signing certificate cùng khóa với máy build local hiện tại để tránh lỗi update `-7` do mismatch chữ ký.
+- Workflow GitHub Actions được khóa bằng `FLAUNCHER_FORCE_DEBUG_RELEASE_SIGNING=true`, không để runner tự sinh debug keystore riêng.
+- Bộ verify release kiểm tra thêm SHA-256 của signer certificate: `BB:22:B0:A3:9E:C2:67:E8:9E:FE:32:4E:99:68:08:91:E3:5A:73:F7:35:B5:4B:54:9A:BB:79:66:D7:24:D9:63`.
+
+### Kiểm chứng
+
+- Thêm test tĩnh khóa policy signing debug cho release official.
+- Build release cần tiếp tục publish đúng 2 asset `atv-launcher-armeabi-v7a-release.apk` và `atv-launcher-arm64-v8a-release.apk`.
+
 ## 2026-05-09 - Official release 2026.05.012 tối ưu ổn định, bảo mật và log release
 
 ### Bảo mật và provisioning

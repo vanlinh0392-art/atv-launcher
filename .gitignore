@@ -46,7 +46,8 @@ app.*.map.json
 /android/app/release
 
 android/app/google-services.json
-android/app/upload-keystore.jks
+# This fork intentionally tracks android/app/upload-keystore.jks because
+# official releases must keep the same debug certificate as local debug builds.
 coverage/
 tmp_verify/
 __pycache__/

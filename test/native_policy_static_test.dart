@@ -20,6 +20,26 @@ void main() {
     expect(manifest, contains('android:fullBackupContent="false"'));
   });
 
+  test('official release uses the bundled local debug signing certificate', () {
+    final appBuild = File('android/app/build.gradle').readAsStringSync();
+    final workflow =
+        File('.github/workflows/continuous-release.yml').readAsStringSync();
+    final verifier = File('scripts/verify_release_apk.py').readAsStringSync();
+
+    expect(appBuild, contains('forceDebugReleaseSigning'));
+    expect(appBuild, contains('bundledDebugReleaseKeystoreFile'));
+    expect(appBuild, contains('signingConfigs.debugRelease'));
+    expect(appBuild, contains('storePassword "android"'));
+    expect(appBuild, contains('keyAlias "androiddebugkey"'));
+    expect(workflow, contains('FLAUNCHER_FORCE_DEBUG_RELEASE_SIGNING: "true"'));
+    expect(
+      verifier,
+      contains(
+        'bb22b0a39ec267e89efe324e99680891e35a73f735b54b549abb7966d724d963',
+      ),
+    );
+  });
+
   test('default ADB provisioning does not auto-whitelist battery optimization',
       () {
     final mainActivity = File(

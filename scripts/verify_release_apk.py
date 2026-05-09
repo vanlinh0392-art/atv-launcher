@@ -20,6 +20,9 @@ OFFICIAL_RELEASE_ASSET_NAMES = {
     "atv-launcher-armeabi-v7a-release.apk",
     "atv-launcher-arm64-v8a-release.apk",
 }
+OFFICIAL_RELEASE_SIGNER_SHA256 = (
+    "bb22b0a39ec267e89efe324e99680891e35a73f735b54b549abb7966d724d963"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,6 +39,11 @@ def parse_args() -> argparse.Namespace:
         "--expected-package",
         default="com.atv.launcher",
         help="Expected Android package name.",
+    )
+    parser.add_argument(
+        "--expected-signer-sha256",
+        default=OFFICIAL_RELEASE_SIGNER_SHA256,
+        help="Expected APK signer certificate SHA-256 digest.",
     )
     parser.add_argument(
         "--pubspec",
@@ -70,6 +78,7 @@ def main() -> int:
             apk_path=Path(args.apk),
             expected_abi=args.expected_abi,
             expected_package=args.expected_package,
+            expected_signer_sha256=args.expected_signer_sha256,
             expected_version=expected_version,
         )
         report["apk"] = apk_report
@@ -103,6 +112,7 @@ def verify_apk(
     apk_path: Path,
     expected_abi: str | None,
     expected_package: str,
+    expected_signer_sha256: str | None,
     expected_version: str,
 ) -> tuple[dict[str, Any], list[str]]:
     report: dict[str, Any] = {
@@ -144,6 +154,17 @@ def verify_apk(
             failures.append(
                 f"{apk_path.name} aapt native-code mismatch: "
                 f"expected only {expected_abi}, got {native_code}",
+            )
+
+    signer_info = inspect_signer_info(apk_path)
+    report["signerInfo"] = signer_info
+    if expected_signer_sha256:
+        actual_digest = (signer_info.get("sha256Digest") or "").lower()
+        expected_digest = expected_signer_sha256.replace(":", "").lower()
+        if actual_digest != expected_digest:
+            failures.append(
+                f"{apk_path.name} signer mismatch: expected SHA-256 "
+                f"{expected_digest}, got {actual_digest or 'unknown'}",
             )
 
     return report, failures
@@ -226,6 +247,38 @@ def inspect_packaged_abis(apk_path: Path) -> list[str]:
     return sorted(abis)
 
 
+def inspect_signer_info(apk_path: Path) -> dict[str, Any]:
+    apksigner_path = find_apksigner()
+    if apksigner_path is None:
+        raise RuntimeError(
+            "Could not find Android build-tools apksigner. "
+            "Set ANDROID_HOME/ANDROID_SDK_ROOT or add apksigner to PATH.",
+        )
+    completed = subprocess.run(
+        [str(apksigner_path), "verify", "--print-certs", str(apk_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    output = completed.stdout
+    digest_match = re.search(
+        r"Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]+)",
+        output,
+    )
+    dn_match = re.search(r"Signer #1 certificate DN:\s*(.+)", output)
+    return {
+        "tool": str(apksigner_path),
+        "dn": dn_match.group(1).strip() if dn_match else None,
+        "sha256Digest": (
+            digest_match.group(1).replace(":", "").lower()
+            if digest_match
+            else None
+        ),
+    }
+
+
 def find_aapt() -> Path | None:
     direct = shutil.which("aapt")
     if direct:
@@ -245,6 +298,35 @@ def find_aapt() -> Path | None:
             continue
         candidates.append(child / "aapt")
         candidates.append(child / "aapt.exe")
+
+    for candidate in sorted(candidates, reverse=True):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def find_apksigner() -> Path | None:
+    direct = shutil.which("apksigner")
+    if direct:
+        return Path(direct)
+    direct_bat = shutil.which("apksigner.bat")
+    if direct_bat:
+        return Path(direct_bat)
+
+    sdk_root = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+    if not sdk_root:
+        return None
+
+    build_tools_dir = Path(sdk_root) / "build-tools"
+    if not build_tools_dir.is_dir():
+        return None
+
+    candidates: list[Path] = []
+    for child in build_tools_dir.iterdir():
+        if not child.is_dir():
+            continue
+        candidates.append(child / "apksigner")
+        candidates.append(child / "apksigner.bat")
 
     for candidate in sorted(candidates, reverse=True):
         if candidate.is_file():

@@ -11,6 +11,7 @@ permissions:
 
 env:
   LAUNCHER_UPDATE_CHANNEL: atv-launcher-official
+  FLAUNCHER_FORCE_DEBUG_RELEASE_SIGNING: "true"
 
 jobs:
   build-release:
@@ -182,6 +183,7 @@ jobs:
               "- `atv-launcher-arm64-v8a-release.apk`",
               "",
               "Updater-Channel: atv-launcher-official",
+              "Release-Signing: debug cert BB:22:B0:A3:9E:C2:67:E8:9E:FE:32:4E:99:68:08:91:E3:5A:73:F7:35:B5:4B:54:9A:BB:79:66:D7:24:D9:63",
               "Launcher updater chi nhan official release va bo qua debug build.",
           ]
           Path("build/release_notes.md").write_text(
