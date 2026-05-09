@@ -5,6 +5,20 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-05-09 - Official release 2026.05.015 sửa điều hướng dock thu gọn
+
+### Điều hướng D-pad HOME
+
+- Sửa lỗi khi dock đang thu gọn, bấm D-pad xuống không tự mở rộng dock và không chuyển focus xuống app ở hàng dưới.
+- Sửa lỗi đôi khi đang focus app trong dock không thể bấm D-pad lên thanh trạng thái/AppBar.
+- Giữ ưu tiên điều hướng nội bộ trong dock khi còn app/hàng phía trên hoặc phía dưới; chỉ nhả focus lên thanh trạng thái khi đã ở mép trên dock.
+
+### Kiểm chứng
+
+- Thêm regression test cho `DPAD_DOWN` mở dock thu gọn trước khi focus xuống app cùng category.
+- Thêm regression test cho `DPAD_UP` từ app đầu dock lên thanh trạng thái.
+- `flutter test --no-pub test/flauncher_test.dart`: pass.
+
 ## 2026-05-09 - Official release 2026.05.014 tối ưu độ mượt HOME và wake
 
 ### Độ mượt HOME / D-pad

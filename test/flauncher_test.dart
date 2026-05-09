@@ -587,6 +587,146 @@ void main() {
     expect(find.text('Category 1'), findsOneWidget);
   });
 
+  testWidgets(
+      'DPAD down expands collapsed dock before same-category focus move',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Collapsed Grid',
+      order: 0,
+      type: CategoryType.row,
+      columnsCount: 3,
+    );
+    category.applications.addAll(
+      List.generate(
+        9,
+        (index) => fakeApp(
+          packageName: 'collapsed.grid.app.$index',
+          name: 'Collapsed Grid App $index',
+        ),
+      ),
+    );
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setShowCategoryTitles(true);
+    await settingsService.setHomeDockRowsPreset(3);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    final dockFinder = find.byKey(const Key('home_bottom_dock'));
+    final collapsedHeight = tester.getSize(dockFinder).height;
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 420));
+
+    expect(tester.getSize(dockFinder).height, greaterThan(collapsedHeight));
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('collapsed.grid.app.3'),
+    );
+  });
+
+  testWidgets('DPAD up from dock top moves focus to status bar',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final category = fakeCategory(
+      name: 'Top Exit',
+      order: 0,
+      type: CategoryType.row,
+    );
+    category.applications.add(
+      fakeApp(packageName: 'top.exit.app.0', name: 'Top Exit App 0'),
+    );
+
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([category]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await settingsService.setHomeDockAutoCollapseEnabled(true);
+    await settingsService.setHomeDockCollapsedRowsPreset(1);
+    await settingsService.setHomeDockRowsPreset(3);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      contains('top.exit.app.0'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+
+    expect(_primaryFocusIsDescendantOf(tester, find.byType(AppBar)), isTrue);
+  });
+
   testWidgets('dock collapse resets scroll to top and focus back to first app',
       (tester) async {
     _prepareView(tester);
@@ -1194,6 +1334,26 @@ void _expectCardNearDockCenter(WidgetTester tester, Key appKey) {
     distanceFromCenter,
     lessThanOrEqualTo(cardRect.height + 40),
   );
+}
+
+bool _primaryFocusIsDescendantOf(WidgetTester tester, Finder finder) {
+  final targetElement = tester.element(finder);
+  final focusedContext = tester.binding.focusManager.primaryFocus?.context;
+  if (focusedContext == null) {
+    return false;
+  }
+  if (focusedContext == targetElement) {
+    return true;
+  }
+  var found = false;
+  focusedContext.visitAncestorElements((element) {
+    if (element == targetElement) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
 }
 
 Future<void> _pumpLauncher(

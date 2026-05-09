@@ -35,6 +35,7 @@ class AppsGrid extends StatelessWidget {
   final Category category;
   final List<App> applications;
   final bool autofocusFirstItem;
+  final bool deferVerticalNavigationToParent;
   final Set<String> eagerImagePackageNames;
   final double rowSpacing;
   final void Function(
@@ -49,6 +50,7 @@ class AppsGrid extends StatelessWidget {
     required this.category,
     required this.applications,
     this.autofocusFirstItem = false,
+    this.deferVerticalNavigationToParent = false,
     this.eagerImagePackageNames = const <String>{},
     this.rowSpacing = homeRowSpacingDefault,
     this.onApplicationFocused,
@@ -147,6 +149,10 @@ class AppsGrid extends StatelessWidget {
     AxisDirection direction,
     int index,
   ) {
+    if (deferVerticalNavigationToParent &&
+        (direction == AxisDirection.up || direction == AxisDirection.down)) {
+      return false;
+    }
     final targetIndex = _targetIndexForDirection(direction, index);
     if (targetIndex == null) {
       return false;

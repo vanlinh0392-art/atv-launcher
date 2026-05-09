@@ -679,6 +679,8 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             category: category,
             applications: category.applications,
             autofocusFirstItem: shouldAutofocus,
+            deferVerticalNavigationToParent:
+                widget.autoCollapseEnabled && _collapsed,
             eagerImagePackageNames: eagerImagePackageNames,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
@@ -689,6 +691,8 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
             category: category,
             applications: category.applications,
             autofocusFirstItem: shouldAutofocus,
+            deferVerticalNavigationToParent:
+                widget.autoCollapseEnabled && _collapsed,
             eagerImagePackageNames: eagerImagePackageNames,
             rowSpacing: widget.rowSpacing,
             onApplicationFocused: onFocused,
@@ -755,8 +759,16 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     if (direction != null &&
         (direction == TraversalDirection.up ||
             direction == TraversalDirection.down)) {
-      _expandForInteraction();
+      final expanded = _expandForInteraction();
       if (_moveFocusWithinDock(direction)) {
+        return KeyEventResult.handled;
+      }
+      if (direction == TraversalDirection.up &&
+          _moveFocusOutOfDock(direction)) {
+        return KeyEventResult.handled;
+      }
+      if (expanded) {
+        _moveFocusAfterDockExpansion(direction);
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -970,7 +982,7 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     }
   }
 
-  void _expandForInteraction() {
+  bool _expandForInteraction() {
     _collapseTimer?.cancel();
     final shouldExpand = widget.autoCollapseEnabled && _collapsed;
 
@@ -991,6 +1003,31 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
         !_reorderModeActive) {
       _scheduleCollapse();
     }
+    return shouldExpand;
+  }
+
+  void _moveFocusAfterDockExpansion(TraversalDirection direction) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _collapsed) {
+        return;
+      }
+      _invalidateDockTraversalCache();
+      _moveFocusWithinDock(direction);
+    });
+  }
+
+  bool _moveFocusOutOfDock(TraversalDirection direction) {
+    final current = FocusManager.instance.primaryFocus;
+    final dockContext = _dockListKey.currentContext;
+    final currentContext = current?.context;
+    if (current == null ||
+        currentContext == null ||
+        dockContext == null ||
+        !_isDockDescendant(currentContext, dockContext)) {
+      return false;
+    }
+    final moved = current.focusInDirection(direction);
+    return moved && !identical(FocusManager.instance.primaryFocus, current);
   }
 
   void _scheduleCollapse() {
