@@ -85,6 +85,20 @@ void main() {
         densityController, isNot(contains('Log.i(TAG, "Local ADB attempt ')));
   });
 
+  test('MapVoice accessibility service runs in the launcher process', () {
+    final manifest =
+        File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    final serviceBlock = _xmlBlock(
+      manifest,
+      'android:name="com.atv.launcher.systembridge.shared.access.VoiceBridgeAccessibilityService"',
+      '</service>',
+    );
+
+    expect(serviceBlock,
+        contains('android.permission.BIND_ACCESSIBILITY_SERVICE'));
+    expect(serviceBlock, isNot(contains('android:process=')));
+  });
+
   test('legacy activity result flow has explicit deprecation suppression', () {
     final mainActivity = File(
       'android/app/src/main/java/com/atv/launcher/MainActivity.java',
@@ -253,6 +267,17 @@ String _methodBody(String source, String startToken, String endToken) {
   final end = source.indexOf(endToken, start);
   expect(start, greaterThanOrEqualTo(0),
       reason: 'Missing start token: $startToken');
+  expect(end, greaterThanOrEqualTo(0), reason: 'Missing end token: $endToken');
+  return source.substring(start, end);
+}
+
+String _xmlBlock(String source, String token, String endToken) {
+  final tokenIndex = source.indexOf(token);
+  expect(tokenIndex, greaterThanOrEqualTo(0), reason: 'Missing token: $token');
+  final start = source.lastIndexOf('<service', tokenIndex);
+  final end = source.indexOf(endToken, tokenIndex);
+  expect(start, greaterThanOrEqualTo(0),
+      reason: 'Missing service start for: $token');
   expect(end, greaterThanOrEqualTo(0), reason: 'Missing end token: $endToken');
   return source.substring(start, end);
 }
