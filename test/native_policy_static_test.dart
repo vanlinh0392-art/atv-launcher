@@ -40,6 +40,28 @@ void main() {
     );
   });
 
+  test('release ABI split follows the Flutter split-per-abi flag', () {
+    final appBuild = File('android/app/build.gradle').readAsStringSync();
+    final workflow =
+        File('.github/workflows/continuous-release.yml').readAsStringSync();
+
+    expect(appBuild, contains("project.findProperty('split-per-abi')"));
+    expect(appBuild, contains('enable splitPerAbi'));
+    expect(appBuild, isNot(contains('it.contains("assembleRelease")')));
+    expect(
+      workflow,
+      contains(
+        'flutter build apk --release --target-platform android-arm --split-per-abi --no-pub',
+      ),
+    );
+    expect(
+      workflow,
+      contains(
+        'flutter build apk --release --target-platform android-arm64 --split-per-abi --no-pub',
+      ),
+    );
+  });
+
   test('default ADB provisioning does not auto-whitelist battery optimization',
       () {
     final mainActivity = File(
@@ -85,7 +107,7 @@ void main() {
         densityController, isNot(contains('Log.i(TAG, "Local ADB attempt ')));
   });
 
-  test('MapVoice accessibility service runs in the launcher process', () {
+  test('MapVoice accessibility service mirrors standalone process policy', () {
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     final serviceBlock = _xmlBlock(
@@ -96,7 +118,22 @@ void main() {
 
     expect(serviceBlock,
         contains('android.permission.BIND_ACCESSIBILITY_SERVICE'));
-    expect(serviceBlock, isNot(contains('android:process=')));
+    expect(serviceBlock, contains('android:process=":acc"'));
+  });
+
+  test('MapVoice key interception mirrors standalone behavior', () {
+    final service = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/shared/access/VoiceBridgeAccessibilityService.java',
+    ).readAsStringSync();
+    final launcher = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/shared/voice/VoiceSearchLauncher.java',
+    ).readAsStringSync();
+
+    expect(service, isNot(contains('isVoiceInterceptEnabled')));
+    expect(launcher, contains('new Intent("android.speech.action.WEB_SEARCH")'));
+    expect(launcher, contains('new Intent(Intent.ACTION_ASSIST)'));
+    expect(launcher, contains('new Intent(Intent.ACTION_VOICE_COMMAND)'));
+    expect(launcher, isNot(contains('setComponent(')));
   });
 
   test('legacy activity result flow has explicit deprecation suppression', () {

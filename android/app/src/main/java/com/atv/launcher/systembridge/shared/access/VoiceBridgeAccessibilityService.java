@@ -51,10 +51,6 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
             return true;
         }
 
-        if (!BridgeStateStore.isVoiceInterceptEnabled(this)) {
-            return super.onKeyEvent(event);
-        }
-
         if (!matchesConfiguredKey(keyCode)) {
             return super.onKeyEvent(event);
         }

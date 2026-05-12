@@ -59,6 +59,16 @@ def forceDebugReleaseSigning =
                 ?: 'true')
                 .toString()
                 .toBoolean()
+def fastDebugSignedRelease =
+        (project.findProperty('fastDebugSignedRelease')
+                ?: System.getenv('FLAUNCHER_FAST_DEBUG_SIGNED_RELEASE')
+                ?: 'false')
+                .toString()
+                .toBoolean()
+def splitPerAbi =
+        (project.findProperty('split-per-abi') ?: 'false')
+                .toString()
+                .toBoolean()
 if (forceDebugReleaseSigning && !bundledDebugReleaseKeystoreFile.exists()) {
     throw new GradleException(
             "Release debug signing is forced, but android/app/upload-keystore.jks is missing."
@@ -85,10 +95,12 @@ if (configuredReleaseAbis.isEmpty()) {
     configuredReleaseAbis << (project.findProperty('releaseAbi') ?: 'armeabi-v7a')
 }
 def buildUniversalReleaseApk =
-        configuredReleaseAbis.size() > 1 ||
-        (project.findProperty('releaseUniversalApk') ?: 'false')
-                .toString()
-                .toBoolean()
+        splitPerAbi && (
+                configuredReleaseAbis.size() > 1 ||
+                        (project.findProperty('releaseUniversalApk') ?: 'false')
+                                .toString()
+                                .toBoolean()
+        )
 
 android {
     namespace 'com.atv.launcher'
@@ -123,8 +135,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled !fastDebugSignedRelease
+            shrinkResources !fastDebugSignedRelease
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             signingConfig forceDebugReleaseSigning && bundledDebugReleaseKeystoreFile.exists()
                     ? signingConfigs.debugRelease
@@ -136,8 +148,7 @@ android {
 
     splits {
         abi {
-            // https://stackoverflow.com/a/39950584/21037183
-            enable gradle.startParameter.taskNames.any { it.contains("assembleRelease") }
+            enable splitPerAbi
             reset()
             include(*configuredReleaseAbis)
             universalApk buildUniversalReleaseApk

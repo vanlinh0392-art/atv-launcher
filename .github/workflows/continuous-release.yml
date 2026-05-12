@@ -53,7 +53,7 @@ jobs:
           rm -f build/app/outputs/flutter-apk/*release*.apk || true
           rm -f build/app/outputs/apk/release/*release*.apk || true
           set +e
-          flutter build apk --release --target-platform android-arm --no-pub \
+          flutter build apk --release --target-platform android-arm --split-per-abi --no-pub \
             --dart-define=LAUNCHER_UPDATE_GITHUB_OWNER="${GITHUB_REPOSITORY_OWNER}" \
             --dart-define=LAUNCHER_UPDATE_GITHUB_REPO="${GITHUB_REPOSITORY#*/}" \
             --dart-define=LAUNCHER_UPDATE_CHANNEL="${LAUNCHER_UPDATE_CHANNEL}" \
@@ -95,7 +95,7 @@ jobs:
           rm -f build/app/outputs/flutter-apk/*release*.apk || true
           rm -f build/app/outputs/apk/release/*release*.apk || true
           set +e
-          flutter build apk --release --target-platform android-arm64 --no-pub \
+          flutter build apk --release --target-platform android-arm64 --split-per-abi --no-pub \
             --dart-define=LAUNCHER_UPDATE_GITHUB_OWNER="${GITHUB_REPOSITORY_OWNER}" \
             --dart-define=LAUNCHER_UPDATE_GITHUB_REPO="${GITHUB_REPOSITORY#*/}" \
             --dart-define=LAUNCHER_UPDATE_CHANNEL="${LAUNCHER_UPDATE_CHANNEL}" \
