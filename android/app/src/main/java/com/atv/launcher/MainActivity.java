@@ -64,6 +64,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
 import android.util.DisplayMetrics;
+import android.view.KeyEvent;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
@@ -76,6 +77,7 @@ import com.atv.launcher.systembridge.density.DensityBridge;
 import com.atv.launcher.systembridge.dns.PrivateDnsController;
 import com.atv.launcher.systembridge.shared.service.SystemBridgeCoordinator;
 import com.atv.launcher.systembridge.shared.state.BridgeStateStore;
+import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
 import com.atv.launcher.systembridge.shared.voice.VoiceSearchLauncher;
 import com.atv.launcher.systembridge.wallpaper.VideoLibraryController;
 import com.atv.launcher.systembridge.wallpaper.VideoWallpaperController;
@@ -119,6 +121,7 @@ import io.flutter.plugins.GeneratedPluginRegistrant;
 @SuppressWarnings("deprecation")
 public class MainActivity extends FlutterActivity {
     private static final String TAG = "FLauncherPerf";
+    private static final String VOICE_KEY_TAG = "LauncherVoiceKey";
     private static final boolean FAST_STARTUP_ENABLED = true;
     private static final String METHOD_CHANNEL = "com.atv.launcher/method";
     private static final String APPS_EVENT_CHANNEL = "com.atv.launcher/event_apps";
@@ -241,6 +244,8 @@ public class MainActivity extends FlutterActivity {
     private String pendingBackupExportContent = "";
     private String pendingBackupExportFileName = "atv-launcher-backup.json";
     private String pendingBackupImportMode = "import";
+    private final VoiceKeyHandler foregroundVoiceKeyHandler =
+            new VoiceKeyHandler(VOICE_KEY_TAG, "foreground");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -371,6 +376,7 @@ public class MainActivity extends FlutterActivity {
 
     @Override
     protected void onStop() {
+        foregroundVoiceKeyHandler.clearPendingActions();
         activityStarted = false;
         wakeRearmAllowedAfterStop = wakeRearmAllowedAfterStop
                 || !isDeviceInteractive()
@@ -408,6 +414,14 @@ public class MainActivity extends FlutterActivity {
             activeActivity = null;
         }
         super.onDestroy();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (foregroundVoiceKeyHandler.handle(this, event)) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     private void registerWallpaperWakeReceiver() {

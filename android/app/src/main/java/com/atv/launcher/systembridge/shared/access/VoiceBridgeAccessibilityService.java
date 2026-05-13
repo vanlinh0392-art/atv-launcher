@@ -6,28 +6,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
 import com.atv.launcher.systembridge.shared.service.SystemBridgeCoordinator;
 import com.atv.launcher.systembridge.shared.state.BridgeStateStore;
-import com.atv.launcher.systembridge.shared.voice.VoiceSearchLauncher;
+import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
 
 public class VoiceBridgeAccessibilityService extends AccessibilityService {
-    private static final long DOUBLE_CLICK_TIMEOUT_MS = 600L;
-    private static final long LONG_PRESS_TIMEOUT_MS = 600L;
-    private static final long SECOND_HOLD_TIMEOUT_MS = 600L;
+    private static final String TAG = "VoiceBridge";
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final VoiceKeyHandler voiceKeyHandler = new VoiceKeyHandler(TAG, "accessibility");
     private BroadcastReceiver wakeReceiver;
-    private int pressStage;
-    private boolean longPressTriggered;
-    private boolean secondHoldTriggered;
-    private Runnable longPressRunnable;
-    private Runnable secondHoldRunnable;
-    private Runnable resetRunnable;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -39,38 +30,15 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
-        int keyCode = event.getKeyCode();
-        int action = event.getAction();
-
-        if (BridgeStateStore.isLearningMode(this)) {
-            if (action != KeyEvent.ACTION_DOWN || event.getRepeatCount() != 0) {
-                return true;
-            }
-            BridgeStateStore.setKeyCode(this, keyCode);
-            BridgeStateStore.setLearningMode(this, false);
-            return true;
-        }
-
-        if (!matchesConfiguredKey(keyCode)) {
-            return super.onKeyEvent(event);
-        }
-
-        int mode = BridgeStateStore.getMode(this);
-        if (mode == BridgeStateStore.MODE_SINGLE) {
-            return handleSinglePress(event);
-        }
-        if (mode == BridgeStateStore.MODE_LONG) {
-            return handleLongPress(event);
-        }
-        if (mode == BridgeStateStore.MODE_DOUBLE_HOLD) {
-            return handleSecondPressHold(event);
-        }
-        return handleDoublePress(event);
+        return voiceKeyHandler.handle(this, event) || super.onKeyEvent(event);
     }
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        Log.i(TAG, "connected process=" + getPackageName()
+                + " key=" + BridgeStateStore.getKeyCode(this)
+                + " mode=" + BridgeStateStore.getMode(this));
         registerWakeReceiver();
         SystemBridgeCoordinator.startCore(this, "accessibility_connected");
         SystemBridgeCoordinator.scheduleWakeBackstop(this, "accessibility_connected");
@@ -78,7 +46,8 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
-        clearPendingActions();
+        Log.i(TAG, "destroyed");
+        voiceKeyHandler.clearPendingActions();
         unregisterWakeReceiver();
         SystemBridgeCoordinator.startCore(this, "accessibility_destroyed");
         super.onDestroy();
@@ -130,125 +99,6 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
         wakeReceiver = null;
     }
 
-    private boolean matchesConfiguredKey(int keyCode) {
-        int targetKeyCode = BridgeStateStore.getKeyCode(this);
-        if (targetKeyCode == BridgeStateStore.DEFAULT_KEY_CODE) {
-            return BridgeStateStore.isDefaultVoiceKeyCode(keyCode);
-        }
-        return keyCode == targetKeyCode;
-    }
-
-    private boolean handleSinglePress(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            launchVoice();
-        }
-        return true;
-    }
-
-    private boolean handleDoublePress(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            if (pressStage == 0) {
-                pressStage = 1;
-                scheduleReset();
-            } else if (pressStage == 1) {
-                cancelReset();
-                pressStage = 0;
-                launchVoice();
-            }
-            return true;
-        }
-        return true;
-    }
-
-    private boolean handleLongPress(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            cancelLongPress();
-            longPressTriggered = false;
-            longPressRunnable = () -> {
-                longPressTriggered = true;
-                launchVoice();
-            };
-            handler.postDelayed(longPressRunnable, LONG_PRESS_TIMEOUT_MS);
-            return true;
-        }
-        if (event.getAction() == KeyEvent.ACTION_UP) {
-            cancelLongPress();
-            longPressTriggered = false;
-        }
-        return true;
-    }
-
-    private boolean handleSecondPressHold(KeyEvent event) {
-        int action = event.getAction();
-        if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            if (pressStage == 0) {
-                pressStage = 1;
-                scheduleReset();
-            } else if (pressStage == 1) {
-                cancelReset();
-                pressStage = 2;
-                secondHoldTriggered = false;
-                secondHoldRunnable = () -> {
-                    secondHoldTriggered = true;
-                    pressStage = 0;
-                    launchVoice();
-                };
-                handler.postDelayed(secondHoldRunnable, SECOND_HOLD_TIMEOUT_MS);
-            }
-            return true;
-        }
-        if (action == KeyEvent.ACTION_UP) {
-            if (pressStage == 2) {
-                cancelSecondHold();
-                if (!secondHoldTriggered) {
-                    pressStage = 0;
-                }
-                secondHoldTriggered = false;
-            }
-            return true;
-        }
-        return true;
-    }
-
-    private void scheduleReset() {
-        cancelReset();
-        resetRunnable = () -> pressStage = 0;
-        handler.postDelayed(resetRunnable, DOUBLE_CLICK_TIMEOUT_MS);
-    }
-
-    private void cancelReset() {
-        if (resetRunnable != null) {
-            handler.removeCallbacks(resetRunnable);
-            resetRunnable = null;
-        }
-    }
-
-    private void cancelLongPress() {
-        if (longPressRunnable != null) {
-            handler.removeCallbacks(longPressRunnable);
-            longPressRunnable = null;
-        }
-    }
-
-    private void cancelSecondHold() {
-        if (secondHoldRunnable != null) {
-            handler.removeCallbacks(secondHoldRunnable);
-            secondHoldRunnable = null;
-        }
-    }
-
-    private void clearPendingActions() {
-        cancelReset();
-        cancelLongPress();
-        cancelSecondHold();
-        pressStage = 0;
-        longPressTriggered = false;
-        secondHoldTriggered = false;
-    }
-
-    private void launchVoice() {
-        VoiceSearchLauncher.launch(this);
-    }
 }
 
 

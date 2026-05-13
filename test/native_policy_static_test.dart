@@ -107,7 +107,7 @@ void main() {
         densityController, isNot(contains('Log.i(TAG, "Local ADB attempt ')));
   });
 
-  test('MapVoice accessibility service mirrors standalone process policy', () {
+  test('MapVoice accessibility service stays bindable on launcher ROMs', () {
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     final serviceBlock = _xmlBlock(
@@ -118,18 +118,33 @@ void main() {
 
     expect(serviceBlock,
         contains('android.permission.BIND_ACCESSIBILITY_SERVICE'));
-    expect(serviceBlock, contains('android:process=":acc"'));
+    expect(serviceBlock, isNot(contains('android:process=":acc"')));
   });
 
   test('MapVoice key interception mirrors standalone behavior', () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
     final service = File(
       'android/app/src/main/java/com/atv/launcher/systembridge/shared/access/VoiceBridgeAccessibilityService.java',
+    ).readAsStringSync();
+    final keyHandler = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/shared/voice/VoiceKeyHandler.java',
     ).readAsStringSync();
     final launcher = File(
       'android/app/src/main/java/com/atv/launcher/systembridge/shared/voice/VoiceSearchLauncher.java',
     ).readAsStringSync();
 
     expect(service, isNot(contains('isVoiceInterceptEnabled')));
+    expect(keyHandler, isNot(contains('isVoiceInterceptEnabled')));
+    expect(service, contains('private static final String TAG = "VoiceBridge"'));
+    expect(service, contains('new VoiceKeyHandler(TAG, "accessibility")'));
+    expect(mainActivity, contains('dispatchKeyEvent(KeyEvent event)'));
+    expect(mainActivity, contains('new VoiceKeyHandler(VOICE_KEY_TAG, "foreground")'));
+    expect(keyHandler, contains('matched_key code='));
+    expect(keyHandler, contains('launch_result success='));
+    expect(launcher, contains('private static final String TAG = "VoiceSearchLauncher"'));
+    expect(launcher, contains('start failed action='));
     expect(launcher, contains('new Intent("android.speech.action.WEB_SEARCH")'));
     expect(launcher, contains('new Intent(Intent.ACTION_ASSIST)'));
     expect(launcher, contains('new Intent(Intent.ACTION_VOICE_COMMAND)'));
