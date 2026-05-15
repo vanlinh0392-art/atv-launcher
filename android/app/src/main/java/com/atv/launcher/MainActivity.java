@@ -155,13 +155,13 @@ public class MainActivity extends FlutterActivity {
     private static final long LITE_PROVISIONING_CACHE_TTL_MS = 60_000L;
     private static final long LITE_MEMORY_CACHE_TTL_MS = 30_000L;
     private static final int MAX_IMAGE_CACHE_ENTRIES = 24;
-    private static final int MAX_IMAGE_CACHE_BYTES = 4 * 1024 * 1024;
-    private static final int MAX_IMAGE_CACHE_ITEM_BYTES = 512 * 1024;
+    private static final int MAX_IMAGE_CACHE_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_IMAGE_CACHE_ITEM_BYTES = 768 * 1024;
     private static final int MAX_IMAGE_NEGATIVE_CACHE_ENTRIES = 24;
-    private static final int MAX_BANNER_WIDTH = 640;
-    private static final int MAX_BANNER_HEIGHT = 360;
-    private static final int MAX_ICON_WIDTH = 256;
-    private static final int MAX_ICON_HEIGHT = 256;
+    private static final int MAX_BANNER_WIDTH = 960;
+    private static final int MAX_BANNER_HEIGHT = 540;
+    private static final int MAX_ICON_WIDTH = 512;
+    private static final int MAX_ICON_HEIGHT = 512;
     private static final int MAX_WALLPAPER_PREVIEW_WIDTH = 1920;
     private static final int MAX_WALLPAPER_PREVIEW_HEIGHT = 1080;
     private static final String PRIVATE_DNS_SETTINGS_ACTION = "android.settings.PRIVATE_DNS_SETTINGS";
@@ -3625,7 +3625,7 @@ public class MainActivity extends FlutterActivity {
         try {
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
             Bitmap.CompressFormat format = opaqueBackground ? Bitmap.CompressFormat.JPEG : Bitmap.CompressFormat.PNG;
-            int quality = opaqueBackground ? 86 : 100;
+            int quality = opaqueBackground ? 92 : 100;
             bitmap.compress(format, quality, stream);
             return stream.toByteArray();
         } finally {

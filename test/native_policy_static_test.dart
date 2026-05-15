@@ -371,6 +371,48 @@ void main() {
           'APP_IMAGE_NEGATIVE_CACHE.size() > MAX_IMAGE_NEGATIVE_CACHE_ENTRIES'),
     );
   });
+
+  test('home app art uses sharper sources without increasing load fanout', () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
+    final appCard = File('lib/widgets/app_card.dart').readAsStringSync();
+    final profile =
+        File('lib/home_performance_profile.dart').readAsStringSync();
+    final qualityProfile = _methodBody(
+      profile,
+      'case SettingsService.homeDockPerformanceModeQuality:',
+      'case SettingsService.homeDockPerformanceModeSmooth:',
+    );
+    final smoothProfile = _methodBody(
+      profile,
+      'case SettingsService.homeDockPerformanceModeSmooth:',
+      'case SettingsService.homeDockPerformanceModeOff:',
+    );
+    final offProfile = _methodBody(
+      profile,
+      'case SettingsService.homeDockPerformanceModeOff:',
+      'case SettingsService.homeDockPerformanceModeBalanced:',
+    );
+
+    expect(mainActivity, contains('MAX_BANNER_WIDTH = 960'));
+    expect(mainActivity, contains('MAX_BANNER_HEIGHT = 540'));
+    expect(mainActivity, contains('MAX_ICON_WIDTH = 512'));
+    expect(mainActivity, contains('MAX_ICON_HEIGHT = 512'));
+    expect(mainActivity, contains('MAX_IMAGE_CACHE_BYTES = 8 * 1024 * 1024'));
+    expect(mainActivity, contains('MAX_IMAGE_CACHE_ITEM_BYTES = 768 * 1024'));
+    expect(mainActivity, contains('int quality = opaqueBackground ? 92 : 100'));
+    expect(appCard, contains('static const int _maxConcurrentImageLoads = 2'));
+    expect(
+      appCard,
+      contains(
+          'static const Duration _deferredImageLoadDelay = Duration(milliseconds: 900)'),
+    );
+    expect(
+        qualityProfile, contains('appCardFilterQuality: FilterQuality.medium'));
+    expect(smoothProfile, contains('appCardFilterQuality: FilterQuality.low'));
+    expect(offProfile, contains('appCardFilterQuality: FilterQuality.none'));
+  });
 }
 
 String _methodBody(String source, String startToken, String endToken) {
