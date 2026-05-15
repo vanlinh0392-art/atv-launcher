@@ -91,7 +91,7 @@ void main() {
     expect(off.disableAudioRendererWhenMuted, isTrue);
   });
 
-  test('smooth mode uses lighter sampling and static app focus treatment', () {
+  test('smooth mode keeps light sampling while sharpening app cards', () {
     final quality = HomePerformanceProfile.resolve(
       SettingsService.homeDockPerformanceModeQuality,
     );
@@ -103,7 +103,8 @@ void main() {
     expect(smooth.appCardHighlightPulseEnabled, isFalse);
     expect(quality.wallpaperFilterQuality, FilterQuality.low);
     expect(smooth.wallpaperFilterQuality, FilterQuality.none);
-    expect(smooth.appCardFilterQuality, FilterQuality.none);
+    expect(quality.appCardFilterQuality, FilterQuality.medium);
+    expect(smooth.appCardFilterQuality, FilterQuality.low);
   });
 
   test('balanced mode keeps reduced dock prebuild limits for RAM savings', () {
