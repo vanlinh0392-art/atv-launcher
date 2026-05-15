@@ -137,18 +137,77 @@ void main() {
 
     expect(service, isNot(contains('isVoiceInterceptEnabled')));
     expect(keyHandler, isNot(contains('isVoiceInterceptEnabled')));
-    expect(service, contains('private static final String TAG = "VoiceBridge"'));
+    expect(
+        service, contains('private static final String TAG = "VoiceBridge"'));
     expect(service, contains('new VoiceKeyHandler(TAG, "accessibility")'));
     expect(mainActivity, contains('dispatchKeyEvent(KeyEvent event)'));
-    expect(mainActivity, contains('new VoiceKeyHandler(VOICE_KEY_TAG, "foreground")'));
+    expect(mainActivity,
+        contains('new VoiceKeyHandler(VOICE_KEY_TAG, "foreground")'));
     expect(keyHandler, contains('matched_key code='));
     expect(keyHandler, contains('launch_result success='));
-    expect(launcher, contains('private static final String TAG = "VoiceSearchLauncher"'));
+    expect(launcher,
+        contains('private static final String TAG = "VoiceSearchLauncher"'));
     expect(launcher, contains('start failed action='));
-    expect(launcher, contains('new Intent("android.speech.action.WEB_SEARCH")'));
+    expect(
+        launcher, contains('new Intent("android.speech.action.WEB_SEARCH")'));
     expect(launcher, contains('new Intent(Intent.ACTION_ASSIST)'));
     expect(launcher, contains('new Intent(Intent.ACTION_VOICE_COMMAND)'));
     expect(launcher, isNot(contains('setComponent(')));
+  });
+
+  test('MapVoice global voice route is owned by the core helper', () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
+    final launcherContract = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/shared/control/VoiceModeControlContract.java',
+    ).readAsStringSync();
+    final coreContractFile = File(
+      '../shared/src/main/java/com/atv/systembridge/shared/control/VoiceModeControlContract.java',
+    );
+    final coreReceiverFile = File(
+      '../shared/src/main/java/com/atv/systembridge/shared/control/VoiceModeControlReceiver.java',
+    );
+    final coreServiceFile = File(
+      '../shared/src/main/java/com/atv/systembridge/shared/access/VoiceBridgeAccessibilityService.java',
+    );
+    final coreManifestFile = File('../shared/src/main/AndroidManifest.xml');
+
+    expect(launcherContract,
+        contains('CORE_PACKAGE = "com.atv.systembridge.core"'));
+    expect(
+        launcherContract,
+        contains(
+            '"com.atv.systembridge.shared.control.VoiceModeControlReceiver"'));
+    expect(launcherContract,
+        contains('ACTION_GET_MODE = "com.atv.systembridge.control.GET_MODE"'));
+    expect(launcherContract,
+        contains('ACTION_SET_MODE = "com.atv.systembridge.control.SET_MODE"'));
+    expect(mainActivity, contains('sendOrderedBroadcast('));
+    expect(mainActivity, contains('globalVoiceActive'));
+    expect(mainActivity, contains('coreVoiceAccessibilityServiceId()'));
+
+    if (!coreContractFile.existsSync() ||
+        !coreReceiverFile.existsSync() ||
+        !coreServiceFile.existsSync() ||
+        !coreManifestFile.existsSync()) {
+      return;
+    }
+
+    final coreContract = coreContractFile.readAsStringSync();
+    final coreReceiver = coreReceiverFile.readAsStringSync();
+    final coreService = coreServiceFile.readAsStringSync();
+    final coreManifest = coreManifestFile.readAsStringSync();
+
+    expect(coreContract, contains('EXTRA_LEARNING_MODE = "learning_mode"'));
+    expect(coreReceiver, contains('BridgeStateStore.MODE_DOUBLE_HOLD'));
+    expect(coreService, contains('accessibility matched_key code='));
+    expect(coreService, contains('accessibility launch_result success='));
+    expect(coreService,
+        contains('new Intent("android.speech.action.WEB_SEARCH")'));
+    expect(coreService, contains('new Intent(Intent.ACTION_ASSIST)'));
+    expect(coreService, contains('new Intent(Intent.ACTION_VOICE_COMMAND)'));
+    expect(coreManifest, contains('android:process=":acc"'));
   });
 
   test('legacy activity result flow has explicit deprecation suppression', () {

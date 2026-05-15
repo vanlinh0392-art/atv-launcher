@@ -34,7 +34,10 @@ public class VoiceModeControlReceiver extends BroadcastReceiver {
             }
             BridgeStateStore.setMode(context, mode);
             BridgeStateStore.setKeyCode(context, keyCode);
-            BridgeStateStore.setLearningMode(context, false);
+            BridgeStateStore.setLearningMode(
+                    context,
+                    intent.getBooleanExtra(VoiceModeControlContract.EXTRA_LEARNING_MODE, false)
+            );
             SystemBridgeCoordinator.startCore(context, "external_config_update");
             respondWithConfig(context, Activity.RESULT_OK, VoiceModeControlContract.STATUS_OK);
         }
@@ -46,8 +49,10 @@ public class VoiceModeControlReceiver extends BroadcastReceiver {
         int keyCode = BridgeStateStore.getKeyCode(context);
         result.putInt(VoiceModeControlContract.EXTRA_MODE, mode);
         result.putInt(VoiceModeControlContract.EXTRA_KEY_CODE, keyCode);
+        result.putBoolean(VoiceModeControlContract.EXTRA_LEARNING_MODE, BridgeStateStore.isLearningMode(context));
         result.putString(VoiceModeControlContract.EXTRA_STATUS, status);
-        setResultData("status=" + status + " mode=" + mode + " key=" + keyCode);
+        setResultData("status=" + status + " mode=" + mode + " key=" + keyCode
+                + " learning=" + BridgeStateStore.isLearningMode(context));
         setResult(resultCode, null, result);
     }
 

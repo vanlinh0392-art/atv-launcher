@@ -75,6 +75,7 @@ import com.atv.launcher.systembridge.accessmanager.service.AccessibilityGrantCoo
 import com.atv.launcher.systembridge.accessmanager.state.AccessStateStore;
 import com.atv.launcher.systembridge.density.DensityBridge;
 import com.atv.launcher.systembridge.dns.PrivateDnsController;
+import com.atv.launcher.systembridge.shared.control.VoiceModeControlContract;
 import com.atv.launcher.systembridge.shared.service.SystemBridgeCoordinator;
 import com.atv.launcher.systembridge.shared.state.BridgeStateStore;
 import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
@@ -143,8 +144,11 @@ public class MainActivity extends FlutterActivity {
             "com.google.android.tv.settings.MainSettings";
     private static final String AOSP_SETTINGS_PACKAGE = "com.android.settings";
     private static final String AOSP_SETTINGS_ACTIVITY = "com.android.settings.Settings";
+    private static final String CORE_VOICE_ACCESSIBILITY_SERVICE_CLASS =
+            "com.atv.systembridge.shared.access.VoiceBridgeAccessibilityService";
     private static final long SYSTEM_EVENT_INTERVAL_MS = 15000L;
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
+    private static final long CORE_VOICE_REFRESH_THROTTLE_MS = 5000L;
     private static final long APPLICATIONS_CACHE_TTL_MS = 60_000L;
     private static final long LITE_ADB_AUTOMATION_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
     private static final long LITE_HOME_GUARD_CACHE_TTL_MS = SYSTEM_EVENT_INTERVAL_MS;
@@ -244,6 +248,9 @@ public class MainActivity extends FlutterActivity {
     private String pendingBackupExportContent = "";
     private String pendingBackupExportFileName = "atv-launcher-backup.json";
     private String pendingBackupImportMode = "import";
+    private CoreVoiceConfigSnapshot lastCoreVoiceConfig =
+            CoreVoiceConfigSnapshot.unavailable("not_queried", "not_queried");
+    private long lastCoreVoiceRefreshElapsedMs;
     private final VoiceKeyHandler foregroundVoiceKeyHandler =
             new VoiceKeyHandler(VOICE_KEY_TAG, "foreground");
 
@@ -1269,35 +1276,194 @@ public class MainActivity extends FlutterActivity {
     }
 
     private Map<String, Object> buildVoiceStatus() {
+        return buildVoiceStatus(true);
+    }
+
+    private Map<String, Object> buildVoiceStatus(boolean refreshCoreConfig) {
         Map<String, Object> voice = new LinkedHashMap<>();
-        String ownServiceId = SystemBridgeCoordinator.ownAccessibilityServiceId(this);
+        String launcherServiceId = SystemBridgeCoordinator.ownAccessibilityServiceId(this);
+        String coreServiceId = coreVoiceAccessibilityServiceId();
         Set<String> enabledServices = readEnabledAccessibilityServices();
-        int mode = BridgeStateStore.getMode(this);
+        boolean launcherAccessibilityEnabled = enabledServices.contains(launcherServiceId);
+        boolean coreHelperInstalled = isPackageInstalled(VoiceModeControlContract.CORE_PACKAGE);
+        boolean coreAccessibilityEnabled = enabledServices.contains(coreServiceId);
+        boolean globalVoiceActive = coreHelperInstalled && coreAccessibilityEnabled;
+        CoreVoiceConfigSnapshot coreSnapshot = lastCoreVoiceConfig;
+        int mode = coreSnapshot.available ? coreSnapshot.mode : BridgeStateStore.getMode(this);
+        int keyCode = coreSnapshot.available ? coreSnapshot.keyCode : BridgeStateStore.getKeyCode(this);
+        boolean learningMode = coreSnapshot.available
+                ? coreSnapshot.learningMode
+                : BridgeStateStore.isLearningMode(this);
+
         voice.put("mode", mode);
         voice.put("modeLabel", SystemBridgeCoordinator.modeLabel(this, mode));
-        voice.put("keyCode", BridgeStateStore.getKeyCode(this));
+        voice.put("keyCode", keyCode);
         voice.put("defaultKeySummary", BridgeStateStore.defaultVoiceKeySummary());
-        voice.put("learningMode", BridgeStateStore.isLearningMode(this));
+        voice.put("learningMode", learningMode);
         voice.put("interceptEnabled", BridgeStateStore.isVoiceInterceptEnabled(this));
-        voice.put("accessibilityEnabled", enabledServices.contains(ownServiceId));
-        voice.put("serviceId", ownServiceId);
+        voice.put("accessibilityEnabled", coreAccessibilityEnabled);
+        voice.put("globalVoiceActive", globalVoiceActive);
+        voice.put("coreHelperInstalled", coreHelperInstalled);
+        voice.put("coreConfigStatus", coreSnapshot.status);
+        voice.put("coreConfigResultCode", coreSnapshot.resultCode);
+        voice.put("coreConfigResultData", coreSnapshot.resultData);
+        voice.put("configSource", coreSnapshot.available ? "core_helper" : "launcher_fallback");
+        voice.put("serviceId", coreServiceId);
+        voice.put("coreServiceId", coreServiceId);
+        voice.put("launcherServiceId", launcherServiceId);
+        voice.put("launcherAccessibilityEnabled", launcherAccessibilityEnabled);
+        voice.put("foregroundFallbackActive", true);
         voice.put("lastRepairResult", BridgeStateStore.getLastAccessibilityRepairResult(this));
         voice.put("missingServices", new ArrayList<>(BridgeStateStore.getLastMissingServiceIds(this)));
         voice.put("writeSecureSettingsGranted", hasPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS));
-        voice.put("health", deriveAccessibilityHealth(enabledServices.contains(ownServiceId)));
+        voice.put("health", deriveAccessibilityHealth(globalVoiceActive));
+        if (refreshCoreConfig) {
+            requestCoreVoiceConfigRefresh("voice_status", coreHelperInstalled);
+        }
         return voice;
+    }
+
+    private void requestCoreVoiceConfigRefresh(String reason, boolean coreHelperInstalled) {
+        if (!coreHelperInstalled) {
+            lastCoreVoiceConfig = CoreVoiceConfigSnapshot.unavailable(reason, "not_installed");
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastCoreVoiceRefreshElapsedMs < CORE_VOICE_REFRESH_THROTTLE_MS) {
+            return;
+        }
+        lastCoreVoiceRefreshElapsedMs = now;
+        sendCoreVoiceBroadcast(buildCoreVoiceIntent(VoiceModeControlContract.ACTION_GET_MODE), reason);
+    }
+
+    private void syncCoreVoiceConfig(int mode, int keyCode, boolean learningMode, String reason) {
+        if (!isPackageInstalled(VoiceModeControlContract.CORE_PACKAGE)) {
+            lastCoreVoiceConfig = CoreVoiceConfigSnapshot.unavailable(reason, "not_installed");
+            return;
+        }
+        lastCoreVoiceRefreshElapsedMs = SystemClock.elapsedRealtime();
+        lastCoreVoiceConfig = CoreVoiceConfigSnapshot.pending(reason, mode, keyCode, learningMode);
+        Intent intent = buildCoreVoiceIntent(VoiceModeControlContract.ACTION_SET_MODE);
+        intent.putExtra(VoiceModeControlContract.EXTRA_MODE, mode);
+        intent.putExtra(VoiceModeControlContract.EXTRA_KEY_CODE, keyCode);
+        intent.putExtra(VoiceModeControlContract.EXTRA_LEARNING_MODE, learningMode);
+        sendCoreVoiceBroadcast(intent, reason);
+    }
+
+    private Intent buildCoreVoiceIntent(String action) {
+        Intent intent = new Intent(action);
+        intent.setPackage(VoiceModeControlContract.CORE_PACKAGE);
+        intent.setComponent(new ComponentName(
+                VoiceModeControlContract.CORE_PACKAGE,
+                VoiceModeControlContract.RECEIVER_CLASS
+        ));
+        return intent;
+    }
+
+    private void sendCoreVoiceBroadcast(Intent intent, String reason) {
+        Bundle initialExtras = new Bundle();
+        initialExtras.putString(VoiceModeControlContract.EXTRA_STATUS, "no_receiver");
+        try {
+            sendOrderedBroadcast(
+                    intent,
+                    null,
+                    new BroadcastReceiver() {
+                        @Override
+                        public void onReceive(Context context, Intent ignored) {
+                            handleCoreVoiceConfigResult(
+                                    reason,
+                                    getResultCode(),
+                                    getResultData(),
+                                    getResultExtras(false)
+                            );
+                        }
+                    },
+                    SHARED_SYSTEM_EVENT_HANDLER,
+                    Activity.RESULT_CANCELED,
+                    "no_receiver",
+                    initialExtras
+            );
+        } catch (Exception exception) {
+            lastCoreVoiceConfig = CoreVoiceConfigSnapshot.unavailable(reason, exception.toString());
+        }
+    }
+
+    private void handleCoreVoiceConfigResult(
+            String reason,
+            int resultCode,
+            String resultData,
+            Bundle extras
+    ) {
+        int fallbackMode = BridgeStateStore.getMode(this);
+        int fallbackKeyCode = BridgeStateStore.getKeyCode(this);
+        boolean fallbackLearning = BridgeStateStore.isLearningMode(this);
+        String status = extras == null
+                ? "missing_extras"
+                : extras.getString(VoiceModeControlContract.EXTRA_STATUS, "missing_status");
+        int mode = extras == null
+                ? fallbackMode
+                : extras.getInt(VoiceModeControlContract.EXTRA_MODE, fallbackMode);
+        int keyCode = extras == null
+                ? fallbackKeyCode
+                : extras.getInt(VoiceModeControlContract.EXTRA_KEY_CODE, fallbackKeyCode);
+        boolean learningMode = extras == null
+                ? fallbackLearning
+                : extras.getBoolean(VoiceModeControlContract.EXTRA_LEARNING_MODE, fallbackLearning);
+        boolean available = resultCode == Activity.RESULT_OK
+                && TextUtils.equals(status, VoiceModeControlContract.STATUS_OK);
+
+        lastCoreVoiceConfig = new CoreVoiceConfigSnapshot(
+                available,
+                reason,
+                status,
+                resultCode,
+                resultData == null ? "" : resultData,
+                mode,
+                keyCode,
+                learningMode,
+                System.currentTimeMillis()
+        );
+
+        if (available) {
+            BridgeStateStore.setMode(this, mode);
+            BridgeStateStore.setKeyCode(this, keyCode);
+            BridgeStateStore.setLearningMode(this, learningMode);
+        }
+
+        Map<String, Object> delta = new LinkedHashMap<>();
+        delta.put("voice", buildVoiceStatus(false));
+        emitSystemSnapshotDelta(delta);
+    }
+
+    private String coreVoiceAccessibilityServiceId() {
+        return VoiceModeControlContract.CORE_PACKAGE + "/" + CORE_VOICE_ACCESSIBILITY_SERVICE_CLASS;
+    }
+
+    private boolean isPackageInstalled(String packageName) {
+        try {
+            getPackageManager().getPackageInfo(packageName, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
     }
 
     private Map<String, Object> buildSystemCoreStatus() {
         Map<String, Object> system = new LinkedHashMap<>();
-        boolean ownAccessibilityEnabled = readEnabledAccessibilityServices()
+        Set<String> enabledServices = readEnabledAccessibilityServices();
+        boolean ownAccessibilityEnabled = enabledServices
                 .contains(SystemBridgeCoordinator.ownAccessibilityServiceId(this));
+        boolean coreHelperInstalled = isPackageInstalled(VoiceModeControlContract.CORE_PACKAGE);
+        boolean coreAccessibilityEnabled = enabledServices.contains(coreVoiceAccessibilityServiceId());
         system.put("adbEnabled", readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1);
         system.put("adbWifiEnabled", readGlobalInt(ADB_WIFI_KEY, 0) == 1);
         system.put("batteryOptimizationIgnored", SystemBridgeCoordinator.isIgnoringBatteryOptimizations(this));
         system.put("deviceOwner", isDeviceOwner());
         system.put("accessibilityMasterEnabled", readSecureInt(Settings.Secure.ACCESSIBILITY_ENABLED, 0) == 1);
-        system.put("coreServiceHealth", deriveAccessibilityHealth(ownAccessibilityEnabled));
+        system.put("coreServiceHealth", deriveAccessibilityHealth(coreHelperInstalled && coreAccessibilityEnabled));
+        system.put("launcherAccessibilityEnabled", ownAccessibilityEnabled);
+        system.put("voiceCoreHelperInstalled", coreHelperInstalled);
+        system.put("voiceCoreAccessibilityEnabled", coreAccessibilityEnabled);
         system.put("lastRecoveryReason", BridgeStateStore.getLastRecoveryReason(this));
         system.put("lastSuccessAt", BridgeStateStore.getLastSuccessAt(this));
         system.put("lastSuccessAtText", formatTime(BridgeStateStore.getLastSuccessAt(this)));
@@ -1618,20 +1784,90 @@ public class MainActivity extends FlutterActivity {
         }
     }
 
+    private static final class CoreVoiceConfigSnapshot {
+        final boolean available;
+        final String reason;
+        final String status;
+        final int resultCode;
+        final String resultData;
+        final int mode;
+        final int keyCode;
+        final boolean learningMode;
+        final long updatedAt;
+
+        CoreVoiceConfigSnapshot(
+                boolean available,
+                String reason,
+                String status,
+                int resultCode,
+                String resultData,
+                int mode,
+                int keyCode,
+                boolean learningMode,
+                long updatedAt
+        ) {
+            this.available = available;
+            this.reason = reason;
+            this.status = status;
+            this.resultCode = resultCode;
+            this.resultData = resultData;
+            this.mode = mode;
+            this.keyCode = keyCode;
+            this.learningMode = learningMode;
+            this.updatedAt = updatedAt;
+        }
+
+        static CoreVoiceConfigSnapshot pending(
+                String reason,
+                int mode,
+                int keyCode,
+                boolean learningMode
+        ) {
+            return new CoreVoiceConfigSnapshot(
+                    false,
+                    reason,
+                    "pending",
+                    Activity.RESULT_CANCELED,
+                    "",
+                    mode,
+                    keyCode,
+                    learningMode,
+                    System.currentTimeMillis()
+            );
+        }
+
+        static CoreVoiceConfigSnapshot unavailable(String reason, String status) {
+            return new CoreVoiceConfigSnapshot(
+                    false,
+                    reason,
+                    status,
+                    Activity.RESULT_CANCELED,
+                    "",
+                    BridgeStateStore.MODE_DOUBLE,
+                    BridgeStateStore.DEFAULT_KEY_CODE,
+                    false,
+                    System.currentTimeMillis()
+            );
+        }
+    }
+
     private Map<String, Object> setVoiceMode(MethodCall call) {
         Integer mode = call.argument("mode");
         Integer keyCode = call.argument("keyCode");
         Boolean interceptEnabled = call.argument("interceptEnabled");
+        int nextMode = mode == null ? BridgeStateStore.getMode(this) : mode;
+        int nextKeyCode = keyCode == null ? BridgeStateStore.getKeyCode(this) : keyCode;
         if (mode != null) {
-            BridgeStateStore.setMode(this, mode);
+            BridgeStateStore.setMode(this, nextMode);
         }
         if (keyCode != null) {
-            BridgeStateStore.setKeyCode(this, keyCode);
+            BridgeStateStore.setKeyCode(this, nextKeyCode);
         }
         if (interceptEnabled != null) {
             BridgeStateStore.setVoiceInterceptEnabled(this, interceptEnabled);
         }
         BridgeStateStore.setLearningMode(this, false);
+        syncCoreVoiceConfig(nextMode, nextKeyCode, false, "manual_voice_config");
         SystemBridgeCoordinator.startCore(this, "manual_voice_config");
         emitSystemSnapshot();
         return buildVoiceStatus();
@@ -1646,12 +1882,24 @@ public class MainActivity extends FlutterActivity {
 
     private Map<String, Object> startKeyLearning() {
         BridgeStateStore.setLearningMode(this, true);
+        syncCoreVoiceConfig(
+                BridgeStateStore.getMode(this),
+                BridgeStateStore.getKeyCode(this),
+                true,
+                "manual_key_learning"
+        );
         emitSystemSnapshot();
         return buildVoiceStatus();
     }
 
     private Map<String, Object> resetVoiceMapping() {
         BridgeStateStore.resetDefaultMapping(this);
+        syncCoreVoiceConfig(
+                BridgeStateStore.getMode(this),
+                BridgeStateStore.getKeyCode(this),
+                BridgeStateStore.isLearningMode(this),
+                "manual_voice_reset"
+        );
         emitSystemSnapshot();
         return buildVoiceStatus();
     }
