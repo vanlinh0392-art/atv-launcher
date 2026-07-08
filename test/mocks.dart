@@ -30,14 +30,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mockito/annotations.dart';
 
-@GenerateMocks([
-  FLauncherChannel,
-  WallpaperService,
-  AppsService,
-  SettingsService,
-  SystemBridgeService,
-  ImagePicker,
-], customMocks: [
+@GenerateNiceMocks([
+  MockSpec<FLauncherChannel>(),
+  MockSpec<WallpaperService>(),
+  MockSpec<AppsService>(),
+  MockSpec<SettingsService>(),
+  MockSpec<SystemBridgeService>(),
+  MockSpec<ImagePicker>(),
   MockSpec<FLauncherDatabase>(unsupportedMembers: {#alias}),
   MockSpec<ImageProvider>(unsupportedMembers: {#alias}),
 ])

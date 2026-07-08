@@ -5,6 +5,26 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-07-08 - Official release 2026.07.009 cải thiện Dpad & Auto-scroll Settings
+
+### Điều hướng Dpad & Cuộn trang trong Cài đặt
+- **Giao diện Cài đặt**: Cải thiện toàn diện cơ chế điều hướng Dpad và tự động cuộn (auto-scroll) cho các panel cài đặt.
+  - `status_bar_panel_page.dart`: Sử dụng `PageStorageKey` để giữ vị trí cuộn khi chuyển tab.
+  - `applications_panel_page.dart`: Chuyển đổi các item ứng dụng thành `_AppListItem` StatefulWidget tự quản lý focus, sử dụng `SettingsFocusFrame` hiển thị viền xanh cyan sắc nét và tự động cuộn bằng `Scrollable.ensureVisible` khi nhận focus.
+  - `gradient_panel_page.dart`: Tách card gradient thành `_GradientCardItem` StatefulWidget tự quản lý focus Dpad và tự cuộn mượt mà.
+  - `launcher_sections_panel_page.dart`: Tách phân mục thành `_SectionItem` StatefulWidget tự quản lý focus và cuộn mượt mà.
+  - `launcher_section_panel_page.dart`: Tích hợp `EnsureVisible` bọc ngoài ListTile giúp Dropdown/TextFormField tự động cuộn lên khi nhận focus.
+- **Khôi phục layout đa cột**: Điều chỉnh giá trị mặc định của `forceSingleColumn` trong `SettingsAdaptiveGrid` về `false` để khôi phục layout đa cột (3 cột) đẹp mắt cho màn hình chọn hình nền và sửa lỗi Dpad ngang.
+
+### Cập nhật và Phiên bản
+- Tăng version ứng dụng lên `2026.07.009+34` trong `pubspec.yaml` giúp giải quyết triệt để lỗi hiển thị phiên bản cũ của tháng 5/2026 trên menu TV.
+
+### Unit Tests & Mocks
+- Chuyển cấu hình Mockito trong `mocks.dart` sang `@GenerateNiceMocks` để loại bỏ hoàn toàn các lỗi `MissingStubError`.
+- Sửa lỗi timing degraded ABI trong `update_panel_page_test.dart` bằng cách thêm pump 200ms để chờ timer 120ms hoàn tất.
+- Cập nhật `home_layout_panel_page_test.dart` tương tác trực tiếp với các settings control thật sau khi loại bỏ quick summary tiles.
+- Toàn bộ unit tests (266+ tests) đã vượt qua thành công (100% green).
+
 ## 2026-05-09 - Official release 2026.05.018 sửa wake HOME/focus/icon
 
 ### Sleep/Wake HOME

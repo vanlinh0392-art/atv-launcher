@@ -398,7 +398,7 @@ class SettingsAdaptiveGrid extends StatelessWidget {
     this.minChildWidth = 260,
     this.maxColumns,
     this.avoidTrailingSingleton = false,
-    this.forceSingleColumn = true,
+    this.forceSingleColumn = false,
   });
 
   @override

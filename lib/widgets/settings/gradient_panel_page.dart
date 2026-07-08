@@ -81,6 +81,7 @@ class _GradientCardItemState extends State<_GradientCardItem> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      key: Key('gradient-${widget.gradient.uuid}'),
       onFocusChange: _onFocusChange,
       child: SettingsFocusFrame(
         padding: EdgeInsets.zero,

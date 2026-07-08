@@ -580,6 +580,7 @@ void main() {
     await _pumpUi(tester);
 
     await tester.tap(find.text('Check latest official release'));
+    await tester.pump(const Duration(milliseconds: 200));
     await _pumpUi(tester);
 
     expect(find.text('ABI fallback', skipOffstage: false), findsWidgets);

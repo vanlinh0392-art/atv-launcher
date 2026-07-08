@@ -64,34 +64,6 @@ void main() {
         findsOneWidget);
     expect(
         find.byKey(const Key('home_dock_row_spacing_stepper')), findsOneWidget);
-    await _scrollToFinder(
-      tester,
-      find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_app_locale'),
-      ),
-    );
-    expect(
-      find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_app_locale'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_card_size'),
-      ),
-      findsOneWidget,
-    );
-
-    final quickTileFrame = tester.widget<SettingsFocusFrame>(
-      find.descendant(
-        of: find.byKey(
-          const ValueKey<String>('home_layout_quick_tile_app_locale'),
-        ),
-        matching: find.byType(SettingsFocusFrame),
-      ),
-    );
-    expect(quickTileFrame.variant, SettingsFocusFrameVariant.rowOnly);
   });
 
   testWidgets('updates locale mode and icon scale from controls',
@@ -119,13 +91,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_collapsed_rows'),
+        const Key('home_dock_collapsed_rows_selector'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_collapsed_rows'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('home_dock_collapsed_rows_selector'));
     await tester.tap(
       find.byKey(
         const ValueKey<String>('home_dock_collapsed_rows_option_2'),
@@ -138,13 +107,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_corner_radius'),
+        const Key('icon_corner_radius_stepper'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_corner_radius'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('icon_corner_radius_stepper'));
     await tester.tap(find.byKey(const ValueKey<String>(
       'icon_corner_radius_increase',
     )));
@@ -158,24 +124,19 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_card_size'),
+        const Key('app_card_layout_scale_stepper'),
       ),
     );
     final initialCardSize = settings.appCardLayoutScalePercent;
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_card_size'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('app_card_layout_scale_stepper'));
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pumpAndSettle();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
     expect(
       settings.appCardLayoutScalePercent,
-      (initialCardSize + 10).clamp(70, 115),
+      (initialCardSize + 5).clamp(70, 115),
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -191,13 +152,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_collapse_delay'),
+        const Key('home_dock_auto_collapse_delay_selector'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_collapse_delay'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('home_dock_auto_collapse_delay_selector'));
     await tester.tap(find.byKey(const ValueKey<String>(
       'home_dock_auto_collapse_delay_option_30',
     )));
@@ -208,13 +166,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_glass_intensity'),
+        const Key('home_dock_glass_intensity_selector'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_glass_intensity'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('home_dock_glass_intensity_selector'));
     await tester.tap(find.byKey(const ValueKey<String>(
       'home_dock_glass_intensity_option_40',
     )));
@@ -225,13 +180,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_performance_mode'),
+        const Key('home_dock_performance_mode_selector'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_performance_mode'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('home_dock_performance_mode_selector'));
     await tester.tap(find.byKey(const ValueKey<String>(
       'home_dock_performance_mode_option_smooth',
     )));
@@ -245,13 +197,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_settings_transparency'),
+        const Key('settings_ui_transparency_stepper'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_settings_transparency'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('settings_ui_transparency_stepper'));
     await tester.tap(find.byKey(const ValueKey<String>(
       'settings_ui_transparency_decrease',
     )));
@@ -262,13 +211,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_row_spacing'),
+        const Key('home_dock_row_spacing_stepper'),
       ),
     );
-    await tester.tap(find.byKey(
-      const ValueKey<String>('home_layout_quick_tile_row_spacing'),
-    ));
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('home_dock_row_spacing_stepper'));
     await tester.tap(find.byKey(const ValueKey<String>(
       'home_dock_row_spacing_decrease',
     )));
@@ -368,15 +314,10 @@ void main() {
     await _scrollToFinder(
       tester,
       find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_row_spacing'),
+        const Key('home_dock_row_spacing_stepper'),
       ),
     );
-    await tester.tap(
-      find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_row_spacing'),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _focusControl(tester, const Key('home_dock_row_spacing_stepper'));
 
     expect(
       FocusManager.instance.primaryFocus?.debugLabel,
@@ -420,36 +361,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(settings.homeDockRowSpacing, initialSpacing + 1);
-  });
-
-  testWidgets('quick summary tile jumps focus to matching setting card',
-      (tester) async {
-    final settings = await _createSettingsService();
-    final appsService = MockAppsService();
-
-    await _pumpPage(
-      tester,
-      settings: settings,
-      appsService: appsService,
-    );
-
-    await _scrollToFinder(
-      tester,
-      find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_card_size'),
-      ),
-    );
-    await tester.tap(
-      find.byKey(
-        const ValueKey<String>('home_layout_quick_tile_card_size'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      FocusManager.instance.primaryFocus?.debugLabel,
-      contains('home_layout_target_cardSize'),
-    );
   });
 
   testWidgets('keeps focused deep settings rows inside the visible detail band',
@@ -550,4 +461,16 @@ Future<void> _scrollToFinder(WidgetTester tester, Finder finder) async {
 Future<SettingsService> _createSettingsService() async {
   SharedPreferences.setMockInitialValues(const <String, Object>{});
   return SettingsService(await SharedPreferences.getInstance());
+}
+
+Future<void> _focusControl(WidgetTester tester, Key key) async {
+  final finder = find.byKey(key);
+  final FocusNode? focusNode = tester.widget<Focus>(
+    find.ancestor(
+      of: finder,
+      matching: find.byType(Focus),
+    ).first,
+  ).focusNode;
+  focusNode?.requestFocus();
+  await tester.pumpAndSettle();
 }

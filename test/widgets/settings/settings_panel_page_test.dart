@@ -2085,6 +2085,8 @@ MockSystemBridgeService _mockBridgeService({
           'wizardSteps': <String>['Enable developer options', 'Run local ADB'],
         },
   );
+  when(bridgeService.getLocalBackups())
+      .thenAnswer((_) async => const <Map<String, dynamic>>[]);
   return bridgeService;
 }
 
