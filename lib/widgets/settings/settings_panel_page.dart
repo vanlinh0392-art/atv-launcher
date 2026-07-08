@@ -820,7 +820,7 @@ class _RailTileState extends State<_RailTile> {
   Widget build(BuildContext context) {
     final highlighted = widget.selected || _focused;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 70),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
         color: highlighted

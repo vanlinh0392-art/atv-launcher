@@ -158,9 +158,8 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: enabled ? () => widget.onPressed!.call() : null,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 120),
-              opacity: enabled ? (_focused ? 1 : 0.97) : 0.46,
+            child: Opacity(
+              opacity: enabled ? (_focused ? 1.0 : 0.97) : 0.46,
               child: Padding(
                 padding: widget.contentPadding,
                 child: Row(

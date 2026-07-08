@@ -168,16 +168,14 @@ class EnsureVisible extends StatelessWidget {
     }
     tracker.lastTargetOffset = targetOffset;
     tracker.lastIssuedAtMs = now;
-    if (preferImmediate || delta < 18) {
+    if (preferImmediate || delta < 32) {
       position.jumpTo(targetOffset);
       return;
     }
 
     position.animateTo(
       targetOffset,
-      duration: Duration(
-        milliseconds: delta < (position.viewportDimension * 0.35) ? 72 : 96,
-      ),
+      duration: const Duration(milliseconds: 50),
       curve: Curves.easeOutCubic,
     );
   }

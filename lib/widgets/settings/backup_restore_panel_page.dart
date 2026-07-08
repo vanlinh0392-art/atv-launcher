@@ -9,6 +9,7 @@ import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -176,75 +177,80 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
                     final size = ((item['size'] as num? ?? 0) / 1024).toStringAsFixed(1);
                     final isSelected = _previewName == name;
                     
-                    return Focus(
-                      onKeyEvent: (node, event) {
-                        if (event is! KeyDownEvent) {
-                          return KeyEventResult.ignored;
-                        }
-                        if (isSettingsActivateKey(event.logicalKey)) {
-                          if (!_busy) _previewLocalBackup(name);
-                          return KeyEventResult.handled;
-                        }
-                        final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
-                            ? TraversalDirection.up
-                            : event.logicalKey == LogicalKeyboardKey.arrowDown
-                                ? TraversalDirection.down
-                                : null;
-                        if (direction != null) {
-                          if (!moveSettingsVerticalFocus(
-                            direction: direction,
-                            localNodes: <FocusNode>[node],
-                          )) {
-                            node.focusInDirection(direction);
+                    return EnsureVisible(
+                      alignment: EnsureVisible.settingsAlignment,
+                      settleFrameCount: 1,
+                      preferImmediate: true,
+                      child: Focus(
+                        onKeyEvent: (node, event) {
+                          if (event is! KeyDownEvent) {
+                            return KeyEventResult.ignored;
                           }
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: Builder(
-                        builder: (context) {
-                          final focused = Focus.of(context).hasFocus;
-                          return SettingsFocusFrame(
-                            padding: EdgeInsets.zero,
-                            variant: SettingsFocusFrameVariant.rowOnly,
-                            focused: focused,
-                            child: ListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                              onTap: _busy ? null : () => _previewLocalBackup(name),
-                              leading: Icon(
-                                isAuto ? Icons.auto_mode_outlined : Icons.settings_backup_restore,
-                                color: isSelected ? Colors.cyanAccent : Colors.white70,
-                              ),
-                              title: Text(
-                                name,
-                                style: TextStyle(
-                                  color: isSelected ? Colors.cyanAccent : Colors.white,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          if (isSettingsActivateKey(event.logicalKey)) {
+                            if (!_busy) _previewLocalBackup(name);
+                            return KeyEventResult.handled;
+                          }
+                          final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+                              ? TraversalDirection.up
+                              : event.logicalKey == LogicalKeyboardKey.arrowDown
+                                  ? TraversalDirection.down
+                                  : null;
+                          if (direction != null) {
+                            if (!moveSettingsVerticalFocus(
+                              direction: direction,
+                              localNodes: <FocusNode>[node],
+                            )) {
+                              node.focusInDirection(direction);
+                            }
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        child: Builder(
+                          builder: (context) {
+                            final focused = Focus.of(context).hasFocus;
+                            return SettingsFocusFrame(
+                              padding: EdgeInsets.zero,
+                              variant: SettingsFocusFrameVariant.rowOnly,
+                              focused: focused,
+                              child: ListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                                onTap: _busy ? null : () => _previewLocalBackup(name),
+                                leading: Icon(
+                                  isAuto ? Icons.auto_mode_outlined : Icons.settings_backup_restore,
+                                  color: isSelected ? Colors.cyanAccent : Colors.white70,
+                                ),
+                                title: Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.cyanAccent : Colors.white,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  "$date  -  $size KB ${isAuto ? '(Tự động)' : '(Thủ công)'}",
+                                  style: const TextStyle(color: Colors.white54),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.preview_outlined, color: Colors.cyan),
+                                      tooltip: "Xem trước",
+                                      onPressed: _busy ? null : () => _previewLocalBackup(name),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                      tooltip: "Xóa",
+                                      onPressed: _busy ? null : () => _deleteLocalBackup(name),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              subtitle: Text(
-                                "$date  -  $size KB ${isAuto ? '(Tự động)' : '(Thủ công)'}",
-                                style: const TextStyle(color: Colors.white54),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.preview_outlined, color: Colors.cyan),
-                                    tooltip: "Xem trước",
-                                    onPressed: _busy ? null : () => _previewLocalBackup(name),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                    tooltip: "Xóa",
-                                    onPressed: _busy ? null : () => _deleteLocalBackup(name),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     );
                   },

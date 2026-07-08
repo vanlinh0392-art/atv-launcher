@@ -543,7 +543,7 @@ class _SettingsFocusFrameState extends State<SettingsFocusFrame> {
         }
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 110),
+        duration: const Duration(milliseconds: 60),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
           color: resolvedFocused
