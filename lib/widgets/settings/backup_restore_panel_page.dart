@@ -9,7 +9,6 @@ import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
-import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -177,81 +176,15 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
                     final size = ((item['size'] as num? ?? 0) / 1024).toStringAsFixed(1);
                     final isSelected = _previewName == name;
                     
-                    return EnsureVisible(
-                      alignment: EnsureVisible.settingsAlignment,
-                      settleFrameCount: 1,
-                      preferImmediate: true,
-                      child: Focus(
-                        onKeyEvent: (node, event) {
-                          if (event is! KeyDownEvent) {
-                            return KeyEventResult.ignored;
-                          }
-                          if (isSettingsActivateKey(event.logicalKey)) {
-                            if (!_busy) _previewLocalBackup(name);
-                            return KeyEventResult.handled;
-                          }
-                          final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
-                              ? TraversalDirection.up
-                              : event.logicalKey == LogicalKeyboardKey.arrowDown
-                                  ? TraversalDirection.down
-                                  : null;
-                          if (direction != null) {
-                            if (!moveSettingsVerticalFocus(
-                              direction: direction,
-                              localNodes: <FocusNode>[node],
-                            )) {
-                              node.focusInDirection(direction);
-                            }
-                            return KeyEventResult.handled;
-                          }
-                          return KeyEventResult.ignored;
-                        },
-                        child: Builder(
-                          builder: (context) {
-                            final focused = Focus.of(context).hasFocus;
-                            return SettingsFocusFrame(
-                              padding: EdgeInsets.zero,
-                              variant: SettingsFocusFrameVariant.rowOnly,
-                              focused: focused,
-                              child: ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                                onTap: _busy ? null : () => _previewLocalBackup(name),
-                                leading: Icon(
-                                  isAuto ? Icons.auto_mode_outlined : Icons.settings_backup_restore,
-                                  color: isSelected ? Colors.cyanAccent : Colors.white70,
-                                ),
-                                title: Text(
-                                  name,
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.cyanAccent : Colors.white,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  "$date  -  $size KB ${isAuto ? '(Tự động)' : '(Thủ công)'}",
-                                  style: const TextStyle(color: Colors.white54),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.preview_outlined, color: Colors.cyan),
-                                      tooltip: "Xem trước",
-                                      onPressed: _busy ? null : () => _previewLocalBackup(name),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                      tooltip: "Xóa",
-                                      onPressed: _busy ? null : () => _deleteLocalBackup(name),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                    return _BackupItemTile(
+                      name: name,
+                      date: date,
+                      size: size,
+                      isAuto: isAuto,
+                      isSelected: isSelected,
+                      busy: _busy,
+                      onPreview: () => _previewLocalBackup(name),
+                      onDelete: () => _deleteLocalBackup(name),
                     );
                   },
                 ),
@@ -889,6 +822,125 @@ class _BackupPreview extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+class _BackupItemTile extends StatefulWidget {
+  final String name;
+  final String date;
+  final String size;
+  final bool isAuto;
+  final bool isSelected;
+  final bool busy;
+  final VoidCallback onPreview;
+  final VoidCallback onDelete;
+
+  const _BackupItemTile({
+    required this.name,
+    required this.date,
+    required this.size,
+    required this.isAuto,
+    required this.isSelected,
+    required this.busy,
+    required this.onPreview,
+    required this.onDelete,
+  });
+
+  @override
+  State<_BackupItemTile> createState() => _BackupItemTileState();
+}
+
+class _BackupItemTileState extends State<_BackupItemTile> {
+  bool _focused = false;
+
+  void _onFocusChange(bool focused) {
+    setState(() => _focused = focused);
+    if (focused) {
+      // Sử dụng Scrollable.ensureVisible trực tiếp trên context
+      // của widget này. API này sẽ tự tìm ancestor Scrollable
+      // thực sự có khả năng cuộn (bỏ qua ListView.separated
+      // con có NeverScrollableScrollPhysics).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Scrollable.ensureVisible(
+          context,
+          alignment: 0.3,
+          duration: const Duration(milliseconds: 50),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: _onFocusChange,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) {
+          return KeyEventResult.ignored;
+        }
+        if (isSettingsActivateKey(event.logicalKey)) {
+          if (!widget.busy) widget.onPreview();
+          return KeyEventResult.handled;
+        }
+        final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+            ? TraversalDirection.up
+            : event.logicalKey == LogicalKeyboardKey.arrowDown
+                ? TraversalDirection.down
+                : null;
+        if (direction != null) {
+          if (!moveSettingsVerticalFocus(
+            direction: direction,
+            localNodes: <FocusNode>[node],
+          )) {
+            node.focusInDirection(direction);
+          }
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: SettingsFocusFrame(
+        padding: EdgeInsets.zero,
+        variant: SettingsFocusFrameVariant.rowOnly,
+        focused: _focused,
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+          onTap: widget.busy ? null : widget.onPreview,
+          leading: Icon(
+            widget.isAuto ? Icons.auto_mode_outlined : Icons.settings_backup_restore,
+            color: widget.isSelected ? Colors.cyanAccent : Colors.white70,
+          ),
+          title: Text(
+            widget.name,
+            style: TextStyle(
+              color: widget.isSelected ? Colors.cyanAccent : Colors.white,
+              fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          subtitle: Text(
+            "${widget.date}  -  ${widget.size} KB ${widget.isAuto ? '(Tự động)' : '(Thủ công)'}",
+            style: const TextStyle(color: Colors.white54),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.preview_outlined, color: Colors.cyan),
+                tooltip: "Xem trước",
+                onPressed: widget.busy ? null : widget.onPreview,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                tooltip: "Xóa",
+                onPressed: widget.busy ? null : widget.onDelete,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
