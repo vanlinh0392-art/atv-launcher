@@ -412,7 +412,7 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
       return null;
     }
     final currentGrid = _settingsAdaptiveGridOf(current);
-    if (currentGrid == null) {
+    if (currentGrid == null || currentGrid.forceSingleColumn) {
       return null;
     }
     final step = direction == TraversalDirection.left ? -1 : 1;
@@ -497,10 +497,19 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
               node.context != null &&
               node.enclosingScope != null,
         )
-        .toList(growable: false);
+        .toList(growable: true);
     if (candidates.isEmpty) {
       return null;
     }
+    candidates.sort((a, b) {
+      final rectA = a.rect;
+      final rectB = b.rect;
+      final yCompare = rectA.top.round().compareTo(rectB.top.round());
+      if (yCompare != 0) {
+        return yCompare;
+      }
+      return rectA.left.round().compareTo(rectB.left.round());
+    });
     return candidates.first;
   }
 

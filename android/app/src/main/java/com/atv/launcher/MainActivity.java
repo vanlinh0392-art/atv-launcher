@@ -364,6 +364,24 @@ public class MainActivity extends FlutterActivity {
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_start");
         handleForegroundWakeFallback("activity_start", returningToForeground);
         scheduleSystemEventPollingIfActive();
+
+        if (!hasPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)) {
+            boolean adbEnabled = false;
+            try {
+                adbEnabled = android.provider.Settings.Global.getInt(getContentResolver(), android.provider.Settings.Global.ADB_ENABLED, 0) == 1;
+            } catch (Exception ignored) {}
+            if (adbEnabled) {
+                android.util.Log.i("MainActivity", "WRITE_SECURE_SETTINGS is missing but ADB is enabled, running auto-grant in background...");
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(1500);
+                        grantWriteSecureSettingsWithLocalAdb();
+                    } catch (Exception e) {
+                        android.util.Log.w("MainActivity", "Auto-grant failed", e);
+                    }
+                }).start();
+            }
+        }
     }
 
     @Override
@@ -591,7 +609,11 @@ public class MainActivity extends FlutterActivity {
             case "getSystemBridgeStatus" -> result.success(buildSystemBridgeStatus());
             case "getProvisioningChecklist" -> result.success(buildProvisioningChecklist());
             case "getAdbAutomationStatus" -> result.success(SystemBridgeCoordinator.buildAdbAutomationStatus(this));
-            case "getAccessibilityManagerSnapshot" -> result.success(buildAccessibilityManagerSnapshot());
+            case "getAccessibilityManagerSnapshot" -> {
+                Boolean includeApps = call.argument("includeApps");
+                if (includeApps == null) includeApps = true;
+                result.success(buildAccessibilityManagerSnapshot(includeApps));
+            }
             case "setVoiceMode" -> result.success(setVoiceMode(call));
             case "setVoiceInterceptEnabled" -> result.success(setVoiceInterceptEnabled(call));
             case "startKeyLearning" -> result.success(startKeyLearning());
@@ -639,6 +661,9 @@ public class MainActivity extends FlutterActivity {
             case "exportSettingsBackup" -> exportSettingsBackup(call, result);
             case "importSettingsBackup" -> importSettingsBackup(result, "import");
             case "previewBackup" -> importSettingsBackup(result, "preview");
+            case "getLocalBackups" -> result.success(getLocalBackups());
+            case "readLocalBackup" -> result.success(readLocalBackup(call));
+            case "deleteLocalBackup" -> result.success(deleteLocalBackup(call));
             case "recordBackupRestoreResult" -> result.success(recordBackupRestoreResult(call));
             case "getVideoWallpaperTextureId" -> result.success(
                     sharedVideoWallpaperController == null
@@ -1525,7 +1550,11 @@ public class MainActivity extends FlutterActivity {
     }
 
     private Map<String, Object> buildAccessibilityManagerSnapshot() {
-        AccessibilityGrantCoordinator.ScanSnapshot snapshot = AccessibilityGrantCoordinator.loadSnapshot(this);
+        return buildAccessibilityManagerSnapshot(true);
+    }
+
+    private Map<String, Object> buildAccessibilityManagerSnapshot(boolean includeApps) {
+        AccessibilityGrantCoordinator.ScanSnapshot snapshot = AccessibilityGrantCoordinator.loadSnapshot(this, includeApps);
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("writeSecureSettingsGranted", snapshot.writeSecureSettingsGranted);
         map.put("accessibilityMasterEnabled", snapshot.accessibilityMasterEnabled);
@@ -3948,6 +3977,56 @@ public class MainActivity extends FlutterActivity {
         } catch (Settings.SettingNotFoundException ignored) {
             return fallback;
         }
+    }
+
+    private List<Map<String, Object>> getLocalBackups() {
+        File directory = getExternalFilesDir("backups");
+        if (directory == null) {
+            directory = new File(getFilesDir(), "backups");
+        }
+        File[] files = directory.listFiles();
+        List<Map<String, Object>> list = new ArrayList<>();
+        if (files != null) {
+            Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+            for (File file : files) {
+                if (file.isFile() && file.getName().endsWith(".json")) {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("name", file.getName());
+                    map.put("path", file.getAbsolutePath());
+                    map.put("size", file.length());
+                    map.put("lastModified", file.lastModified());
+                    list.add(map);
+                }
+            }
+        }
+        return list;
+    }
+
+    private String readLocalBackup(MethodCall call) {
+        String fileName = call.argument("fileName");
+        File directory = getExternalFilesDir("backups");
+        if (directory == null) {
+            directory = new File(getFilesDir(), "backups");
+        }
+        File file = new File(directory, fileName);
+        if (!file.exists()) {
+            return "";
+        }
+        try {
+            return readTextFromUri(Uri.fromFile(file));
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private boolean deleteLocalBackup(MethodCall call) {
+        String fileName = call.argument("fileName");
+        File directory = getExternalFilesDir("backups");
+        if (directory == null) {
+            directory = new File(getFilesDir(), "backups");
+        }
+        File file = new File(directory, fileName);
+        return file.exists() && file.delete();
     }
 
     private String formatTime(long epochMillis) {

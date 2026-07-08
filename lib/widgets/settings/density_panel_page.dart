@@ -142,6 +142,7 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
               SettingsAdaptiveGrid(
                 minChildWidth: 220,
                 maxColumns: 2,
+                forceSingleColumn: false,
                 children: [
                   SettingsActionCard(
                     key: const Key('density_apply_button'),

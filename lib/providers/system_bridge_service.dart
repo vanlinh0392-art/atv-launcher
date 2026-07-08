@@ -75,8 +75,8 @@ class SystemBridgeService extends ChangeNotifier {
     }
   }
 
-  Future<void> refreshAccessibilitySnapshot() async {
-    final nextSnapshot = await _channel.getAccessibilityManagerSnapshot();
+  Future<void> refreshAccessibilitySnapshot({bool includeApps = true}) async {
+    final nextSnapshot = await _channel.getAccessibilityManagerSnapshot(includeApps: includeApps);
     if (_deepEquals(_accessibilitySnapshot, nextSnapshot)) {
       return;
     }
@@ -266,6 +266,10 @@ class SystemBridgeService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> previewBackup() async =>
       _channel.previewBackup();
+
+  Future<List<Map<String, dynamic>>> getLocalBackups() => _channel.getLocalBackups();
+  Future<String> readLocalBackup(String fileName) => _channel.readLocalBackup(fileName);
+  Future<bool> deleteLocalBackup(String fileName) => _channel.deleteLocalBackup(fileName);
 
   Future<Map<String, dynamic>> recordBackupRestoreResult({
     required String importName,

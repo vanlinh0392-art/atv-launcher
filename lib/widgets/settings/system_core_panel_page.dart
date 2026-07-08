@@ -204,6 +204,7 @@ class SystemCorePanelPage extends StatelessWidget {
                 runSpacing: 8,
                 minChildWidth: 240,
                 maxColumns: 2,
+                forceSingleColumn: false,
                 children: [
                   _buildCompactActionCard(
                     key: const Key('system_core_enable_now_button'),
@@ -250,6 +251,7 @@ class SystemCorePanelPage extends StatelessWidget {
           runSpacing: 8,
           minChildWidth: 240,
           maxColumns: 2,
+          forceSingleColumn: false,
           children: [
             _buildCompactActionCard(
               key: const Key('system_core_developer_options_button'),
@@ -421,6 +423,7 @@ class _SystemCoreSnapshotSectionState
                   runSpacing: 8,
                   minChildWidth: 220,
                   maxColumns: 2,
+                  forceSingleColumn: false,
                   children: widget.entries
                       .map(
                         (entry) => _SystemCoreSnapshotTile(

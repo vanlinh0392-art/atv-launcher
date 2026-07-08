@@ -26,12 +26,13 @@ class _AccessibilityManagerPanelPageState
     extends State<AccessibilityManagerPanelPage> {
   static const String _summaryDebugLabel = 'accessibility_summary_metrics';
   bool _showManagedApps = false;
+  bool _loadingApps = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SystemBridgeService>().refreshAccessibilitySnapshot();
+      context.read<SystemBridgeService>().refreshAccessibilitySnapshot(includeApps: false);
     });
   }
 
@@ -135,6 +136,7 @@ class _AccessibilityManagerPanelPageState
                     SettingsAdaptiveGrid(
                       minChildWidth: 208,
                       maxColumns: actionsMaxColumns,
+                      forceSingleColumn: false,
                       children: [
                         for (final entry in <_AccessibilityActionConfig>[
                           _AccessibilityActionConfig(
@@ -164,8 +166,8 @@ class _AccessibilityManagerPanelPageState
                           _AccessibilityActionConfig(
                             key: const Key('accessibility_toggle_apps_button'),
                             focusNode: widget.primaryFocusNode,
-                            onPressed: () async {
-                              _setShowManagedApps(
+                            onPressed: _loadingApps ? null : () async {
+                              await _setShowManagedApps(
                                 !_showManagedApps,
                                 managedApps: managedApps,
                               );
@@ -197,7 +199,19 @@ class _AccessibilityManagerPanelPageState
                   ],
                 ),
               ),
-              if (_showManagedApps) ...[
+              if (_loadingApps) ...[
+                const SizedBox(height: 18),
+                const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
+                    ),
+                  ),
+                ),
+              ] else if (_showManagedApps) ...[
                 const SizedBox(height: 18),
                 SettingsSurfaceCard(
                   child: Column(
@@ -276,33 +290,49 @@ class _AccessibilityManagerPanelPageState
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _setShowManagedApps(
+  Future<void> _setShowManagedApps(
     bool value, {
     required List<Map<String, dynamic>> managedApps,
-  }) {
+  }) async {
     if (_showManagedApps == value) {
       return;
     }
-    setState(() {
-      _showManagedApps = value;
-    });
-    if (!value || managedApps.isEmpty) {
-      return;
-    }
-    final firstApp = managedApps.first;
-    final debugLabel = buildManagedAccessibilityAppDebugLabel(
-      title: firstApp['label']?.toString() ??
-          ((firstApp['packageName']?.toString() ?? '').isEmpty
-              ? '-'
-              : firstApp['packageName'].toString()),
-      subtitle: firstApp['packageName']?.toString() ?? '',
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+    if (value) {
+      setState(() {
+        _loadingApps = true;
+      });
+      await context.read<SystemBridgeService>().refreshAccessibilitySnapshot(includeApps: true);
+      if (!mounted) return;
+      setState(() {
+        _loadingApps = false;
+        _showManagedApps = true;
+      });
+      final snapshot = context.read<SystemBridgeService>().accessibilitySnapshot;
+      final newManagedApps = (((snapshot['apps'] as List?) ?? const [])
+          .map((item) => (item as Map).cast<String, dynamic>())
+          .toList(growable: false));
+      if (newManagedApps.isEmpty) {
         return;
       }
-      focusCurrentSettingsNodeByDebugLabel(debugLabel);
-    });
+      final firstApp = newManagedApps.first;
+      final debugLabel = buildManagedAccessibilityAppDebugLabel(
+        title: firstApp['label']?.toString() ??
+            ((firstApp['packageName']?.toString() ?? '').isEmpty
+                ? '-'
+                : firstApp['packageName'].toString()),
+        subtitle: firstApp['packageName']?.toString() ?? '',
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        focusCurrentSettingsNodeByDebugLabel(debugLabel);
+      });
+    } else {
+      setState(() {
+        _showManagedApps = false;
+      });
+    }
   }
 
   bool _focusManagedAppsToggle() {

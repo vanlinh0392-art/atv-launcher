@@ -84,10 +84,16 @@ public final class AccessibilityGrantCoordinator {
     }
 
     public static ScanSnapshot loadSnapshot(Context context) {
+        return loadSnapshot(context, true);
+    }
+
+    public static ScanSnapshot loadSnapshot(Context context, boolean includeApps) {
         Context appContext = context.getApplicationContext();
         AccessibilityState state = readAccessibilityState(appContext);
         Set<String> managedPackages = AccessStateStore.getManagedPackageNames(appContext);
-        List<AppEntry> apps = buildAppEntries(appContext, state, managedPackages);
+        List<AppEntry> apps = includeApps 
+                ? buildAppEntries(appContext, state, managedPackages)
+                : new java.util.ArrayList<>();
         return new ScanSnapshot(
                 apps,
                 state.writeSecureSettingsGranted,

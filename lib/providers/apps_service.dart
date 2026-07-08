@@ -48,6 +48,9 @@ class AppsService extends ChangeNotifier {
   final Duration _liveSyncRetryDelay;
   final Duration _liveSyncWarmDelay;
 
+  final StreamController<App> _appInstalledController = StreamController<App>.broadcast();
+  Stream<App> get onAppInstalled => _appInstalledController.stream;
+
   bool _initialized = false;
   bool _staleCache = false;
   String _startupPhase = startupPhaseBootstrapCached;
@@ -136,6 +139,9 @@ class AppsService extends ChangeNotifier {
           App application = App.fromSystem(applicationInfo);
           _applications[application.packageName] = application;
           changedImagePackageName = application.packageName;
+          if (event["action"] == "PACKAGE_ADDED") {
+            _appInstalledController.add(application);
+          }
           break;
         case "PACKAGES_AVAILABLE":
           List<dynamic> applicationsInfo = event["activitiesInfo"];
@@ -1379,6 +1385,7 @@ class AppsService extends ChangeNotifier {
   void dispose() {
     _liveSyncRetryTimer?.cancel();
     _appsChangedNotifyTimer?.cancel();
+    _appInstalledController.close();
     super.dispose();
   }
 

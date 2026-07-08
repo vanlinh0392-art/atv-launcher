@@ -10,6 +10,7 @@ import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -32,6 +33,27 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
   String _previewName = '';
   String _lastMessage = '';
   bool _busy = false;
+  List<Map<String, dynamic>> _localBackups = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadLocalBackups();
+    });
+  }
+
+  Future<void> _loadLocalBackups() async {
+    try {
+      final bridge = context.read<SystemBridgeService>();
+      final List<Map<String, dynamic>> list = await bridge.getLocalBackups();
+      setState(() {
+        _localBackups = list;
+      });
+    } catch (e) {
+      debugPrint("Error loading local backups: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +101,7 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
           child: SettingsAdaptiveGrid(
             minChildWidth: 230,
             maxColumns: 2,
+            forceSingleColumn: false,
             children: [
               SettingsActionCard(
                 focusNode: widget.primaryFocusNode,
@@ -121,6 +144,113 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
           Text(_lastMessage, style: Theme.of(context).textTheme.bodyMedium),
         ],
         const SizedBox(height: 18),
+        Text(
+          "Bản sao lưu cục bộ",
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        SettingsSurfaceCard(
+          padding: const EdgeInsets.all(10),
+          child: _localBackups.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Center(
+                    child: Text(
+                      "Chưa có bản sao lưu nào trong bộ nhớ thiết bị.",
+                      style: TextStyle(color: Colors.white60),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _localBackups.length,
+                  separatorBuilder: (_, __) => const Divider(color: Colors.white10),
+                  itemBuilder: (context, index) {
+                    final item = _localBackups[index];
+                    final name = item['name']?.toString() ?? '';
+                    final isAuto = name.startsWith('atv-launcher-auto-backup-');
+                    final date = DateTime.fromMillisecondsSinceEpoch(
+                      (item['lastModified'] as num? ?? 0).toInt(),
+                    ).toLocal().toString().substring(0, 19);
+                    final size = ((item['size'] as num? ?? 0) / 1024).toStringAsFixed(1);
+                    final isSelected = _previewName == name;
+                    
+                    return Focus(
+                      onKeyEvent: (node, event) {
+                        if (event is! KeyDownEvent) {
+                          return KeyEventResult.ignored;
+                        }
+                        if (isSettingsActivateKey(event.logicalKey)) {
+                          if (!_busy) _previewLocalBackup(name);
+                          return KeyEventResult.handled;
+                        }
+                        final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+                            ? TraversalDirection.up
+                            : event.logicalKey == LogicalKeyboardKey.arrowDown
+                                ? TraversalDirection.down
+                                : null;
+                        if (direction != null) {
+                          if (!moveSettingsVerticalFocus(
+                            direction: direction,
+                            localNodes: <FocusNode>[node],
+                          )) {
+                            node.focusInDirection(direction);
+                          }
+                          return KeyEventResult.handled;
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: Builder(
+                        builder: (context) {
+                          final focused = Focus.of(context).hasFocus;
+                          return SettingsFocusFrame(
+                            padding: EdgeInsets.zero,
+                            variant: SettingsFocusFrameVariant.rowOnly,
+                            focused: focused,
+                            child: ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                              onTap: _busy ? null : () => _previewLocalBackup(name),
+                              leading: Icon(
+                                isAuto ? Icons.auto_mode_outlined : Icons.settings_backup_restore,
+                                color: isSelected ? Colors.cyanAccent : Colors.white70,
+                              ),
+                              title: Text(
+                                name,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.cyanAccent : Colors.white,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              subtitle: Text(
+                                "$date  -  $size KB ${isAuto ? '(Tự động)' : '(Thủ công)'}",
+                                style: const TextStyle(color: Colors.white54),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.preview_outlined, color: Colors.cyan),
+                                    tooltip: "Xem trước",
+                                    onPressed: _busy ? null : () => _previewLocalBackup(name),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                    tooltip: "Xóa",
+                                    onPressed: _busy ? null : () => _deleteLocalBackup(name),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+        const SizedBox(height: 18),
         SettingsSurfaceCard(
           child: _preview == null
               ? Text(localizations.backupPreviewEmptyState)
@@ -161,6 +291,7 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
                 ) +
                 (exportPath.trim().isEmpty ? '' : '\n$exportPath');
       });
+      await _loadLocalBackups();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -313,6 +444,7 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
             localizations.missingAppsList(unresolvedPackages.join(', ')),
         ].join('\n');
       });
+      await _loadLocalBackups();
     } on FormatException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -324,6 +456,64 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
         _lastMessage =
             AppLocalizations.of(context)!.backupRestoreFailed(error.toString());
       });
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _previewLocalBackup(String fileName) async {
+    setState(() => _busy = true);
+    try {
+      final bridge = context.read<SystemBridgeService>();
+      final content = await bridge.readLocalBackup(fileName);
+      if (!mounted) return;
+
+      final preview = _parseBackupPreview(content);
+      final localizations = AppLocalizations.of(context)!;
+      setState(() {
+        _preview = preview;
+        _previewName = fileName;
+        _lastMessage = localizations.backupPreviewLoadedFrom(fileName);
+      });
+    } on FormatException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _preview = null;
+        _previewName = '';
+        _lastMessage = _localizedBackupFormatMessage(context, error);
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _preview = null;
+        _previewName = '';
+        _lastMessage = AppLocalizations.of(context)!.backupPreviewFailed(error.toString());
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _deleteLocalBackup(String fileName) async {
+    setState(() => _busy = true);
+    try {
+      final bridge = context.read<SystemBridgeService>();
+      final success = await bridge.deleteLocalBackup(fileName);
+      if (success) {
+        await _loadLocalBackups();
+        if (_previewName == fileName) {
+          setState(() {
+            _preview = null;
+            _previewName = '';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error deleting backup: $e");
     } finally {
       if (mounted) {
         setState(() => _busy = false);

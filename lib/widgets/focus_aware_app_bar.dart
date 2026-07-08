@@ -1,4 +1,5 @@
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
+import 'package:flauncher/widgets/settings/applications_panel_page.dart';
 import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/providers/apps_service.dart';
@@ -158,6 +159,10 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
                     icon: Icons.settings_outlined,
                     tooltip: AppLocalizations.of(context)!.settings,
                     onPressed: () => _openSettings(context),
+                    onLongPress: () => _openSettings(
+                      context,
+                      initialRoute: ApplicationsPanelPage.routeName,
+                    ),
                   ),
                   if (!isCompact) ...[
                     const SizedBox(width: _statusBarActionSpacing),
@@ -420,6 +425,7 @@ class _StatusBarIconButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final VoidCallback? onLongPress;
   final Color iconColor;
   final Color? badgeColor;
 
@@ -428,6 +434,7 @@ class _StatusBarIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.onLongPress,
     this.iconColor = _statusBarGlyphColor,
     this.badgeColor,
   });
@@ -438,6 +445,7 @@ class _StatusBarIconButton extends StatelessWidget {
       focusNode: focusNode,
       tooltip: tooltip,
       onPressed: onPressed,
+      onLongPress: onLongPress,
       badgeColor: badgeColor,
       child: Icon(
         icon,
@@ -452,6 +460,7 @@ class _StatusBarActionSurface extends StatefulWidget {
   final FocusNode? focusNode;
   final Widget child;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
   final String? tooltip;
   final Color? badgeColor;
 
@@ -459,6 +468,7 @@ class _StatusBarActionSurface extends StatefulWidget {
     this.focusNode,
     required this.child,
     this.onPressed,
+    this.onLongPress,
     this.tooltip,
     this.badgeColor,
   });
@@ -490,6 +500,7 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
                 ? TextButton(
                     focusNode: widget.focusNode,
                     onPressed: widget.onPressed,
+                    onLongPress: widget.onLongPress,
                     style: _statusBarCompactButtonStyle(intensityFactor),
                     child: widget.child,
                   )

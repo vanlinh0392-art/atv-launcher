@@ -87,8 +87,10 @@ class FLauncherChannel {
   Future<Map<String, dynamic>> getAdbAutomationStatus() async =>
       _invokeMapMethod('getAdbAutomationStatus');
 
-  Future<Map<String, dynamic>> getAccessibilityManagerSnapshot() async =>
-      _invokeMapMethod('getAccessibilityManagerSnapshot');
+  Future<Map<String, dynamic>> getAccessibilityManagerSnapshot({bool includeApps = true}) async =>
+      _invokeMapMethod('getAccessibilityManagerSnapshot', {
+        'includeApps': includeApps,
+      });
 
   Future<Map<String, dynamic>> setVoiceMode({
     int? mode,
@@ -299,6 +301,22 @@ class FLauncherChannel {
         'summary': summary,
         'restoredAt': restoredAt,
       });
+
+  Future<List<Map<String, dynamic>>> getLocalBackups() async {
+    final List<dynamic>? result = await _methodChannel.invokeListMethod<dynamic>('getLocalBackups');
+    if (result == null) return const [];
+    return result.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  Future<String> readLocalBackup(String fileName) async {
+    final String? result = await _methodChannel.invokeMethod<String>('readLocalBackup', {'fileName': fileName});
+    return result ?? '';
+  }
+
+  Future<bool> deleteLocalBackup(String fileName) async {
+    final bool? result = await _methodChannel.invokeMethod<bool>('deleteLocalBackup', {'fileName': fileName});
+    return result ?? false;
+  }
 
   Future<int> getVideoWallpaperTextureId() async =>
       await _methodChannel.invokeMethod<int>('getVideoWallpaperTextureId') ??

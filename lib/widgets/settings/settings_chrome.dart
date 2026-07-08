@@ -388,6 +388,7 @@ class SettingsAdaptiveGrid extends StatelessWidget {
   final double minChildWidth;
   final int? maxColumns;
   final bool avoidTrailingSingleton;
+  final bool forceSingleColumn;
 
   const SettingsAdaptiveGrid({
     super.key,
@@ -397,6 +398,7 @@ class SettingsAdaptiveGrid extends StatelessWidget {
     this.minChildWidth = 260,
     this.maxColumns,
     this.avoidTrailingSingleton = false,
+    this.forceSingleColumn = true,
   });
 
   @override
@@ -407,6 +409,21 @@ class SettingsAdaptiveGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (forceSingleColumn) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children
+                .map(
+                  (child) => Padding(
+                    padding: EdgeInsets.only(bottom: runSpacing),
+                    child: child,
+                  ),
+                )
+                .toList(growable: false),
+          );
+        }
+
         final availableWidth = constraints.hasBoundedWidth
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
@@ -475,6 +492,7 @@ class SettingsMetricsGrid extends StatelessWidget {
       minChildWidth: minChildWidth,
       maxColumns: maxColumns,
       avoidTrailingSingleton: avoidTrailingSingleton,
+      forceSingleColumn: false,
       children: children,
     );
   }

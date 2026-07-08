@@ -16,8 +16,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'dart:async';
+import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'package:flauncher/actions.dart';
+import 'package:flauncher/models/app.dart';
+import 'package:flauncher/models/launcher_backup_payload.dart';
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/providers/profile_security_service.dart';
+import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
@@ -61,6 +68,8 @@ class _FLauncherAppState extends State<FLauncherApp>
 
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   SystemBridgeService? _systemBridgeService;
+  StreamSubscription<App>? _appInstalledSubscription;
+  bool _autoBackupChecking = false;
   int _lastHandledHomeSequence = 0;
   int _lastHandledBenchmarkSequence = 0;
   bool _bridgeSnapshotPrimed = false;
@@ -81,6 +90,13 @@ class _FLauncherAppState extends State<FLauncherApp>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final nextBridgeService = context.read<SystemBridgeService>();
+    
+    final appsService = context.read<AppsService>();
+    _appInstalledSubscription?.cancel();
+    _appInstalledSubscription = appsService.onAppInstalled.listen((app) {
+      _showNewAppPlacementDialog(app);
+    });
+
     if (identical(_systemBridgeService, nextBridgeService)) {
       return;
     }
@@ -108,10 +124,19 @@ class _FLauncherAppState extends State<FLauncherApp>
         _scheduleAdbLocalOnboardingCheck();
       });
     }
+    if (nextBridgeService.initialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_systemBridgeService, nextBridgeService)) {
+          return;
+        }
+        _checkAndRunAutoBackup();
+      });
+    }
   }
 
   @override
   void dispose() {
+    _appInstalledSubscription?.cancel();
     _systemBridgeService?.removeListener(_handleSystemBridgeChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -145,6 +170,7 @@ class _FLauncherAppState extends State<FLauncherApp>
       if (benchmark.sequence <= 0 || benchmark.action.isEmpty) {
         _lastHandledBenchmarkSequence = benchmark.sequence;
       }
+      _checkAndRunAutoBackup();
     }
     if (benchmark.sequence > _lastHandledBenchmarkSequence) {
       _lastHandledBenchmarkSequence = benchmark.sequence;
@@ -510,6 +536,140 @@ class _FLauncherAppState extends State<FLauncherApp>
                 launcherState.handleBackNavigation(context);
               })),
     );
+  }
+
+  Future<void> _showNewAppPlacementDialog(App app) async {
+    final rootContext = _navigatorKey.currentContext;
+    if (rootContext == null) return;
+    
+    final appsService = rootContext.read<AppsService>();
+    final tvCategory = appsService.categories.firstWhereOrNull((c) => c.name == 'TV Applications');
+    final nonTvCategory = appsService.categories.firstWhereOrNull((c) => c.name == 'Non-TV Applications');
+
+    await showDialog<void>(
+      context: rootContext,
+      useRootNavigator: true,
+      builder: (context) => AlertDialog(
+        title: const Text("Thêm ứng dụng mới"),
+        content: Text("Bạn muốn thêm ứng dụng '${app.name}' vào nhóm nào trên màn hình chính?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Bỏ qua"),
+          ),
+          if (nonTvCategory != null)
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await appsService.addToCategory(app, nonTvCategory);
+              },
+              child: const Text("Ứng dụng không dành cho TV"),
+            ),
+          if (tvCategory != null)
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await appsService.addToCategory(app, tvCategory);
+              },
+              child: const Text("Ứng dụng TV"),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkAndRunAutoBackup() async {
+    if (!mounted || _autoBackupChecking) return;
+    _autoBackupChecking = true;
+    try {
+      final settings = context.read<SettingsService>();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final lastAutoBackup = settings.backupLastAutoAt;
+
+      if (now - lastAutoBackup >= 86400000) {
+        await settings.setBackupLastAutoAt(now);
+
+        final bridge = context.read<SystemBridgeService>();
+        await bridge.refreshAccessibilitySnapshot();
+        await bridge.refresh();
+        final appsService = context.read<AppsService>();
+        final security = context.read<ProfileSecurityService>();
+        final search = context.read<SearchService>();
+
+        final managedPackages = bridge.accessibilityApps
+            .where((app) => app['managed'] == true)
+            .map((app) => app['packageName']?.toString() ?? '')
+            .where((value) => value.isNotEmpty)
+            .toList(growable: false);
+
+        final payload = <String, dynamic>{
+          'version': LauncherBackupPayload.currentVersion,
+          'schema': LauncherBackupPayload.schemaId,
+          'packageName': bridge.provisioningStatus['packageName']?.toString() ?? 'com.atv.launcher',
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'settings': settings.toBackupMap(),
+          'launcherLayout': appsService.exportLayoutBackup(),
+          'profileSecurity': security.toBackupMap(),
+          'search': search.toBackupMap(),
+          'systemBridge': <String, dynamic>{
+            'voice': <String, dynamic>{
+              'mode': bridge.voiceStatus['mode'],
+              'keyCode': bridge.voiceStatus['keyCode'],
+              'interceptEnabled': bridge.voiceStatus['interceptEnabled'],
+            },
+            'accessibility': <String, dynamic>{
+              'managedPackages': managedPackages,
+            },
+            'adbAutomation': <String, dynamic>{
+              'policy': bridge.adbAutomationStatus['policy'],
+              'disableOnSleep': bridge.adbAutomationStatus['disableOnSleep'],
+            },
+            'density': <String, dynamic>{
+              'overrideDensity': bridge.densityStatus['overrideDensity'],
+            },
+            'privateDns': <String, dynamic>{
+              'mode': bridge.privateDnsStatus['mode'],
+              'specifier': bridge.privateDnsStatus['specifier'],
+            },
+          },
+        };
+
+        final json = const JsonEncoder.withIndent('  ').convert(payload);
+        final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+        final fileName = 'atv-launcher-auto-backup-$timestamp.json';
+
+        await bridge.exportSettingsBackup(
+          fileName: fileName,
+          content: json,
+        );
+
+        await _rotateAutoBackups(bridge);
+      }
+    } catch (e) {
+      debugPrint("Auto backup failed: $e");
+    } finally {
+      _autoBackupChecking = false;
+    }
+  }
+
+  Future<void> _rotateAutoBackups(SystemBridgeService bridge) async {
+    try {
+      final List<dynamic> localBackups = await bridge.getLocalBackups();
+      final autoBackups = localBackups
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .where((item) => item['name'] != null && item['name'].toString().startsWith('atv-launcher-auto-backup-'))
+          .toList();
+
+      if (autoBackups.length > 3) {
+        for (int i = 3; i < autoBackups.length; i++) {
+          final fileName = autoBackups[i]['name'].toString();
+          await bridge.deleteLocalBackup(fileName);
+          debugPrint("Deleted old auto backup: $fileName");
+        }
+      }
+    } catch (e) {
+      debugPrint("Failed to rotate auto backups: $e");
+    }
   }
 }
 
