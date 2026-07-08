@@ -17,9 +17,11 @@
  */
 
 import 'package:flauncher/providers/apps_service.dart';
-import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/launcher_section_panel_page.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -35,7 +37,7 @@ class LauncherSectionsPanelPage extends StatelessWidget {
       children: [
         Text(localizations.launcherSections,
             style: Theme.of(context).textTheme.titleLarge),
-        Divider(),
+        const Divider(),
         Consumer<AppsService>(
           builder: (_, service, __) {
             List<LauncherSection> sections = service.launcherSections;
@@ -47,17 +49,21 @@ class LauncherSectionsPanelPage extends StatelessWidget {
                     int index = tuple.$1;
                     bool last = index == sections.length - 1;
 
-                    return _section(
-                        context, sections[index], index, last, index == 0);
+                    return _SectionItem(
+                      section: sections[index],
+                      index: index,
+                      last: last,
+                      autofocus: index == 0,
+                    );
                   }).toList(),
                 ),
               ),
             );
           },
         ),
-        SizedBox(height: 4, width: 0),
+        const SizedBox(height: 4, width: 0),
         TextButton.icon(
-          icon: Icon(Icons.add),
+          icon: const Icon(Icons.add),
           label: Text(localizations.addSection),
           onPressed: () {
             Navigator.pushNamed(context, LauncherSectionPanelPage.routeName);
@@ -66,59 +72,123 @@ class LauncherSectionsPanelPage extends StatelessWidget {
       ],
     );
   }
+}
 
-  Widget _section(BuildContext context, LauncherSection section, int index,
-      bool last, bool autofocus) {
+class _SectionItem extends StatefulWidget {
+  final LauncherSection section;
+  final int index;
+  final bool last;
+  final bool autofocus;
+
+  const _SectionItem({
+    required this.section,
+    required this.index,
+    required this.last,
+    this.autofocus = false,
+  });
+
+  @override
+  State<_SectionItem> createState() => _SectionItemState();
+}
+
+class _SectionItemState extends State<_SectionItem> {
+  bool _focused = false;
+
+  void _onFocusChange(bool focused) {
+    setState(() => _focused = focused);
+    if (focused) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Scrollable.ensureVisible(
+          context,
+          alignment: 0.3,
+          duration: const Duration(milliseconds: 50),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     AppLocalizations localizations = AppLocalizations.of(context)!;
-
     String title = localizations.spacer;
-    if (section is Category) {
-      title = section.name;
-
+    if (widget.section is Category) {
+      title = (widget.section as Category).name;
       if (title == localizations.spacer) {
         title = localizations.disambiguateCategoryTitle(title);
       }
     }
 
     return Padding(
-      //key: Key(section.order.toString()),
-      padding: EdgeInsets.only(bottom: 8),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: EnsureVisible(
-          alignment: 0.5,
-          child: ListTile(
-            dense: true,
-            title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  constraints: BoxConstraints(),
-                  splashRadius: 20,
-                  icon: Icon(Icons.arrow_upward),
-                  onPressed:
-                      index > 0 ? () => _move(context, index, index - 1) : null,
-                ),
-                IconButton(
-                  constraints: BoxConstraints(),
-                  splashRadius: 20,
-                  icon: Icon(Icons.arrow_downward),
-                  onPressed:
-                      last ? null : () => _move(context, index, index + 1),
-                ),
-                IconButton(
-                  autofocus: autofocus,
-                  constraints: BoxConstraints(),
-                  splashRadius: 20,
-                  icon: Icon(Icons.settings),
-                  onPressed: () {
-                    Navigator.pushNamed(
-                        context, LauncherSectionPanelPage.routeName,
-                        arguments: index);
-                  },
-                ),
-              ],
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Focus(
+        onFocusChange: _onFocusChange,
+        onKeyEvent: (node, event) {
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          if (isSettingsActivateKey(event.logicalKey)) {
+            Navigator.pushNamed(
+                context, LauncherSectionPanelPage.routeName,
+                arguments: widget.index);
+            return KeyEventResult.handled;
+          }
+          final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+              ? TraversalDirection.up
+              : event.logicalKey == LogicalKeyboardKey.arrowDown
+                  ? TraversalDirection.down
+                  : null;
+          if (direction != null) {
+            if (!moveSettingsVerticalFocus(
+              direction: direction,
+              localNodes: <FocusNode>[node],
+            )) {
+              node.focusInDirection(direction);
+            }
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: SettingsFocusFrame(
+          padding: EdgeInsets.zero,
+          variant: SettingsFocusFrameVariant.rowOnly,
+          focused: _focused,
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              dense: true,
+              autofocus: widget.autofocus,
+              title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    constraints: const BoxConstraints(),
+                    splashRadius: 20,
+                    icon: const Icon(Icons.arrow_upward),
+                    onPressed: widget.index > 0
+                        ? () => _move(context, widget.index, widget.index - 1)
+                        : null,
+                  ),
+                  IconButton(
+                    constraints: const BoxConstraints(),
+                    splashRadius: 20,
+                    icon: const Icon(Icons.arrow_downward),
+                    onPressed: widget.last
+                        ? null
+                        : () => _move(context, widget.index, widget.index + 1),
+                  ),
+                  IconButton(
+                    constraints: const BoxConstraints(),
+                    splashRadius: 20,
+                    icon: const Icon(Icons.settings),
+                    onPressed: () {
+                      Navigator.pushNamed(
+                          context, LauncherSectionPanelPage.routeName,
+                          arguments: widget.index);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -130,3 +200,4 @@ class LauncherSectionsPanelPage extends StatelessWidget {
     await context.read<AppsService>().moveSection(oldIndex, newIndex);
   }
 }
+

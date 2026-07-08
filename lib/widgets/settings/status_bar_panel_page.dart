@@ -41,6 +41,7 @@ class StatusBarPanelPage extends StatelessWidget {
     final settings = context.watch<SettingsService>();
 
     return ListView(
+      key: const PageStorageKey<String>(StatusBarPanelPage.routeName),
       children: [
         SettingsSummarySection(
           debugLabel: _summaryDebugLabel,

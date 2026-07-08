@@ -16,13 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import 'dart:typed_data';
-
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/widgets/add_to_category_dialog.dart';
 import 'package:flauncher/widgets/application_info_panel.dart';
-import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flutter/material.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -96,8 +96,7 @@ class _TVTab extends StatelessWidget {
             .toList(),
         builder: (context, applications, _) => ListView(
           children: applications
-              .map((application) => EnsureVisible(
-                  alignment: 0.5, child: _AppListItem(application)))
+              .map((application) => _AppListItem(application))
               .toList(),
         ),
       );
@@ -111,8 +110,7 @@ class _SideloadedTab extends StatelessWidget {
             .toList(),
         builder: (context, applications, _) => ListView(
           children: applications
-              .map((application) => EnsureVisible(
-                  alignment: 0.5, child: _AppListItem(application)))
+              .map((application) => _AppListItem(application))
               .toList(),
         ),
       );
@@ -125,8 +123,7 @@ class _HiddenTab extends StatelessWidget {
             appsService.applications.where((app) => app.hidden).toList(),
         builder: (context, applications, _) => ListView(
           children: applications
-              .map((application) => EnsureVisible(
-                  alignment: 0.5, child: _AppListItem(application)))
+              .map((application) => _AppListItem(application))
               .toList(),
         ),
       );
@@ -143,6 +140,34 @@ class _AppListItem extends StatefulWidget {
 
 class _AppListItemState extends State<_AppListItem> {
   late Future<ImageProvider> _iconLoadFuture;
+  bool _focused = false;
+  ImageProvider? _resolvedIcon;
+
+  void _onFocusChange(bool focused) {
+    setState(() => _focused = focused);
+    if (focused) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Scrollable.ensureVisible(
+          context,
+          alignment: 0.3,
+          duration: const Duration(milliseconds: 50),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
+  }
+
+  void _showAppInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => ApplicationInfoPanel(
+        category: null,
+        application: widget.application,
+        applicationIcon: _resolvedIcon,
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -154,67 +179,92 @@ class _AppListItemState extends State<_AppListItem> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-        clipBehavior: Clip.antiAlias,
-        child: FutureBuilder(
-          future: _iconLoadFuture,
-          builder: (context, snapshot) {
-            Widget appIcon;
+    return Focus(
+      onFocusChange: _onFocusChange,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (isSettingsActivateKey(event.logicalKey)) {
+          _showAppInfo();
+          return KeyEventResult.handled;
+        }
+        final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
+            ? TraversalDirection.up
+            : event.logicalKey == LogicalKeyboardKey.arrowDown
+                ? TraversalDirection.down
+                : null;
+        if (direction != null) {
+          if (!moveSettingsVerticalFocus(
+            direction: direction,
+            localNodes: <FocusNode>[node],
+          )) {
+            node.focusInDirection(direction);
+          }
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: SettingsFocusFrame(
+        padding: EdgeInsets.zero,
+        variant: SettingsFocusFrameVariant.rowOnly,
+        focused: _focused,
+        child: Card(
+            clipBehavior: Clip.antiAlias,
+            margin: EdgeInsets.zero,
+            child: FutureBuilder(
+              future: _iconLoadFuture,
+              builder: (context, snapshot) {
+                Widget appIcon;
 
-            if (snapshot.hasData) {
-              appIcon = Image(image: snapshot.data!, height: 48);
-            } else if (snapshot.hasError) {
-              appIcon = const Icon(Icons.warning);
-            } else {
-              appIcon = const SizedBox(
-                  height: 48,
-                  width: 48,
-                  child: Padding(
-                    padding: EdgeInsets.all(8),
-                    child: CircularProgressIndicator(),
-                  ));
-            }
+                if (snapshot.hasData) {
+                  _resolvedIcon = snapshot.data;
+                  appIcon = Image(image: snapshot.data!, height: 48);
+                } else if (snapshot.hasError) {
+                  appIcon = const Icon(Icons.warning);
+                } else {
+                  appIcon = const SizedBox(
+                      height: 48,
+                      width: 48,
+                      child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: CircularProgressIndicator(),
+                      ));
+                }
 
-            return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: Text(
-                widget.application.name,
-                style: Theme.of(context).textTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              leading: appIcon,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!widget.application.hidden)
-                    IconButton(
-                      constraints: const BoxConstraints(),
-                      splashRadius: 20,
-                      icon: const Icon(Icons.add_box_outlined),
-                      onPressed: () => showDialog<Category>(
-                        context: context,
-                        builder: (_) => AddToCategoryDialog(widget.application),
-                      ),
-                    ),
-                  IconButton(
-                    constraints: const BoxConstraints(),
-                    splashRadius: 20,
-                    icon: const Icon(Icons.info_outline),
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (context) => ApplicationInfoPanel(
-                        category: null,
-                        application: widget.application,
-                        applicationIcon: snapshot.data,
-                      ),
-                    ),
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  title: Text(
+                    widget.application.name,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-            );
-          },
-        ));
+                  leading: appIcon,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!widget.application.hidden)
+                        IconButton(
+                          constraints: const BoxConstraints(),
+                          splashRadius: 20,
+                          icon: const Icon(Icons.add_box_outlined),
+                          onPressed: () => showDialog<Category>(
+                            context: context,
+                            builder: (_) => AddToCategoryDialog(widget.application),
+                          ),
+                        ),
+                      IconButton(
+                        constraints: const BoxConstraints(),
+                        splashRadius: 20,
+                        icon: const Icon(Icons.info_outline),
+                        onPressed: _showAppInfo,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            )),
+      ),
+    );
   }
 
   Future<ImageProvider> _loadAppIcon(AppsService service) async {

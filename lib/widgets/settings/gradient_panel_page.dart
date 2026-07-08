@@ -18,7 +18,7 @@
 
 import 'package:flauncher/gradients.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
-import 'package:flauncher/widgets/ensure_visible.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -37,57 +37,87 @@ class GradientPanelPage extends StatelessWidget {
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
               children: FLauncherGradients.all
-                  .map((gradient) => EnsureVisible(
-                      alignment: 0.5, child: _gradientCard(gradient)))
+                  .map((gradient) => _GradientCardItem(
+                      gradient: gradient,
+                      autofocus: gradient == FLauncherGradients.greatWhale))
                   .toList(),
             ),
           ),
         ],
       );
-
-  Widget _gradientCard(FLauncherGradient fLauncherGradient) => Focus(
-        key: Key("gradient-${fLauncherGradient.uuid}"),
-        canRequestFocus: false,
-        child: Builder(
-          builder: (context) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  shape: _cardBorder(Focus.of(context).hasFocus),
-                  child: InkWell(
-                    autofocus:
-                        fLauncherGradient == FLauncherGradients.greatWhale,
-                    onTap: () => context
-                        .read<WallpaperService>()
-                        .setGradient(fLauncherGradient),
-                    child: Container(
-                        decoration: BoxDecoration(
-                            gradient: fLauncherGradient.gradient)),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: AnimatedDefaultTextStyle(
-                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                        decoration: TextDecoration.underline,
-                        color: Focus.of(context).hasFocus ? Colors.white : null,
-                      ),
-                  duration: const Duration(milliseconds: 90),
-                  child: Text(fLauncherGradient.name,
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  ShapeBorder? _cardBorder(bool hasFocus) => hasFocus
-      ? RoundedRectangleBorder(
-          side: const BorderSide(color: Colors.white, width: 2),
-          borderRadius: BorderRadius.circular(4))
-      : null;
 }
+
+class _GradientCardItem extends StatefulWidget {
+  final FLauncherGradient gradient;
+  final bool autofocus;
+
+  const _GradientCardItem({
+    required this.gradient,
+    this.autofocus = false,
+  });
+
+  @override
+  State<_GradientCardItem> createState() => _GradientCardItemState();
+}
+
+class _GradientCardItemState extends State<_GradientCardItem> {
+  bool _focused = false;
+
+  void _onFocusChange(bool focused) {
+    setState(() => _focused = focused);
+    if (focused) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Scrollable.ensureVisible(
+          context,
+          alignment: 0.3,
+          duration: const Duration(milliseconds: 50),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: _onFocusChange,
+      child: SettingsFocusFrame(
+        padding: EdgeInsets.zero,
+        focused: _focused,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                margin: EdgeInsets.zero,
+                child: InkWell(
+                  autofocus: widget.autofocus,
+                  onTap: () => context
+                      .read<WallpaperService>()
+                      .setGradient(widget.gradient),
+                  child: Container(
+                      decoration: BoxDecoration(
+                          gradient: widget.gradient.gradient)),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                widget.gradient.name,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _focused ? Colors.white : null,
+                      decoration: TextDecoration.underline,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

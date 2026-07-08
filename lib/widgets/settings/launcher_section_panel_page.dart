@@ -19,6 +19,7 @@
 import 'dart:async';
 
 import 'package:flauncher/providers/apps_service.dart';
+import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -653,12 +654,17 @@ class _LauncherSpacerSettingsState extends State<_LauncherSpacerSettings> {
 
 Widget _listTile(BuildContext context, Widget title, Widget subtitle,
         {Widget? trailing}) =>
-    Material(
-        type: MaterialType.transparency,
-        child: ListTile(
-          dense: true,
-          minVerticalPadding: 8,
-          title: title,
-          subtitle: subtitle,
-          trailing: trailing,
-        ));
+    EnsureVisible(
+      alignment: EnsureVisible.settingsAlignment,
+      settleFrameCount: 1,
+      preferImmediate: true,
+      child: Material(
+          type: MaterialType.transparency,
+          child: ListTile(
+            dense: true,
+            minVerticalPadding: 8,
+            title: title,
+            subtitle: subtitle,
+            trailing: trailing,
+          )),
+    );
