@@ -498,21 +498,30 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
         children: [
           Positioned.fill(
             child: widget.onPressed != null
-                ? FocusKeyboardListener(
-                    onLongPress: widget.onLongPress != null
-                        ? (_) {
-                            widget.onLongPress!();
-                            return KeyEventResult.handled;
-                          }
-                        : null,
-                    builder: (_) => TextButton(
-                      focusNode: widget.focusNode,
-                      onPressed: widget.onPressed,
-                      onLongPress: widget.onLongPress,
-                      style: _statusBarCompactButtonStyle(intensityFactor),
-                      child: widget.child,
-                    ),
-                  )
+                ? (widget.onLongPress != null
+                    ? FocusKeyboardListener(
+                        onPressed: (_) {
+                          widget.onPressed!();
+                          return KeyEventResult.handled;
+                        },
+                        onLongPress: (_) {
+                          widget.onLongPress!();
+                          return KeyEventResult.handled;
+                        },
+                        builder: (_) => TextButton(
+                          focusNode: widget.focusNode,
+                          onPressed: widget.onPressed,
+                          onLongPress: widget.onLongPress,
+                          style: _statusBarCompactButtonStyle(intensityFactor),
+                          child: widget.child,
+                        ),
+                      )
+                    : TextButton(
+                        focusNode: widget.focusNode,
+                        onPressed: widget.onPressed,
+                        style: _statusBarCompactButtonStyle(intensityFactor),
+                        child: widget.child,
+                      ))
                 : DecoratedBox(
                     decoration: _statusBarSurfaceDecoration(intensityFactor),
                     child: Center(child: widget.child),
