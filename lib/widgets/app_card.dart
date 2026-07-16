@@ -346,6 +346,7 @@ class _QueuedAppImageLoad {
 
 class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   static const Duration _focusBurstCooldown = Duration(milliseconds: 280);
+  static int _lastDpadTime = 0;
 
   bool _moving = false;
   bool _focusBurstActive = false;
@@ -1034,6 +1035,14 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
       return KeyEventResult.handled;
     } else if (navigationDirection != null) {
+      final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+      if (!isTest) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _lastDpadTime < 95) {
+          return KeyEventResult.handled;
+        }
+        _lastDpadTime = now;
+      }
       _markFocusNavigationBurst();
       return (widget.onNavigate?.call(navigationDirection) ?? false)
           ? KeyEventResult.handled

@@ -6,6 +6,7 @@ import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/focus_keyboard_listener.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -500,9 +501,15 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
             child: widget.onPressed != null
                 ? (widget.onLongPress != null
                     ? FocusKeyboardListener(
-                        onPressed: (_) {
-                          widget.onPressed!();
-                          return KeyEventResult.handled;
+                        onPressed: (key) {
+                          if (key == LogicalKeyboardKey.enter ||
+                              key == LogicalKeyboardKey.select ||
+                              key == LogicalKeyboardKey.space ||
+                              key == LogicalKeyboardKey.gameButtonA) {
+                            widget.onPressed!();
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
                         },
                         onLongPress: (_) {
                           widget.onLongPress!();

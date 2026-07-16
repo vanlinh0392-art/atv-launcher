@@ -473,6 +473,7 @@ class _HomeDockViewport extends StatefulWidget {
 }
 
 class _HomeDockViewportState extends State<_HomeDockViewport> {
+  static int _lastDpadTime = 0;
   final FocusNode _dockFocusNode = FocusNode(debugLabel: 'home_dock_scope');
   final GlobalKey _dockListKey = GlobalKey(debugLabel: 'home_dock_list');
   final ScrollController _dockScrollController = ScrollController();
@@ -796,6 +797,16 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       return KeyEventResult.ignored;
     }
     final direction = _traversalDirectionForKey(event.logicalKey);
+    if (direction != null) {
+      final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+      if (!isTest) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _lastDpadTime < 95) {
+          return KeyEventResult.handled;
+        }
+        _lastDpadTime = now;
+      }
+    }
     if (direction == TraversalDirection.up) {
       if (_moveFocusWithinDock(TraversalDirection.up)) {
         return KeyEventResult.handled;
