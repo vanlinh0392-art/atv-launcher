@@ -1,6 +1,6 @@
-/*
+﻿/*
  * FLauncher
- * Copyright (C) 2021  Étienne Fesser
+ * Copyright (C) 2021  Etienne Fesser
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,27 +55,37 @@ class _ApplicationsPanelPageState extends State<ApplicationsPanelPage> {
           const Divider(),
           Material(
             type: MaterialType.transparency,
-            child: TabBar(
-              onTap: (index) {
-                switch (index) {
-                  case 0:
-                    setState(() => _title = localizations.tvApplications);
-                    break;
-                  case 1:
-                    setState(() => _title = localizations.nonTvApplications);
-                    break;
-                  case 2:
-                    setState(() => _title = localizations.hiddenApplications);
-                    break;
-                  default:
-                    throw ArgumentError.value(index, "index");
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                  FocusScope.of(context).focusInDirection(TraversalDirection.down);
+                  return KeyEventResult.handled;
                 }
+                return KeyEventResult.ignored;
               },
-              tabs: const [
-                Focus(autofocus: true, child: Tab(icon: Icon(Icons.tv))),
-                Tab(icon: Icon(Icons.android)),
-                Tab(icon: Icon(Icons.visibility_off_outlined)),
-              ],
+              child: TabBar(
+                onTap: (index) {
+                  switch (index) {
+                    case 0:
+                      setState(() => _title = localizations.tvApplications);
+                      break;
+                    case 1:
+                      setState(() => _title = localizations.nonTvApplications);
+                      break;
+                    case 2:
+                      setState(() => _title = localizations.hiddenApplications);
+                      break;
+                    default:
+                      throw ArgumentError.value(index, "index");
+                  }
+                },
+                tabs: const [
+                  Focus(autofocus: true, child: Tab(icon: Icon(Icons.tv))),
+                  Tab(icon: Icon(Icons.android)),
+                  Tab(icon: Icon(Icons.visibility_off_outlined)),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -141,7 +151,19 @@ class _AppListItem extends StatefulWidget {
 class _AppListItemState extends State<_AppListItem> {
   late Future<ImageProvider> _iconLoadFuture;
   bool _focused = false;
+  bool _addFocused = false;
+  bool _infoFocused = false;
   ImageProvider? _resolvedIcon;
+
+  final FocusNode _addFocusNode = FocusNode(debugLabel: 'app_list_add_btn');
+  final FocusNode _infoFocusNode = FocusNode(debugLabel: 'app_list_info_btn');
+
+  @override
+  void dispose() {
+    _addFocusNode.dispose();
+    _infoFocusNode.dispose();
+    super.dispose();
+  }
 
   void _onFocusChange(bool focused) {
     setState(() => _focused = focused);
@@ -172,19 +194,28 @@ class _AppListItemState extends State<_AppListItem> {
   @override
   void initState() {
     super.initState();
-
     _iconLoadFuture =
         _loadAppIcon(Provider.of<AppsService>(context, listen: false));
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool showAddButton = !widget.application.hidden;
+
     return Focus(
       onFocusChange: _onFocusChange,
       onKeyEvent: (node, event) {
         if (event is! KeyDownEvent) return KeyEventResult.ignored;
         if (isSettingsActivateKey(event.logicalKey)) {
           _showAppInfo();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          if (showAddButton) {
+            _addFocusNode.requestFocus();
+          } else {
+            _infoFocusNode.requestFocus();
+          }
           return KeyEventResult.handled;
         }
         final direction = event.logicalKey == LogicalKeyboardKey.arrowUp
@@ -206,7 +237,7 @@ class _AppListItemState extends State<_AppListItem> {
       child: SettingsFocusFrame(
         padding: EdgeInsets.zero,
         variant: SettingsFocusFrameVariant.rowOnly,
-        focused: _focused,
+        focused: _focused || _addFocused || _infoFocused,
         child: Card(
             clipBehavior: Clip.antiAlias,
             margin: EdgeInsets.zero,
@@ -242,20 +273,90 @@ class _AppListItemState extends State<_AppListItem> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!widget.application.hidden)
-                        IconButton(
-                          constraints: const BoxConstraints(),
-                          splashRadius: 20,
-                          icon: const Icon(Icons.add_box_outlined),
+                      if (showAddButton)
+                        _TrailingFocusButton(
+                          focusNode: _addFocusNode,
+                          icon: Icons.add_box_outlined,
+                          focused: _addFocused,
+                          onFocusChange: (f) =>
+                              setState(() => _addFocused = f),
+                          onKeyEvent: (node, event) {
+                            if (event is! KeyDownEvent) {
+                              return KeyEventResult.ignored;
+                            }
+                            if (isSettingsActivateKey(event.logicalKey)) {
+                              showDialog<Category>(
+                                context: context,
+                                builder: (_) =>
+                                    AddToCategoryDialog(widget.application),
+                              );
+                              return KeyEventResult.handled;
+                            }
+                            if (event.logicalKey ==
+                                LogicalKeyboardKey.arrowRight) {
+                              _infoFocusNode.requestFocus();
+                              return KeyEventResult.handled;
+                            }
+                            if (event.logicalKey ==
+                                LogicalKeyboardKey.arrowLeft) {
+                              FocusScope.of(context)
+                                  .focusInDirection(TraversalDirection.left);
+                              return KeyEventResult.handled;
+                            }
+                            if (event.logicalKey ==
+                                    LogicalKeyboardKey.arrowUp ||
+                                event.logicalKey ==
+                                    LogicalKeyboardKey.arrowDown) {
+                              node.focusInDirection(
+                                event.logicalKey == LogicalKeyboardKey.arrowUp
+                                    ? TraversalDirection.up
+                                    : TraversalDirection.down,
+                              );
+                              return KeyEventResult.handled;
+                            }
+                            return KeyEventResult.ignored;
+                          },
                           onPressed: () => showDialog<Category>(
                             context: context,
-                            builder: (_) => AddToCategoryDialog(widget.application),
+                            builder: (_) =>
+                                AddToCategoryDialog(widget.application),
                           ),
                         ),
-                      IconButton(
-                        constraints: const BoxConstraints(),
-                        splashRadius: 20,
-                        icon: const Icon(Icons.info_outline),
+                      _TrailingFocusButton(
+                        focusNode: _infoFocusNode,
+                        icon: Icons.info_outline,
+                        focused: _infoFocused,
+                        onFocusChange: (f) => setState(() => _infoFocused = f),
+                        onKeyEvent: (node, event) {
+                          if (event is! KeyDownEvent) {
+                            return KeyEventResult.ignored;
+                          }
+                          if (isSettingsActivateKey(event.logicalKey)) {
+                            _showAppInfo();
+                            return KeyEventResult.handled;
+                          }
+                          if (event.logicalKey ==
+                              LogicalKeyboardKey.arrowLeft) {
+                            if (showAddButton) {
+                              _addFocusNode.requestFocus();
+                            } else {
+                              FocusScope.of(context)
+                                  .focusInDirection(TraversalDirection.left);
+                            }
+                            return KeyEventResult.handled;
+                          }
+                          if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                              event.logicalKey ==
+                                  LogicalKeyboardKey.arrowDown) {
+                            node.focusInDirection(
+                              event.logicalKey == LogicalKeyboardKey.arrowUp
+                                  ? TraversalDirection.up
+                                  : TraversalDirection.down,
+                            );
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
+                        },
                         onPressed: _showAppInfo,
                       ),
                     ],
@@ -270,5 +371,54 @@ class _AppListItemState extends State<_AppListItem> {
   Future<ImageProvider> _loadAppIcon(AppsService service) async {
     Uint8List bytes = await service.getAppIcon(widget.application.packageName);
     return MemoryImage(bytes);
+  }
+}
+
+/// Widget nut trailing co vien highlight rieng khi duoc focus qua Dpad
+class _TrailingFocusButton extends StatelessWidget {
+  final FocusNode focusNode;
+  final IconData icon;
+  final bool focused;
+  final ValueChanged<bool> onFocusChange;
+  final KeyEventResult Function(FocusNode, KeyEvent) onKeyEvent;
+  final VoidCallback onPressed;
+
+  const _TrailingFocusButton({
+    required this.focusNode,
+    required this.icon,
+    required this.focused,
+    required this.onFocusChange,
+    required this.onKeyEvent,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: focusNode,
+      onFocusChange: onFocusChange,
+      onKeyEvent: onKeyEvent,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: focused
+              ? Border.all(color: const Color(0xFF00E5FF), width: 2)
+              : Border.all(color: Colors.transparent, width: 2),
+          color: focused
+              ? const Color(0xFF00E5FF).withOpacity(0.12)
+              : Colors.transparent,
+        ),
+        child: IconButton(
+          constraints: const BoxConstraints(),
+          splashRadius: 20,
+          icon: Icon(
+            icon,
+            color: focused ? const Color(0xFF00E5FF) : null,
+          ),
+          onPressed: onPressed,
+        ),
+      ),
+    );
   }
 }

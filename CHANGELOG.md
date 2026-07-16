@@ -5,6 +5,26 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-07-16 - Official release 2026.07.010 — Dpad nút + & ⓘ, Fix Long Press Settings, Dialog app mới
+
+### Điều hướng Dpad trong Applications Panel
+- **Nút `+` và `ⓘ` có thể focus qua Dpad**: Từ một app trong danh sách, nhấn **Arrow Right** để chuyển focus sang nút `+` (Thêm vào danh mục) hoặc `ⓘ` (Thông tin). Các nút này hiển thị **viền xanh cyan** khi được focus.
+- **Điều hướng ngang giữa 2 nút**: Dpad Right từ `+` → chuyển sang `ⓘ`; Dpad Left từ `ⓘ` → về lại `+`.
+- **Dpad Down từ TabBar**: Nhấn Arrow Down từ thanh Tab (TV / Non-TV / Ẩn) sẽ chuyển focus xuống item đầu tiên trong danh sách.
+- **Viền row duy trì**: `SettingsFocusFrame` giữ viền highlight khi focus nằm ở nút trailing bên trong.
+
+### Sửa lỗi Long Press nút Settings trên TV Remote (D-pad)
+- **Root cause**: `TextButton.onLongPress` chỉ nhận touch gesture (chuột/tay), không nhận D-pad nhấn giữ trên Android TV.
+- **Fix**: Bọc `TextButton` trong `_StatusBarActionSurface` bằng `FocusKeyboardListener` để detect `KeyRepeatEvent` sau 500ms → trigger `onLongPress`. Giờ đây nhấn giữ nút OK/Select trên remote khi focus vào icon Settings sẽ mở thẳng vào tab **Danh sách ứng dụng**.
+
+### Cải thiện dialog hỏi khi cài app mới
+- **Dùng localization**: Tiêu đề và nút dùng `AppLocalizations` thay vì hard-code tiếng Việt.
+- **Không phụ thuộc tên category**: Dùng method `setSideloaded(app, bool)` mới trong `AppsService` để phân loại TV (`false`) hoặc Non-TV (`true`) thay vì tìm category theo tên cứng.
+- **Luôn hiển thị 2 nút**: Nút "Ứng dụng không dành cho TV" và "Ứng dụng TV" luôn hiện, không còn ẩn khi không tìm thấy category đúng tên.
+
+### Cập nhật và Phiên bản
+- Tăng version lên `2026.07.010+35`.
+
 ## 2026-07-08 - Official release 2026.07.009 cải thiện Dpad & Auto-scroll Settings
 
 ### Điều hướng Dpad & Cuộn trang trong Cài đặt

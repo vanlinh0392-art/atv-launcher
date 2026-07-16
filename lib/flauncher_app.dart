@@ -541,8 +541,9 @@ class _FLauncherAppState extends State<FLauncherApp>
   Future<void> _showNewAppPlacementDialog(App app) async {
     final rootContext = _navigatorKey.currentContext;
     if (rootContext == null) return;
-    
+    final localizations = AppLocalizations.of(rootContext)!;
     final appsService = rootContext.read<AppsService>();
+
     final tvCategory = appsService.categories.firstWhereOrNull((c) => c.name == 'TV Applications');
     final nonTvCategory = appsService.categories.firstWhereOrNull((c) => c.name == 'Non-TV Applications');
 
@@ -550,12 +551,12 @@ class _FLauncherAppState extends State<FLauncherApp>
       context: rootContext,
       useRootNavigator: true,
       builder: (context) => AlertDialog(
-        title: const Text("Thêm ứng dụng mới"),
-        content: Text("Bạn muốn thêm ứng dụng '${app.name}' vào nhóm nào trên màn hình chính?"),
+        title: Text(localizations.newAppInstalledTitle(app.name)),
+        content: Text(localizations.newAppInstalledHint),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Bỏ qua"),
+            child: Text(localizations.newAppInstalledSkip),
           ),
           if (nonTvCategory != null)
             TextButton(
@@ -563,7 +564,7 @@ class _FLauncherAppState extends State<FLauncherApp>
                 Navigator.of(context).pop();
                 await appsService.addToCategory(app, nonTvCategory);
               },
-              child: const Text("Ứng dụng không dành cho TV"),
+              child: Text(localizations.nonTvApplications),
             ),
           if (tvCategory != null)
             FilledButton(
@@ -571,7 +572,7 @@ class _FLauncherAppState extends State<FLauncherApp>
                 Navigator.of(context).pop();
                 await appsService.addToCategory(app, tvCategory);
               },
-              child: const Text("Ứng dụng TV"),
+              child: Text(localizations.tvApplications),
             ),
         ],
       ),

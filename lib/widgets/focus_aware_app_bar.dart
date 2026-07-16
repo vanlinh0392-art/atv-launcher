@@ -4,6 +4,7 @@ import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/widgets/focus_keyboard_listener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -497,12 +498,20 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
         children: [
           Positioned.fill(
             child: widget.onPressed != null
-                ? TextButton(
-                    focusNode: widget.focusNode,
-                    onPressed: widget.onPressed,
-                    onLongPress: widget.onLongPress,
-                    style: _statusBarCompactButtonStyle(intensityFactor),
-                    child: widget.child,
+                ? FocusKeyboardListener(
+                    onLongPress: widget.onLongPress != null
+                        ? (_) {
+                            widget.onLongPress!();
+                            return KeyEventResult.handled;
+                          }
+                        : null,
+                    builder: (_) => TextButton(
+                      focusNode: widget.focusNode,
+                      onPressed: widget.onPressed,
+                      onLongPress: widget.onLongPress,
+                      style: _statusBarCompactButtonStyle(intensityFactor),
+                      child: widget.child,
+                    ),
                   )
                 : DecoratedBox(
                     decoration: _statusBarSurfaceDecoration(intensityFactor),

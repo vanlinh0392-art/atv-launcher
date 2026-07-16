@@ -863,5 +863,15 @@
     "typeInTheHourFormat": "Type in the hour format",
     "uninstall": "Uninstall",
     "wallpaper": "Wallpaper",
-    "withEllipsisAddTo": "Add to..."
+    "withEllipsisAddTo": "Add to...",
+    "newAppInstalledTitle": "New app: {appName}",
+    "@newAppInstalledTitle": {
+        "placeholders": {
+            "appName": {
+                "type": "String"
+            }
+        }
+    },
+    "newAppInstalledHint": "Add to which group on the home screen?",
+    "newAppInstalledSkip": "Skip"
 }

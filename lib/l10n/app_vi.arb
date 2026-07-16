@@ -1,4 +1,4 @@
-﻿{
+{
     "@@locale": "vi",
     "backupProfilesChip": "{count} bộ bảo mật app",
     "@backupProfilesChip": {
@@ -865,5 +865,15 @@
     "homeDockBlurTitle": "Nền mờ quanh vùng app",
     "homeDockBlurDescription": "Bật hiệu ứng blur/kính cho dock HOME. Tắt để video hình nền lộ ra nhiều hơn.",
     "dateAndTimeScaleTitle": "Cỡ ngày giờ",
-    "dateAndTimeScaleDescription": "Phóng to hoặc thu nhỏ ngày và giờ trên thanh trạng thái."
+    "dateAndTimeScaleDescription": "Phóng to hoặc thu nhỏ ngày và giờ trên thanh trạng thái.",
+    "newAppInstalledTitle": "Ứng dụng mới: {appName}",
+    "@newAppInstalledTitle": {
+        "placeholders": {
+            "appName": {
+                "type": "String"
+            }
+        }
+    },
+    "newAppInstalledHint": "Thêm vào nhóm nào trên màn hình chính?",
+    "newAppInstalledSkip": "Bỏ qua"
 }
