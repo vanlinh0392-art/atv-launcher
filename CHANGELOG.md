@@ -5,6 +5,13 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-07-16 - Official release 2026.07.011 — Fix Dpad nhảy liên tục (Debounce Dpad)
+
+### Sửa lỗi D-pad nhảy liên tục (Double-firing / Bouncing)
+- **Cơ chế Debounce Dpad**: Thêm bộ lọc chống dội phím D-pad 95ms cho cả thẻ ứng dụng `AppCard` và Vertical Dock chính.
+- **Lọc phím thông minh**: Chỉ lọc các phím điều hướng Arrow (Up/Down/Left/Right) khi chúng đến quá nhanh (dưới 95ms) để ổn định tốc độ di chuyển, không ảnh hưởng đến các phím Select/Enter.
+- **Tương thích Test Suite**: Tự động nhận diện môi trường chạy test ảo hóa để bỏ qua debounce, giúp test suite chạy nhanh chính xác.
+
 ## 2026-07-16 - Official release 2026.07.010 — Dpad nút + & ⓘ, Fix Long Press Settings, Dialog app mới
 
 ### Điều hướng Dpad trong Applications Panel
