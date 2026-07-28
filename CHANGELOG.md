@@ -5,6 +5,13 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-07-28 - Official release 2026.07.012 — Fix video nền không play khi về Home (Smooth mode)
+
+### Sửa lỗi Video Wallpaper không phát lại ở chế độ Smooth
+- **Root cause**: Khi về home ở chế độ Smooth, `didChangeAppLifecycleState(resumed)` return sớm mà không trigger recovery. Video chỉ resume nếu `notifyHomeVisibleAndUsable()` được gọi lại — nhưng nếu home widget tree không rebuild (đã có sẵn trong bộ nhớ), hàm này không được gọi → video kẹt im.
+- **Fix**: Ở Smooth mode, khi `resumed`, tự động khôi phục `_homeVisibleAndUsable = true` và gọi `scheduleHomeVisibleVideoStart()` để schedule lại timer warm-up 650ms. Guard conditions `_videoWarmUpScheduled` ngăn double-scheduling nếu `notifyHomeVisibleAndUsable()` vẫn được gọi sau đó.
+- **Impact**: Video nền sẽ luôn phát lại khi về home, bất kể widget tree có rebuild hay không.
+
 ## 2026-07-16 - Official release 2026.07.011 — Fix Dpad nhảy liên tục (Debounce Dpad)
 
 ### Sửa lỗi D-pad nhảy liên tục (Double-firing / Bouncing)

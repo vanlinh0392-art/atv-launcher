@@ -719,7 +719,16 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (!_canActivateVideoWallpaper || _shouldDelayVideoAfterReturningHome) {
+      if (!_canActivateVideoWallpaper) {
+        return;
+      }
+      if (_shouldDelayVideoAfterReturningHome) {
+        _homeVisibleAndUsable = true;
+        if (!_videoWarmUpCompleted &&
+            !_videoWarmUpScheduled &&
+            !settingsPlaybackSuppressed) {
+          scheduleHomeVisibleVideoStart();
+        }
         return;
       }
       unawaited(
