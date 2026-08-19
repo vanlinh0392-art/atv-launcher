@@ -52,7 +52,7 @@ void main() {
     expect(ttsContent, contains('TIER1_TIMEOUT_MS'));
   });
 
-  test('AiVoiceAssistantClient connects OpenRouter / LLM Q&A with 8-model alternating fallback', () {
+  test('AiVoiceAssistantClient connects Multi-Model AI with multi-layer key obfuscation and alternating fallback', () {
     final aiClientFile = File(
       'android/app/src/main/java/com/atv/launcher/systembridge/ai/AiVoiceAssistantClient.java',
     );
@@ -63,14 +63,16 @@ void main() {
     expect(aiContent, contains('OPENROUTER_ENDPOINT'));
     expect(aiContent, contains('NVIDIA_ENDPOINT'));
     expect(aiContent, contains('FALLBACK_MODELS'));
-    expect(aiContent, contains('google/gemini-2.0-flash-exp:free'));
     expect(aiContent, contains('meta/llama-3.1-8b-instruct'));
-    expect(aiContent, contains('meta-llama/llama-3.3-70b-instruct'));
-    expect(aiContent, contains('mistralai/mistral-large-2-instruct'));
-    expect(aiContent, contains('deepseek/deepseek-chat'));
-    expect(aiContent, contains('nvidia/llama-3.1-nemotron-70b-instruct'));
-    expect(aiContent, contains('mistralai/mistral-7b-instruct:free'));
-    expect(aiContent, contains('qwen/qwen2.5-7b-instruct'));
+    expect(aiContent, contains('google/gemma-4-31b-it'));
+    expect(aiContent, contains('google/diffusiongemma-26b-a4b-it'));
+    expect(aiContent, contains('meta/llama-3.2-11b-vision-instruct'));
+    expect(aiContent, contains('nvidia/nemotron-3.5-lightning:free'));
+    expect(aiContent, contains('google/gemma-4-31b-it:free'));
+    expect(aiContent, contains('google/gemma-4-26b-a4b-it:free'));
+    expect(aiContent, contains('openai/gpt-oss-20b:free'));
+    expect(aiContent, contains('GEMINI_API_URL'));
+    expect(aiContent, contains('resolveKey'));
   });
 
   test('AppIndexStore is defined with multi-tier fuzzy matching and persistent cache', () {

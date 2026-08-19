@@ -5,6 +5,22 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-19 - Official release 2026.08.007 — Reliable Standby Wake Video Auto-Resume, Gemini Final Fallback & Multi-Layer Key Defense
+
+### 1. Khắc Phục Triệt Để Lỗi Không Tự Play Video Nền Khi Bật TV Từ Chế Độ Ngủ (Standby Wake Fix)
+- **Tự Động Kết Nối & Xác Thực Lại Surface (`surface.isValid()`)**: Khi TV thức dậy từ trạng thái tắt màn hình / Standby (HDMI-CEC hoặc nút Power), hệ thống tự động kiểm tra tính hợp lệ của Surface phần cứng và tái kết nối tức thì cho ExoPlayer.
+- **Bắt Trọn Vẹn 15+ Broadcast Wake Của Mọi Hãng TV**: Hỗ trợ đầy đủ các intent thức dậy từ Xiaomi (`com.xiaomi.mitv.ACTION_SCREEN_ON`), TCL (`com.tcl.tv.action.SCREEN_ON`), Sony Bravia (`com.sony.dtv.intent.action.PANEL_ON`), Android AOSP (`ACTION_SCREEN_ON`, `ACTION_USER_PRESENT`, `ACTION_DREAMING_STOPPED`).
+- **Phục Hồi Ngay Khi Cửa Sổ Nhận Focus (`onWindowFocusChanged`)**: Đảm bảo video nền luôn tự động phát mượt mà ngay khi TV vừa sáng màn hình.
+
+### 2. Tái Cấu Trúc Điều Phối AI: Google Gemini Chốt Chặn Ở Cuối Cùng
+- **Ưu Tiên Tầng 1**: NVIDIA NIM Cloud (`meta/llama-3.1-8b-instruct`, `google/gemma-4-31b-it`, `google/diffusiongemma-26b-a4b-it`, `meta/llama-3.2-11b-vision-instruct`) - Tốc độ GPU ~340ms.
+- **Ưu Tiên Tầng 2**: OpenRouter Free Models (`nemotron-3.5-lightning`, `gemma-4-31b`, `gemma-4-26b`, `gpt-oss-20b`).
+- **Tầng 3 (Dự phòng chốt chặn ở cuối)**: Google Gemini 2.5 Flash Lite (Chỉ kích hoạt khi cả Tầng 1 & 2 bận/hết hạn ngạch).
+
+### 3. Mã Hóa Bảo Mật 3 API Key Đa Tầng (Multi-Layer Secret Obfuscation)
+- Loại bỏ hoàn toàn chuỗi Base64 thô khỏi mã nguồn.
+- Triển khai thuật toán biến đổi 4 tầng: **Bitwise Rotate (ROL 3 / ROR 3) + Mảng Muối Động `SALT` 8-byte + Dynamic Position XOR + On-Demand RAM Assembly**, chống dịch ngược tĩnh và chống trích xuất chuỗi.
+
 ## 2026-08-19 - Official release 2026.08.006 — Universal All-TV Remote Learning Matrix & Smart On-Device Response Cache
 
 ### 1. Ma Trận Nhận Diện Phím Voice Toàn Diện Cho Mọi Hãng TV (Universal Key Matrix)

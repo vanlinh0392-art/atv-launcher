@@ -177,10 +177,6 @@ public final class VideoWallpaperController {
         }
 
         String resolvedReason = TextUtils.isEmpty(reason) ? "screen_wake" : reason;
-        if (!hostWakeEligible) {
-            cancelWakePlaylistRetry();
-            return;
-        }
         if (!shouldAutoResumeFromWake()) {
             cancelWakePlaylistRetry();
             return;
@@ -188,7 +184,7 @@ public final class VideoWallpaperController {
 
         long now = SystemClock.elapsedRealtime();
         if (lastWakeRearmAtElapsedMs > 0L
-                && now - lastWakeRearmAtElapsedMs < WAKE_REARM_DEBOUNCE_MS) {
+                && now - lastWakeRearmAtElapsedMs < 400L) {
             return;
         }
         lastWakeRearmAtElapsedMs = now;
@@ -199,7 +195,17 @@ public final class VideoWallpaperController {
         startupWarmupReady = true;
         pendingWakePlaylistRetryCount = 0;
         pendingWakeReason = resolvedReason;
+        ensureSurface();
         maybeStartPlayback(true, true);
+
+        // Hardware wake delay check: phục hồi video ngay khi bộ giải mã phần cứng TV sẵn sàng
+        mainHandler.postDelayed(() -> {
+            if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                if (player == null || !player.isPlaying()) {
+                    resumeExistingPlayerIfNeeded();
+                }
+            }
+        }, 450L);
     }
 
     public void onStop() {
@@ -636,12 +642,27 @@ public final class VideoWallpaperController {
     }
 
     private void ensureSurface() {
-        if (surfaceTextureEntry != null && surface != null) {
+        if (surfaceTextureEntry != null && surface != null && surface.isValid()) {
             return;
         }
-        surfaceTextureEntry = textureRegistry.createSurfaceTexture();
+        if (surface != null) {
+            try {
+                surface.release();
+            } catch (Exception ignored) {
+            }
+            surface = null;
+        }
+        if (surfaceTextureEntry == null) {
+            surfaceTextureEntry = textureRegistry.createSurfaceTexture();
+        }
         surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
         surface = new Surface(surfaceTextureEntry.surfaceTexture());
+        if (player != null) {
+            try {
+                player.setVideoSurface(surface);
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void stopIntervalAdvance() {
@@ -650,10 +671,11 @@ public final class VideoWallpaperController {
 
     private void resumeExistingPlayerIfNeeded() {
         if (player == null) {
-            maybeStartPlayback(true);
+            maybeStartPlayback(true, true);
             return;
         }
-        if (surface != null) {
+        ensureSurface();
+        if (surface != null && surface.isValid()) {
             try {
                 player.setVideoSurface(surface);
             } catch (Exception ignored) {}

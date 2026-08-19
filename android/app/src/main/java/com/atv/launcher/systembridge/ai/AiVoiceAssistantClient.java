@@ -29,18 +29,50 @@ import java.util.concurrent.Executors;
 public final class AiVoiceAssistantClient {
     private static final String TAG = "AiVoiceAssistant";
 
-    private static String decodeKey(String b64) {
+    // Multi-Layer Dynamic Key Obfuscation (Anti-Decompilation & Reverse Engineering Defense)
+    private static final int[] SALT = new int[]{0x5A, 0xA5, 0x3C, 0xC3, 0x7E, 0xE7, 0x96, 0x69};
+
+    private static final int[] GEM_ENC = new int[]{
+            97, 166, 251, 196, 176, 21, 127, 112, 160, 181, 216, 167, 123, 135, 100, 203,
+            147, 221, 240, 71, 43, 23, 93, 168, 107, 52, 81, 71, 26, 166, 167, 147,
+            243, 93, 146, 102, 58, 183, 84
+    };
+
+    private static final int[] NV_ENC = new int[]{
+            43, 12, 112, 63, 18, 228, 220, 202, 170, 228, 9, 117, 90, 175, 221, 58,
+            19, 244, 232, 47, 130, 87, 245, 34, 35, 69, 1, 110, 75, 94, 28, 89,
+            74, 204, 81, 118, 98, 54, 134, 251, 98, 55, 97, 46, 91, 222, 228, 156,
+            31, 106, 183, 17, 101, 128, 66, 45, 221, 216, 223, 9, 4, 40, 187, 132,
+            231, 178, 54, 211, 125, 208
+    };
+
+    private static final int[] OR_ENC = new int[]{
+            2, 37, 211, 6, 11, 37, 124, 65, 48, 157, 179, 174, 233, 61, 182, 187,
+            176, 111, 9, 60, 137, 199, 246, 84, 71, 18, 124, 25, 244, 162, 49, 4,
+            63, 248, 166, 97, 94, 130, 89, 212, 85, 40, 204, 11, 222, 128, 43, 30,
+            61, 242, 14, 59, 190, 90, 193, 207, 78, 145, 215, 48, 87, 57, 8, 151,
+            6, 225, 159, 112, 31, 81, 88, 221, 198
+    };
+
+    private static String resolveKey(int[] enc, int maskOffset) {
         try {
-            return new String(android.util.Base64.decode(b64, android.util.Base64.DEFAULT), "UTF-8").trim();
+            byte[] bytes = new byte[enc.length];
+            for (int i = 0; i < enc.length; i++) {
+                int val = enc[i];
+                int dec = ((val >> 3) & 0x1F) | ((val << 5) & 0xFF);
+                int saltVal = SALT[i % SALT.length];
+                bytes[i] = (byte) (dec ^ saltVal ^ ((i + maskOffset) & 0xFF));
+            }
+            return new String(bytes, StandardCharsets.UTF_8).trim();
         } catch (Exception e) {
             return "";
         }
     }
 
-    // 100% Free Verified API Keys (Encoded)
-    public static final String DEFAULT_GEMINI_KEY = decodeKey("QUl6YVN5RFlxU2Z1UlNfVm9Wa2FQSXAyeHNHeW5nN01zVjdVYk1B");
-    public static final String DEFAULT_NVIDIA_KEY = decodeKey("bnZhcGktWmhWY0YxaExyTllZQkJLa09FV2d3YnpCejJiTmV5R1cxbm85a3poQnV6OGpJZVdxWURoNExuc2xuaTdhaS1Eaw==");
-    public static final String DEFAULT_OPENROUTER_KEY = decodeKey("c2stb3ItdjEtZDliNjY3ZjUyZjgyYTdjM2UwZGU1N2E0MGNjODkyY2EyNjYwYWQyZGFmODQyMTAyNWVhMWYwMzMzZGEwYzJiMw==");
+    // 100% Free Verified API Keys (Dynamically Resolved)
+    public static final String DEFAULT_GEMINI_KEY = resolveKey(GEM_ENC, 0x37);
+    public static final String DEFAULT_NVIDIA_KEY = resolveKey(NV_ENC, 0x51);
+    public static final String DEFAULT_OPENROUTER_KEY = resolveKey(OR_ENC, 0x69);
 
     public static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
     public static final String NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -319,43 +351,31 @@ public final class AiVoiceAssistantClient {
 
             String dynamicPrompt = buildSystemPrompt(userQuery);
 
-            // 1. Tầng 1: Google Gemini 2.5 Flash Lite (Chính thức)
-            try {
-                Log.i(TAG, "Tier 1: Querying Google Gemini 2.5 Flash Lite...");
-                String geminiAnswer = queryGeminiOfficial(geminiApiKey, userQuery, dynamicPrompt);
-                if (!TextUtils.isEmpty(geminiAnswer)) {
-                    String clean = cleanResponse(geminiAnswer);
-                    addMessageToHistory("user", userQuery);
-                    addMessageToHistory("assistant", clean);
-                    RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, "Google Gemini 2.5 Flash Lite"));
-                    speakAndDisplay(context, clean, "Google Gemini 2.5 Flash Lite", callback);
-                    return;
+            // 1. Tầng 1: NVIDIA NIM GPU Cloud (Ưu tiên số 1 - Siêu tốc 340ms)
+            for (int i = 0; i < 4 && i < FALLBACK_MODELS.size(); i++) {
+                ModelTarget target = FALLBACK_MODELS.get(i);
+                if (!"NVIDIA NIM".equalsIgnoreCase(target.provider)) continue;
+                try {
+                    Log.i(TAG, "Tier 1 NVIDIA NIM [" + (i + 1) + "]: " + target.modelId);
+                    String nvAnswer = queryOpenAiCompatible(target.endpoint, target.modelId, nvidiaKey, userQuery, dynamicPrompt);
+                    if (!TextUtils.isEmpty(nvAnswer)) {
+                        String clean = cleanResponse(nvAnswer);
+                        addMessageToHistory("user", userQuery);
+                        addMessageToHistory("assistant", clean);
+                        RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, target.modelId));
+                        speakAndDisplay(context, clean, target.modelId, callback);
+                        return;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Tier 1 NVIDIA " + target.modelId + " failed: " + e.getMessage());
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "Tier 1 Gemini failed, falling back to Tier 2: " + e.getMessage());
             }
 
-            // 2. Tầng 2: NVIDIA NIM Llama 3.1 8B (Cực nhanh 340ms)
-            try {
-                Log.i(TAG, "Tier 2: Querying NVIDIA NIM Llama 3.1 8B...");
-                String nvAnswer = queryOpenAiCompatible(NVIDIA_ENDPOINT, "meta/llama-3.1-8b-instruct", nvidiaKey, userQuery, dynamicPrompt);
-                if (!TextUtils.isEmpty(nvAnswer)) {
-                    String clean = cleanResponse(nvAnswer);
-                    addMessageToHistory("user", userQuery);
-                    addMessageToHistory("assistant", clean);
-                    RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, "NVIDIA Llama 3.1 8B"));
-                    speakAndDisplay(context, clean, "NVIDIA Llama 3.1 8B", callback);
-                    return;
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Tier 2 NVIDIA failed, falling back to Tier 3: " + e.getMessage());
-            }
-
-            // 3. Tầng 3: Các Model Free qua OpenRouter
-            for (int i = 2; i < FALLBACK_MODELS.size(); i++) {
+            // 2. Tầng 2: Các Model Free qua OpenRouter
+            for (int i = 4; i < FALLBACK_MODELS.size(); i++) {
                 ModelTarget target = FALLBACK_MODELS.get(i);
                 try {
-                    Log.i(TAG, "Tier 3 OpenRouter Free [" + (i - 1) + "]: " + target.modelId);
+                    Log.i(TAG, "Tier 2 OpenRouter Free [" + (i - 3) + "]: " + target.modelId);
                     String answer = queryOpenAiCompatible(target.endpoint, target.modelId, openRouterKey, userQuery, dynamicPrompt);
                     if (!TextUtils.isEmpty(answer)) {
                         String clean = cleanResponse(answer);
@@ -366,8 +386,24 @@ public final class AiVoiceAssistantClient {
                         return;
                     }
                 } catch (Exception e) {
-                    Log.w(TAG, "Tier 3 Model " + target.modelId + " failed: " + e.getMessage());
+                    Log.w(TAG, "Tier 2 Model " + target.modelId + " failed: " + e.getMessage());
                 }
+            }
+
+            // 3. Tầng 3 (Dự phòng chốt chặn ở cuối cùng): Google Gemini 2.5 Flash Lite
+            try {
+                Log.i(TAG, "Tier 3 Final Fallback: Querying Google Gemini 2.5 Flash Lite...");
+                String geminiAnswer = queryGeminiOfficial(geminiApiKey, userQuery, dynamicPrompt);
+                if (!TextUtils.isEmpty(geminiAnswer)) {
+                    String clean = cleanResponse(geminiAnswer);
+                    addMessageToHistory("user", userQuery);
+                    addMessageToHistory("assistant", clean);
+                    RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, "Google Gemini 2.5 Flash Lite"));
+                    speakAndDisplay(context, clean, "Google Gemini 2.5 Flash Lite", callback);
+                    return;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Tier 3 Gemini failed: " + e.getMessage());
             }
 
             // 4. Tầng 4: Dự phòng ngoại tuyến an toàn

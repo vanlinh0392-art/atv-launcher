@@ -393,12 +393,25 @@ public class MainActivity extends FlutterActivity {
         activeActivity = this;
         if (sharedVideoWallpaperController != null) {
             sharedVideoWallpaperController.onStart();
+            sharedVideoWallpaperController.onScreenWake("activity_resume", true);
         }
         pruneBackgroundLauncherTasks("onResume");
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_resume");
         recordHomeNavigation("activity_resume");
         handleForegroundWakeFallback("activity_resume", true);
         scheduleSystemEventPollingIfActive();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            activityStarted = true;
+            if (sharedVideoWallpaperController != null) {
+                sharedVideoWallpaperController.onStart();
+                sharedVideoWallpaperController.onScreenWake("window_focus_gained", true);
+            }
+        }
     }
 
     @Override
@@ -509,8 +522,15 @@ public class MainActivity extends FlutterActivity {
         filter.addAction(Intent.ACTION_USER_PRESENT);
         filter.addAction(Intent.ACTION_DREAMING_STARTED);
         filter.addAction(Intent.ACTION_DREAMING_STOPPED);
+        filter.addAction("android.intent.action.SCREEN_ON");
+        filter.addAction("android.intent.action.SCREEN_OFF");
+        filter.addAction("android.intent.action.USER_PRESENT");
         filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_ON");
         filter.addAction("com.xiaomi.tv.ACTION_OPEN_CLOSE_SCREEN_SAVER");
+        filter.addAction("com.tcl.tv.action.SCREEN_ON");
+        filter.addAction("com.tcl.tv.action.SCREEN_OFF");
+        filter.addAction("com.sony.dtv.intent.action.PANEL_ON");
+        filter.addAction("com.sony.dtv.intent.action.PANEL_OFF");
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(wallpaperWakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
