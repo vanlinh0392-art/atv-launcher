@@ -27,6 +27,7 @@ import android.widget.TextView;
 import com.atv.launcher.systembridge.tts.VietnameseTtsEngine;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Map;
 
 public final class VoiceFloatingOverlayManager {
@@ -50,6 +51,7 @@ public final class VoiceFloatingOverlayManager {
 
     private SpeechRecognizer speechRecognizer;
     private boolean isListening = false;
+    private volatile boolean isFollowUpMode = false;
     private Runnable dismissRunnable;
 
     private final AudioManager.OnAudioFocusChangeListener audioFocusListener = focusChange -> {
@@ -77,6 +79,7 @@ public final class VoiceFloatingOverlayManager {
     }
 
     public void showAndListen() {
+        isFollowUpMode = false;
         mainHandler.post(() -> {
             try {
                 // 1. Dừng TTS nếu đang phát
@@ -101,6 +104,28 @@ public final class VoiceFloatingOverlayManager {
             } catch (Exception e) {
                 Log.e(TAG, "showAndListen error", e);
                 abandonAudioDucking();
+            }
+        });
+    }
+
+    public void startFollowUpListening() {
+        mainHandler.post(() -> {
+            try {
+                if (!isOverlayShowing()) return;
+                isFollowUpMode = true;
+                Log.i(TAG, "Starting Follow-up Multi-turn conversation mode...");
+                abandonAudioDucking();
+                requestAudioDucking();
+
+                updateSubtitle("Đang lắng nghe tiếp... 🎙️", 0xFF00E5FF);
+                if (waveformView != null) {
+                    waveformView.setTtsMode(false);
+                    waveformView.startAnimation();
+                }
+                startInProcessSpeechRecognition();
+            } catch (Exception e) {
+                Log.e(TAG, "startFollowUpListening error", e);
+                scheduleDismiss(1500);
             }
         });
     }
@@ -343,6 +368,14 @@ public final class VoiceFloatingOverlayManager {
                 if (waveformView != null) {
                     waveformView.stopAnimation();
                 }
+
+                if (isFollowUpMode && (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
+                    Log.i(TAG, "Follow-up listening completed (user finished speaking), smoothly dismissing");
+                    isFollowUpMode = false;
+                    dismiss();
+                    return;
+                }
+
                 if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                     updateSubtitle("Không nghe rõ câu lệnh", 0xFFFF5252);
                 } else if (error == SpeechRecognizer.ERROR_AUDIO) {
@@ -366,11 +399,25 @@ public final class VoiceFloatingOverlayManager {
                 Log.i(TAG, "Speech recognized: '" + recognizedText + "'");
 
                 if (!TextUtils.isEmpty(recognizedText)) {
+                    String norm = SmartVoiceDispatcher.stripAccents(recognizedText.toLowerCase(Locale.ROOT)).trim();
+                    if (norm.equals("cam on") || norm.equals("tam biet") || norm.equals("thoat") || norm.equals("xong roi") || norm.equals("dung lai") || norm.equals("thoi")) {
+                        isFollowUpMode = false;
+                        updateSubtitle("Hẹn gặp lại bạn nhé!", 0xFF00E5FF);
+                        VietnameseTtsEngine.getInstance(context).speak(context, "Hẹn gặp lại bạn nhé!", null);
+                        com.atv.launcher.systembridge.ai.AiVoiceAssistantClient.clearConversationHistory();
+                        scheduleDismiss(1800);
+                        return;
+                    }
                     updateSubtitle(recognizedText, 0xFFFFFFFF);
                     handleVoiceText(recognizedText);
                 } else {
-                    updateSubtitle("Không có giọng nói", 0xFFFF5252);
-                    scheduleDismiss(2000);
+                    if (isFollowUpMode) {
+                        isFollowUpMode = false;
+                        dismiss();
+                    } else {
+                        updateSubtitle("Không có giọng nói", 0xFFFF5252);
+                        scheduleDismiss(2000);
+                    }
                 }
             }
 

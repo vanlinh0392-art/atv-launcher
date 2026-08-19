@@ -223,6 +223,48 @@ public final class AiVoiceAssistantClient {
         return openRouterKey;
     }
 
+    public static class ConversationMessage {
+        public final String role;
+        public final String content;
+
+        public ConversationMessage(String role, String content) {
+            this.role = role;
+            this.content = content;
+        }
+    }
+
+    private static final List<ConversationMessage> conversationHistory = Collections.synchronizedList(new ArrayList<>());
+    private static volatile long lastInteractionTime = 0L;
+    private static final long HISTORY_TIMEOUT_MS = 60000L; // 60s memory
+
+    public static synchronized void clearConversationHistory() {
+        conversationHistory.clear();
+        lastInteractionTime = 0L;
+        Log.i(TAG, "Conversation history cleared");
+    }
+
+    public static synchronized void addMessageToHistory(String role, String content) {
+        if (TextUtils.isEmpty(content)) return;
+        long now = System.currentTimeMillis();
+        if (now - lastInteractionTime > HISTORY_TIMEOUT_MS) {
+            conversationHistory.clear();
+        }
+        lastInteractionTime = now;
+        conversationHistory.add(new ConversationMessage(role, content));
+        while (conversationHistory.size() > 6) {
+            conversationHistory.remove(0);
+        }
+    }
+
+    public static synchronized List<ConversationMessage> getRecentHistory() {
+        long now = System.currentTimeMillis();
+        if (now - lastInteractionTime > HISTORY_TIMEOUT_MS) {
+            conversationHistory.clear();
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(conversationHistory);
+    }
+
     public static void setNvidiaKey(String key) {
         nvidiaKey = TextUtils.isEmpty(key) ? DEFAULT_NVIDIA_KEY : key.trim();
     }
@@ -241,7 +283,10 @@ public final class AiVoiceAssistantClient {
                 Log.i(TAG, "Tier 1: Querying Google Gemini 2.5 Flash Lite...");
                 String geminiAnswer = queryGeminiOfficial(geminiApiKey, userQuery, dynamicPrompt);
                 if (!TextUtils.isEmpty(geminiAnswer)) {
-                    speakAndDisplay(context, cleanResponse(geminiAnswer), "Google Gemini 2.5 Flash Lite", callback);
+                    String clean = cleanResponse(geminiAnswer);
+                    addMessageToHistory("user", userQuery);
+                    addMessageToHistory("assistant", clean);
+                    speakAndDisplay(context, clean, "Google Gemini 2.5 Flash Lite", callback);
                     return;
                 }
             } catch (Exception e) {
@@ -253,7 +298,10 @@ public final class AiVoiceAssistantClient {
                 Log.i(TAG, "Tier 2: Querying NVIDIA NIM Llama 3.1 8B...");
                 String nvAnswer = queryOpenAiCompatible(NVIDIA_ENDPOINT, "meta/llama-3.1-8b-instruct", nvidiaKey, userQuery, dynamicPrompt);
                 if (!TextUtils.isEmpty(nvAnswer)) {
-                    speakAndDisplay(context, cleanResponse(nvAnswer), "NVIDIA Llama 3.1 8B", callback);
+                    String clean = cleanResponse(nvAnswer);
+                    addMessageToHistory("user", userQuery);
+                    addMessageToHistory("assistant", clean);
+                    speakAndDisplay(context, clean, "NVIDIA Llama 3.1 8B", callback);
                     return;
                 }
             } catch (Exception e) {
@@ -267,7 +315,10 @@ public final class AiVoiceAssistantClient {
                     Log.i(TAG, "Tier 3 OpenRouter Free [" + (i - 1) + "]: " + target.modelId);
                     String answer = queryOpenAiCompatible(target.endpoint, target.modelId, openRouterKey, userQuery, dynamicPrompt);
                     if (!TextUtils.isEmpty(answer)) {
-                        speakAndDisplay(context, cleanResponse(answer), target.modelId, callback);
+                        String clean = cleanResponse(answer);
+                        addMessageToHistory("user", userQuery);
+                        addMessageToHistory("assistant", clean);
+                        speakAndDisplay(context, clean, target.modelId, callback);
                         return;
                     }
                 } catch (Exception e) {
@@ -339,10 +390,10 @@ public final class AiVoiceAssistantClient {
 
             @Override
             public void onComplete() {
-                Log.i(TAG, "TTS Completed all chunks, scheduling overlay dismiss in 2.5s");
+                Log.i(TAG, "TTS Completed all chunks -> entering Follow-up listening mode");
                 try {
                     VoiceFloatingOverlayManager.getInstance(context).stopTtsWaveform();
-                    VoiceFloatingOverlayManager.getInstance(context).scheduleDismiss(2500);
+                    VoiceFloatingOverlayManager.getInstance(context).startFollowUpListening();
                 } catch (Exception ignored) {
                 }
                 try {
@@ -414,9 +465,20 @@ public final class AiVoiceAssistantClient {
             }
 
             JSONArray contents = new JSONArray();
+            List<ConversationMessage> history = getRecentHistory();
+            for (ConversationMessage m : history) {
+                JSONObject hContent = new JSONObject();
+                hContent.put("role", "assistant".equals(m.role) ? "model" : "user");
+                JSONArray hParts = new JSONArray();
+                JSONObject hText = new JSONObject();
+                hText.put("text", m.content);
+                hParts.put(hText);
+                hContent.put("parts", hParts);
+                contents.put(hContent);
+            }
+
             JSONObject userContent = new JSONObject();
             userContent.put("role", "user");
-
             JSONArray parts = new JSONArray();
             JSONObject textPart = new JSONObject();
             textPart.put("text", userQuery);
@@ -495,6 +557,14 @@ public final class AiVoiceAssistantClient {
             sysMsg.put("role", "system");
             sysMsg.put("content", TextUtils.isEmpty(systemPrompt) ? TV_SYSTEM_PROMPT : systemPrompt);
             messages.put(sysMsg);
+
+            List<ConversationMessage> history = getRecentHistory();
+            for (ConversationMessage m : history) {
+                JSONObject hMsg = new JSONObject();
+                hMsg.put("role", m.role);
+                hMsg.put("content", m.content);
+                messages.put(hMsg);
+            }
 
             JSONObject userMsg = new JSONObject();
             userMsg.put("role", "user");

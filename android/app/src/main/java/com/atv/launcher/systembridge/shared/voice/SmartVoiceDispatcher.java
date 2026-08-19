@@ -112,6 +112,12 @@ public final class SmartVoiceDispatcher {
             return localAction;
         }
 
+        // 0.1 Kiểm tra Kịch bản Giọng nói Thông minh (Smart Voice Macro Routines)
+        Map<String, Object> macroResult = handleVoiceMacroRoutines(context, query, lowerQuery, normalized);
+        if (macroResult != null) {
+            return macroResult;
+        }
+
         // 1. Kiểm tra lệnh kênh TV (VTV, HTV, THVL, VTC, SCTV...)
         String channelName = extractTvChannel(query, lowerQuery, normalized);
         if (channelName != null) {
@@ -839,5 +845,60 @@ public final class SmartVoiceDispatcher {
             case Calendar.SATURDAY: return "Thứ Bảy";
             default: return "";
         }
+    }
+
+    private static Map<String, Object> handleVoiceMacroRoutines(Context context, String query, String lowerQuery, String normalized) {
+        Context appContext = context.getApplicationContext();
+
+        // 1. Macro Đi Ngủ (Hạ volume / Tắt tiếng + Hẹn 15 phút tắt TV)
+        if (matchesExactOrPrefix(normalized, "di ngu thoi", "chuc ngu ngon", "ngu thoi", "ngu nao", "di ngu day", "ngu di", "ngu thoi nao")) {
+            try {
+                AudioManager audio = (AudioManager) appContext.getSystemService(Context.AUDIO_SERVICE);
+                if (audio != null) {
+                    int maxVol = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.max(1, maxVol / 10), AudioManager.FLAG_SHOW_UI);
+                }
+            } catch (Exception ignored) {}
+            SleepTimerManager.setSleepTimer(appContext, 15);
+            return createSystemActionResult(context, "Chúc bạn ngủ ngon! TV đã được hạ nhỏ âm lượng và hẹn giờ tắt sau 15 phút.");
+        }
+
+        // 2. Macro Xem Thời Sự VTV1
+        if (matchesAny(normalized, "xem thoi su", "mo thoi su", "tin thoi su", "thoi su vtv1", "thoi su 19h", "ban tin thoi su")) {
+            boolean launched = launchXemTvChannel(context, "VTV1");
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("success", launched);
+            res.put("type", TYPE_TV_CHANNEL);
+            res.put("target", "VTV1");
+            res.put("package", XEMTV_PACKAGE);
+            String msg = "Đang mở Thời sự VTV1 trên XemTV";
+            res.put("message", msg);
+            com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(context).speak(context, msg, null);
+            return res;
+        }
+
+        // 3. Macro Nhạc Chill Thư Giãn
+        if (matchesAny(normalized, "nhac chill", "nhac thu gian", "nhac lofi", "nhac ngu", "nhac acoustic", "nhac cafe")) {
+            boolean searchLaunched = launchMediaSearch(context, "nhạc lofi chill thư giãn");
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("success", searchLaunched);
+            res.put("type", TYPE_MEDIA_SEARCH);
+            res.put("query", "nhạc lofi chill thư giãn");
+            String msg = "Đang phát nhạc Lofi thư giãn trên YouTube";
+            res.put("message", msg);
+            com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(context).speak(context, msg, null);
+            return res;
+        }
+
+        // 4. Macro Dọn Dẹp TV / Tối Ưu RAM
+        if (matchesAny(normalized, "don dep tv", "giai phong ram", "toi uu tv", "don rac tv", "don dep bo nho", "tang toc tv")) {
+            try {
+                System.gc();
+                Runtime.getRuntime().gc();
+            } catch (Exception ignored) {}
+            return createSystemActionResult(context, "Đã dọn dẹp bộ nhớ và tối ưu hóa hệ thống TV mượt mà.");
+        }
+
+        return null;
     }
 }

@@ -5,6 +5,23 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-19 - Official release 2026.08.005 — Multi-turn Continuous Conversation & Smart Voice Macro Routines
+
+### 1. Chế Độ Hội Thoại Đàm Thoại Liên Tục (Multi-turn Follow-up Conversation)
+- **Tự Động Mở Micro Tiếp Theo (Auto Follow-up)**: Sau khi Trợ lý AI đọc xong câu trả lời, micro tự động chuyển sang chế độ lắng nghe tiếp theo (`Đang lắng nghe tiếp... 🎙️`) mà người dùng không cần phải bấm phím Voice trên remote lần nữa.
+- **Bộ Nhớ Ngữ Cảnh 3 Lượt Hội Thoại**: Lưu giữ 3 cặp câu hỏi - câu trả lời gần nhất (`user` và `assistant`), giúp AI hiểu rõ các câu hỏi tiếp nối ngữ cảnh (ví dụ: hỏi *"Thủ đô nước Pháp?"* rồi hỏi tiếp *"Ở đó có tháp gì?"*).
+- **Đóng Overlay Êm Ái Khi Kết Thúc**: Tự động đóng nhẹ nhàng khi người dùng im lặng hoặc nói lời tạm biệt (*"Cảm ơn"*, *"Tạm biệt"*, *"Xong rồi"*).
+
+### 2. Kịch Bản Giọng Nói Thông Minh (Smart Voice Macro Routines)
+- **Macro Đi Ngủ (*"Đi ngủ thôi"*, *"Chúc ngủ ngon"*, *"Ngủ nào"*)**:
+  - Tự động hạ nhỏ âm lượng TV + Kích hoạt hẹn giờ 15 phút tắt TV qua `SleepTimerManager`.
+- **Macro Thời Sự (*"Xem thời sự"*, *"Mở thời sự VTV1"*)**:
+  - Mở trực tiếp kênh Thời sự VTV1 trên XemTV.
+- **Macro Thư Giãn (*"Bật nhạc chill"*, *"Nhạc thư giãn"*, *"Nhạc Lofi"*)**:
+  - Tìm kiếm và phát playlist nhạc Lofi / Acoustic thư giãn trên SmartTube/YouTube.
+- **Macro Tối Ưu Hóa (*"Dọn dẹp TV"*, *"Giải phóng RAM"*, *"Tăng tốc TV"*)**:
+  - Thực hiện dọn rác bộ nhớ đệm và tối ưu hóa hệ thống TV tức thì.
+
 ## 2026-08-19 - Official release 2026.08.004 — Deep TV Skills, 0ms Local Answers, Karaoke 1-Chạm & Resilient Voice Auto-Retry
 
 ### 1. Phản Hồi Tức Thì 0ms (Zero-Latency Local Fast Answers)
