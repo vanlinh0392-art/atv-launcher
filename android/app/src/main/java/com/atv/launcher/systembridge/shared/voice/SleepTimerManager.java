@@ -68,7 +68,11 @@ public final class SleepTimerManager {
         try {
             VoiceBridgeAccessibilityService accessibility = VoiceBridgeAccessibilityService.getInstance();
             if (accessibility != null) {
-                accessibility.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_POWER_DIALOG);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    accessibility.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN);
+                } else {
+                    accessibility.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_POWER_DIALOG);
+                }
             }
             Intent sleepIntent = new Intent(Intent.ACTION_SCREEN_OFF);
             context.sendBroadcast(sleepIntent);

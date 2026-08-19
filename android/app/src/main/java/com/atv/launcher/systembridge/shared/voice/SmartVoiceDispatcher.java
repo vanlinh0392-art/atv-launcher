@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
@@ -478,10 +479,18 @@ public final class SmartVoiceDispatcher {
             }
         }
 
-        // 3. Tra cứu danh sách ứng dụng đã cài đặt trên thiết bị
+        // 3. Tra cứu danh sách ứng dụng đã cài đặt trên thiết bị (cả Standard & Android TV Leanback)
         Intent launcherIntent = new Intent(Intent.ACTION_MAIN, null);
         launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> availableActivities = pm.queryIntentActivities(launcherIntent, 0);
+        List<ResolveInfo> standardActivities = pm.queryIntentActivities(launcherIntent, 0);
+
+        Intent leanbackIntent = new Intent(Intent.ACTION_MAIN, null);
+        leanbackIntent.addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+        List<ResolveInfo> leanbackActivities = pm.queryIntentActivities(leanbackIntent, 0);
+
+        List<ResolveInfo> availableActivities = new ArrayList<>();
+        if (standardActivities != null) availableActivities.addAll(standardActivities);
+        if (leanbackActivities != null) availableActivities.addAll(leanbackActivities);
 
         ResolveInfo bestMatch = null;
         for (ResolveInfo ri : availableActivities) {

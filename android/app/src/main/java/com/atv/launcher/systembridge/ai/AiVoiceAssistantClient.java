@@ -12,6 +12,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -601,6 +602,12 @@ public final class AiVoiceAssistantClient {
                     }
                 }
             } else {
+                try (InputStream es = conn.getErrorStream()) {
+                    if (es != null) {
+                        byte[] buf = new byte[512];
+                        while (es.read(buf) > 0) {}
+                    }
+                } catch (Exception ignored) {}
                 Log.w(TAG, "Gemini HTTP " + responseCode);
             }
         } catch (Exception e) {
@@ -681,6 +688,12 @@ public final class AiVoiceAssistantClient {
                     }
                 }
             } else {
+                try (InputStream es = conn.getErrorStream()) {
+                    if (es != null) {
+                        byte[] buf = new byte[512];
+                        while (es.read(buf) > 0) {}
+                    }
+                } catch (Exception ignored) {}
                 Log.w(TAG, "HTTP " + responseCode + " for model " + modelId);
             }
         } catch (Exception e) {

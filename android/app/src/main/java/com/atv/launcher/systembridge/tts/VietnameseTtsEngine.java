@@ -399,6 +399,12 @@ public final class VietnameseTtsEngine {
                     Log.i(TAG, "Online TTS downloaded chunk (" + text.length() + " chars): " + tempFile.length() + " bytes");
                     return tempFile;
                 } else {
+                    try (InputStream es = conn.getErrorStream()) {
+                        if (es != null) {
+                            byte[] buf = new byte[512];
+                            while (es.read(buf) > 0) {}
+                        }
+                    } catch (Exception ignored) {}
                     Log.w(TAG, "Online TTS HTTP " + code + " (attempt " + (attempt + 1) + ")");
                 }
             } catch (Exception e) {
