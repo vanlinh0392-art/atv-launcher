@@ -244,20 +244,35 @@ public final class VoiceFloatingOverlayManager {
         }
     }
 
+    private boolean hasRetriedRecognition = false;
+
     private void startInProcessSpeechRecognition() {
+        hasRetriedRecognition = false;
+        startSpeechRecognitionInternal(false);
+    }
+
+    private void startSpeechRecognitionInternal(boolean isFallback) {
         stopSpeechRecognition();
 
-        android.content.ComponentName serviceComponent = new android.content.ComponentName(
-                "com.google.android.katniss",
-                "com.google.android.katniss.search.serviceapi.KatnissRecognitionService"
-        );
         try {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context, serviceComponent);
-        } catch (Exception e) {
+            if (isFallback) {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context);
+            } else {
+                android.content.ComponentName serviceComponent = new android.content.ComponentName(
+                        "com.google.android.katniss",
+                        "com.google.android.katniss.search.serviceapi.KatnissRecognitionService"
+                );
+                try {
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context, serviceComponent);
+                } catch (Exception e) {
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context);
+                }
+            }
+        } catch (Exception ex) {
             try {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context);
-            } catch (Exception ex) {
-                Log.e(TAG, "Cannot create SpeechRecognizer", ex);
+            } catch (Exception e) {
+                Log.e(TAG, "Cannot create SpeechRecognizer", e);
             }
         }
 
@@ -306,8 +321,25 @@ public final class VoiceFloatingOverlayManager {
 
             @Override
             public void onError(int error) {
-                Log.w(TAG, "SpeechRecognizer onError code=" + error);
+                Log.w(TAG, "SpeechRecognizer onError code=" + error + ", isFallback=" + isFallback + ", hasRetried=" + hasRetriedRecognition);
                 isListening = false;
+
+                if (!hasRetriedRecognition && (error == SpeechRecognizer.ERROR_NETWORK ||
+                        error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT ||
+                        error == SpeechRecognizer.ERROR_SERVER ||
+                        error == SpeechRecognizer.ERROR_CLIENT ||
+                        error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
+                    hasRetriedRecognition = true;
+                    Log.i(TAG, "SpeechRecognizer network/server glitch, auto-retrying with system speech engine...");
+                    mainHandler.postDelayed(() -> {
+                        if (isOverlayShowing()) {
+                            updateSubtitle("Đang kết nối lại...", 0xFF00E5FF);
+                            startSpeechRecognitionInternal(true);
+                        }
+                    }, 250);
+                    return;
+                }
+
                 if (waveformView != null) {
                     waveformView.stopAnimation();
                 }
@@ -358,8 +390,11 @@ public final class VoiceFloatingOverlayManager {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "vi-VN");
+        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.getPackageName());
+        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3500L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L);
@@ -368,8 +403,13 @@ public final class VoiceFloatingOverlayManager {
             speechRecognizer.startListening(intent);
         } catch (Exception e) {
             Log.e(TAG, "startListening error", e);
-            updateSubtitle("Lỗi khởi động thu âm", 0xFFFF5252);
-            scheduleDismiss(2000);
+            if (!hasRetriedRecognition) {
+                hasRetriedRecognition = true;
+                mainHandler.postDelayed(() -> startSpeechRecognitionInternal(true), 250);
+            } else {
+                updateSubtitle("Lỗi khởi động thu âm", 0xFFFF5252);
+                scheduleDismiss(2000);
+            }
         }
     }
 
