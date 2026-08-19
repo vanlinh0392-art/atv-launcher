@@ -17,9 +17,14 @@ import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
 public class VoiceBridgeAccessibilityService extends AccessibilityService {
     private static final String TAG = "VoiceBridge";
 
+    private static volatile VoiceBridgeAccessibilityService instance;
     private static volatile String currentForegroundPackage = "com.atv.launcher";
     private final VoiceKeyHandler voiceKeyHandler = new VoiceKeyHandler(TAG, "accessibility");
     private BroadcastReceiver wakeReceiver;
+
+    public static VoiceBridgeAccessibilityService getInstance() {
+        return instance;
+    }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -72,6 +77,7 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
         Log.i(TAG, "connected process=" + getPackageName()
                 + " key=" + BridgeStateStore.getKeyCode(this)
                 + " mode=" + BridgeStateStore.getMode(this));
@@ -84,6 +90,7 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() {
         Log.i(TAG, "destroyed");
+        instance = null;
         com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.setAccessibilityService(null);
         voiceKeyHandler.clearPendingActions();
         unregisterWakeReceiver();

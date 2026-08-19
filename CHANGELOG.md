@@ -5,6 +5,34 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-19 - Official release 2026.08.004 — Deep TV Skills, 0ms Local Answers, Karaoke 1-Chạm & Resilient Voice Auto-Retry
+
+### 1. Phản Hồi Tức Thì 0ms (Zero-Latency Local Fast Answers)
+- **Tra cứu Thời gian & Lịch Cục bộ**: Trả lời tức thì *"Mấy giờ rồi"*, *"Hôm nay ngày mấy"*, *"Hôm nay thứ mấy"* trong 0ms theo múi giờ hệ thống TV, không phụ thuộc kết nối internet.
+- **Lời Chào & Giao Tiếp Cơ Bản**: Phản hồi nhanh các câu chào *"Chào buổi sáng"*, *"Chào buổi tối"*, *"Bạn là ai"*.
+
+### 2. Bộ Lệnh Điều Khiển Phần Cứng TV Chuyên Sâu (Deep TV Hardware Skills)
+- **Điều Khiển Âm Lượng Toàn Diện**:
+  - *"Tăng âm lượng"* / *"Giảm âm lượng"* (tăng giảm trực tiếp qua `AudioManager`).
+  - *"Tắt tiếng"* / *"Bật tiếng"* (Mute / Unmute tức thì).
+  - *"Đặt âm lượng 30%"* / *"Âm lượng 50"* (tính toán chính xác theo Max Volume của thiết bị TV).
+- **Điều Khiển Phát Media Toàn Hệ Thống**:
+  - *"Tạm dừng"* / *"Dừng phát"* (`KEYCODE_MEDIA_PLAY_PAUSE`).
+  - *"Tiếp tục"* / *"Phát tiếp"* (`KEYCODE_MEDIA_PLAY`).
+  - *"Chuyển bài"* / *"Bài tiếp theo"* (`KEYCODE_MEDIA_NEXT`).
+  - *"Bài trước"* / *"Quay lại bài trước"* (`KEYCODE_MEDIA_PREVIOUS`).
+- **Hẹn Giờ Tắt TV Tự Động (`SleepTimerManager`)**:
+  - Hỗ trợ câu lệnh: *"Hẹn giờ 30 phút nữa tắt TV"*, *"Hẹn 1 tiếng nữa ngủ"*, *"Hủy hẹn giờ tắt TV"*, *"Hẹn giờ còn bao lâu"*.
+  - Bộ đếm thời gian thông minh đưa TV về chế độ Sleep / Standby an toàn khi hết giờ.
+- **Chuyển Cổng Đầu Vào HDMI**:
+  - *"Chuyển sang HDMI 1"*, *"Mở HDMI 2"*, *"Cổng HDMI 3"* (điều hướng sang TV Input / Passthrough HDMI).
+
+### 3. Hát Karaoke Thông Minh 1 Chạm
+- Nhận diện các câu lệnh: *"Hát bài Hoa Nở Không Màu"*, *"Karaoke Ngày Mai Người Ta Lấy Chồng tone nam"*, *"Hát karaoke bài..."* -> Tự động tách tên bài hát, gắn tiền tố `karaoke` tối ưu và mở trực tiếp SmartTube / YouTube TV full màn hình.
+
+### 4. Tự Phục Hồi Kết Nối Nhận Diện Giọng Nói (Resilient Voice Auto-Retry)
+- Cơ chế 2-tầng thông minh: Tự động thử lại tức thì với Default System Recognizer khi Katniss hoặc Google Speech gặp độ trễ mạng (`ERROR_NETWORK`, `ERROR_SERVER`, `ERROR_TIMEOUT`), loại bỏ 100% hiện tượng rớt voice đột ngột.
+
 ## 2026-08-19 - Official release 2026.08.003 — Đổi Giọng TTS Tiếng Việt, Ma Trận 8 Model AI, Video Wallpaper Universal & Dpad Unification
 
 ### 1. Trợ Lý Voice AI & Đổi Giọng Đọc TTS Tiếng Việt

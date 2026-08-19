@@ -5,11 +5,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.media.AudioManager;
 import android.net.Uri;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 
 import java.text.Normalizer;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -101,6 +105,12 @@ public final class SmartVoiceDispatcher {
         String lowerQuery = query.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
 
         Log.i(TAG, "dispatch voice query: '" + query + "' (normalized: '" + normalized + "')");
+
+        // 0. Kiểm tra lệnh phần cứng TV và hỏi đáp cục bộ 0ms (Âm lượng, Hẹn giờ ngủ, Media, Đồng hồ, Lời chào)
+        Map<String, Object> localAction = handleHardwareAndFastLocalCommands(context, query, lowerQuery, normalized);
+        if (localAction != null) {
+            return localAction;
+        }
 
         // 1. Kiểm tra lệnh kênh TV (VTV, HTV, THVL, VTC, SCTV...)
         String channelName = extractTvChannel(query, lowerQuery, normalized);
@@ -231,8 +241,15 @@ public final class SmartVoiceDispatcher {
         // 1. Loại bỏ các đuôi 'trên youtube', 'trên smarttube'
         clean = clean.replaceAll("(?i)\\s*(trên|tren|ở|o)\\s*(youtube|smarttube|you tube|du tu be)\\s*$", "").trim();
 
-        // 2. Xử lý các tiền tố mở / nghe / tìm kiếm
+        // 2. Xử lý chuyên sâu chế độ Hát Karaoke 1 chạm
         String lower = clean.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("hát bài ") || lower.startsWith("hat bai ") ||
+                lower.startsWith("hát karaoke ") || lower.startsWith("hat karaoke ") ||
+                lower.startsWith("karaoke bài ") || lower.startsWith("karaoke ")) {
+            String sub = clean.replaceAll("(?i)^(?:hát\\s*karaoke|hat\\s*karaoke|hát\\s*bài|hat\\s*bai|karaoke\\s*bài|karaoke\\s*bai|karaoke|hát|hat)\\s*", "").trim();
+            return "karaoke " + sub;
+        }
+
         String[] leadingVerbs = {
                 "mở bài hát ", "mo bai hat ", "nghe bài hát ", "nghe bai hat ", "bật bài hát ", "bat bai hat ",
                 "nghe bài ", "nghe bai ", "mở bài ", "mo bai ", "bật bài ", "bat bai ",
@@ -614,5 +631,213 @@ public final class SmartVoiceDispatcher {
         return pattern.matcher(normalized).replaceAll("")
                 .replaceAll("đ", "d")
                 .replaceAll("Đ", "D");
+    }
+
+    private static Map<String, Object> handleHardwareAndFastLocalCommands(Context context, String query, String lowerQuery, String normalized) {
+        Context appContext = context.getApplicationContext();
+        AudioManager audioManager = (AudioManager) appContext.getSystemService(Context.AUDIO_SERVICE);
+
+        // --- 1. ĐIỀU KHIỂN ÂM LƯỢNG (VOLUME) ---
+        if (matchesAny(normalized, "tang am luong", "tang volume", "cho to len", "to len", "tang tieng", "cho lon len", "lon len")) {
+            if (audioManager != null) {
+                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI);
+            }
+            return createSystemActionResult(context, "Đã tăng âm lượng TV");
+        }
+        if (matchesAny(normalized, "giam am luong", "giam volume", "cho nho lai", "nho lai", "giam tieng", "cho be lai", "be lai")) {
+            if (audioManager != null) {
+                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI);
+            }
+            return createSystemActionResult(context, "Đã giảm âm lượng TV");
+        }
+        if (matchesAny(normalized, "tat tieng", "tat am thanh", "tat volume", "im lang", "mute")) {
+            if (audioManager != null) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, AudioManager.FLAG_SHOW_UI);
+                } else {
+                    audioManager.setStreamMute(AudioManager.STREAM_MUSIC, true);
+                }
+            }
+            return createSystemActionResult(context, "Đã tắt tiếng TV");
+        }
+        if (matchesAny(normalized, "bat tieng", "bat lai tieng", "mo tieng", "unmute", "mo am thanh")) {
+            if (audioManager != null) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, AudioManager.FLAG_SHOW_UI);
+                } else {
+                    audioManager.setStreamMute(AudioManager.STREAM_MUSIC, false);
+                }
+            }
+            return createSystemActionResult(context, "Đã bật lại tiếng TV");
+        }
+        Matcher volMatcher = Pattern.compile("(?:dat|chinh|cho|de)?\\s*am luong\\s*(\\d+)\\s*%?").matcher(normalized);
+        if (volMatcher.find()) {
+            try {
+                int percent = Integer.parseInt(volMatcher.group(1));
+                percent = Math.max(0, Math.min(100, percent));
+                if (audioManager != null) {
+                    int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                    int targetVol = Math.round((percent / 100.0f) * maxVol);
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, AudioManager.FLAG_SHOW_UI);
+                }
+                return createSystemActionResult(context, "Đã đặt âm lượng TV mức " + percent + "%");
+            } catch (Exception ignored) {}
+        }
+
+        // --- 2. ĐIỀU KHIỂN PHÁT MEDIA TOÀN HỆ THỐNG ---
+        if (matchesExactOrPrefix(normalized, "tam dung", "dung phat", "dung lai", "pause")) {
+            dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
+            return createSystemActionResult(context, "Đã tạm dừng phát");
+        }
+        if (matchesExactOrPrefix(normalized, "tiep tuc", "phat tiep", "phat lai", "play")) {
+            dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_PLAY);
+            return createSystemActionResult(context, "Đang tiếp tục phát");
+        }
+        if (matchesExactOrPrefix(normalized, "chuyen bai", "bai tiep theo", "bai ke tiep", "next")) {
+            dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_NEXT);
+            return createSystemActionResult(context, "Đã chuyển bài tiếp theo");
+        }
+        if (matchesExactOrPrefix(normalized, "bai truoc", "quay lai bai truoc", "previous")) {
+            dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_PREVIOUS);
+            return createSystemActionResult(context, "Đã quay lại bài trước");
+        }
+
+        // --- 3. HẸN GIỜ TẮT TV (SLEEP TIMER) ---
+        if (normalized.contains("huy hen gio") || normalized.contains("huy tat tv") || normalized.contains("tat hen gio")) {
+            SleepTimerManager.cancelSleepTimer(appContext);
+            return createSystemActionResult(context, "Đã hủy hẹn giờ tắt TV");
+        }
+        Matcher sleepMatcher = Pattern.compile("hen\\s*(?:gio)?\\s*(\\d+)\\s*(phut|p|tieng|gio|h)").matcher(normalized);
+        if (sleepMatcher.find()) {
+            try {
+                int val = Integer.parseInt(sleepMatcher.group(1));
+                String unit = sleepMatcher.group(2);
+                int minutes = ("tieng".equals(unit) || "gio".equals(unit) || "h".equals(unit)) ? val * 60 : val;
+                SleepTimerManager.setSleepTimer(appContext, minutes);
+                String msg = "Đã hẹn giờ " + val + " " + (minutes >= 60 && minutes % 60 == 0 ? "tiếng" : "phút") + " nữa tắt TV";
+                return createSystemActionResult(context, msg);
+            } catch (Exception ignored) {}
+        }
+        if (normalized.contains("hen gio con bao lau") || normalized.contains("con bao nhieu phut tat tv")) {
+            if (SleepTimerManager.isTimerActive()) {
+                int remaining = SleepTimerManager.getRemainingMinutes();
+                return createSystemActionResult(context, "Hẹn giờ tắt TV còn lại khoảng " + remaining + " phút.");
+            } else {
+                return createSystemActionResult(context, "Hiện tại không có hẹn giờ tắt TV nào đang chạy.");
+            }
+        }
+
+        // --- 4. CHUYỂN CỔNG ĐẦU VÀO HDMI ---
+        Matcher hdmiMatcher = Pattern.compile("(?:chuyen\\s*(?:sang)?|mo|bat|cong)\\s*hdmi\\s*(\\d+)").matcher(normalized);
+        if (hdmiMatcher.find()) {
+            String port = hdmiMatcher.group(1);
+            launchHdmiPort(appContext, port);
+            return createSystemActionResult(context, "Đang chuyển sang cổng HDMI " + port);
+        }
+
+        // --- 5. HỎI ĐÁP CỤC BỘ 0MS (GIỜ GIẤC, NGÀY THÁNG, LỊCH) ---
+        if (matchesAny(normalized, "may gio", "xem gio", "gio roi", "bay gio la may gio", "gio bay gio")) {
+            Calendar cal = Calendar.getInstance();
+            int hour = cal.get(Calendar.HOUR_OF_DAY);
+            int min = cal.get(Calendar.MINUTE);
+            String ans = "Bây giờ là " + hour + " giờ " + (min < 10 ? "0" + min : min) + " phút.";
+            return createSystemActionResult(context, ans);
+        }
+        if (matchesAny(normalized, "ngay may", "ngay bao nhieu", "hom nay ngay may", "hom nay ngay bao nhieu")) {
+            Calendar cal = Calendar.getInstance();
+            int day = cal.get(Calendar.DAY_OF_MONTH);
+            int month = cal.get(Calendar.MONTH) + 1;
+            int year = cal.get(Calendar.YEAR);
+            String dayName = getDayOfWeekVietnamese(cal.get(Calendar.DAY_OF_WEEK));
+            String ans = "Hôm nay là " + dayName + ", ngày " + day + " tháng " + month + " năm " + year + ".";
+            return createSystemActionResult(context, ans);
+        }
+        if (matchesAny(normalized, "thu may", "hom nay thu may", "thu may roi")) {
+            Calendar cal = Calendar.getInstance();
+            String dayName = getDayOfWeekVietnamese(cal.get(Calendar.DAY_OF_WEEK));
+            String ans = "Hôm nay là " + dayName + ".";
+            return createSystemActionResult(context, ans);
+        }
+
+        // --- 6. LỜI CHÀO & PERSONA CỤC BỘ ---
+        if (matchesAny(normalized, "chao buoi sang", "good morning")) {
+            return createSystemActionResult(context, "Chào buổi sáng! Chúc bạn một ngày mới an lành, tràn đầy niềm vui và may mắn.");
+        }
+        if (matchesAny(normalized, "chao buoi toi", "good evening")) {
+            return createSystemActionResult(context, "Chào buổi tối! Chúc bạn có những phút giây xem TV thư giãn tuyệt vời.");
+        }
+        if (matchesAny(normalized, "ban la ai", "ban ten gi", "tro ly ten gi")) {
+            return createSystemActionResult(context, "Tôi là Trợ lý Giọng nói Thông minh trên Android TV của bạn. Tôi có thể giúp bạn mở kênh, tìm video YouTube, điều khiển TV và trò chuyện.");
+        }
+
+        return null;
+    }
+
+    private static boolean matchesAny(String text, String... keywords) {
+        if (TextUtils.isEmpty(text)) return false;
+        for (String kw : keywords) {
+            if (text.contains(kw)) return true;
+        }
+        return false;
+    }
+
+    private static boolean matchesExactOrPrefix(String text, String... keywords) {
+        if (TextUtils.isEmpty(text)) return false;
+        for (String kw : keywords) {
+            if (text.equals(kw) || text.startsWith(kw + " ") || text.endsWith(" " + kw)) return true;
+        }
+        return false;
+    }
+
+    private static Map<String, Object> createSystemActionResult(Context context, String message) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("type", TYPE_SYSTEM_ACTION);
+        result.put("message", message);
+        com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(context).speak(context, message, null);
+        return result;
+    }
+
+    private static void dispatchMediaKey(Context context, int keyCode) {
+        try {
+            AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            long eventTime = SystemClock.uptimeMillis();
+            if (audio != null) {
+                audio.dispatchMediaKeyEvent(new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0));
+                audio.dispatchMediaKeyEvent(new KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, keyCode, 0));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "dispatchMediaKey error", e);
+        }
+    }
+
+    private static void launchHdmiPort(Context context, String portNumber) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(Uri.parse("passthrough://com.android.tv.passthrough/HDMI" + portNumber));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            try {
+                Intent tvInputIntent = new Intent("android.intent.action.TV_INPUT_BUTTON");
+                tvInputIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(tvInputIntent);
+            } catch (Exception ex) {
+                Log.w(TAG, "Cannot launch HDMI input", ex);
+            }
+        }
+    }
+
+    private static String getDayOfWeekVietnamese(int dayOfWeek) {
+        switch (dayOfWeek) {
+            case Calendar.SUNDAY: return "Chủ Nhật";
+            case Calendar.MONDAY: return "Thứ Hai";
+            case Calendar.TUESDAY: return "Thứ Ba";
+            case Calendar.WEDNESDAY: return "Thứ Tư";
+            case Calendar.THURSDAY: return "Thứ Năm";
+            case Calendar.FRIDAY: return "Thứ Sáu";
+            case Calendar.SATURDAY: return "Thứ Bảy";
+            default: return "";
+        }
     }
 }
