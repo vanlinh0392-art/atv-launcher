@@ -19,8 +19,10 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -273,9 +275,48 @@ public final class AiVoiceAssistantClient {
         return nvidiaKey;
     }
 
+    // Smart On-Device Response Cache (TTL 30 phút, tối đa 50 câu hỏi phổ biến)
+    private static class CachedAiResponse {
+        final String text;
+        final String model;
+        final long createdAt;
+
+        CachedAiResponse(String text, String model) {
+            this.text = text;
+            this.model = model;
+            this.createdAt = System.currentTimeMillis();
+        }
+
+        boolean isValid() {
+            return (System.currentTimeMillis() - createdAt) < 1800000L; // 30 phút
+        }
+    }
+
+    private static final Map<String, CachedAiResponse> RESPONSE_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<String, CachedAiResponse>(32, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, CachedAiResponse> eldest) {
+                    return size() > 50;
+                }
+            }
+    );
+
     public static void askAi(Context context, String userQuery, AiResponseCallback callback) {
         executor.execute(() -> {
             Log.i(TAG, "askAi query: '" + userQuery + "' -> dispatching through Free AI models");
+
+            String cacheKey = userQuery.trim().toLowerCase(Locale.ROOT);
+            if (getRecentHistory().isEmpty() && !isStoryOrLongContent(userQuery)) {
+                CachedAiResponse cached = RESPONSE_CACHE.get(cacheKey);
+                if (cached != null && cached.isValid()) {
+                    Log.i(TAG, "Serving instant AI response from local memory cache (0ms): " + cached.text);
+                    addMessageToHistory("user", userQuery);
+                    addMessageToHistory("assistant", cached.text);
+                    speakAndDisplay(context, cached.text, cached.model + " (Cache)", callback);
+                    return;
+                }
+            }
+
             String dynamicPrompt = buildSystemPrompt(userQuery);
 
             // 1. Tầng 1: Google Gemini 2.5 Flash Lite (Chính thức)
@@ -286,6 +327,7 @@ public final class AiVoiceAssistantClient {
                     String clean = cleanResponse(geminiAnswer);
                     addMessageToHistory("user", userQuery);
                     addMessageToHistory("assistant", clean);
+                    RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, "Google Gemini 2.5 Flash Lite"));
                     speakAndDisplay(context, clean, "Google Gemini 2.5 Flash Lite", callback);
                     return;
                 }
@@ -301,6 +343,7 @@ public final class AiVoiceAssistantClient {
                     String clean = cleanResponse(nvAnswer);
                     addMessageToHistory("user", userQuery);
                     addMessageToHistory("assistant", clean);
+                    RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, "NVIDIA Llama 3.1 8B"));
                     speakAndDisplay(context, clean, "NVIDIA Llama 3.1 8B", callback);
                     return;
                 }
@@ -318,6 +361,7 @@ public final class AiVoiceAssistantClient {
                         String clean = cleanResponse(answer);
                         addMessageToHistory("user", userQuery);
                         addMessageToHistory("assistant", clean);
+                        RESPONSE_CACHE.put(cacheKey, new CachedAiResponse(clean, target.modelId));
                         speakAndDisplay(context, clean, target.modelId, callback);
                         return;
                     }

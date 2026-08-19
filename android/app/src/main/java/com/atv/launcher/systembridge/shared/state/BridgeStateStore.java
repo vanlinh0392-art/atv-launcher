@@ -31,7 +31,23 @@ public final class BridgeStateStore {
     public static final String WALLPAPER_ADVANCE_ON_COMPLETION = "on_completion";
     public static final String WALLPAPER_ADVANCE_FIXED_INTERVAL = "fixed_interval";
 
-    private static final int[] DEFAULT_VOICE_KEY_CODES = new int[]{0, 84, 219, 229, 231};
+    private static final int[] DEFAULT_VOICE_KEY_CODES = new int[]{
+            0,
+            84,  // KEYCODE_SEARCH (Sony Bravia, Casper, TCL, Mi TV)
+            231, // KEYCODE_VOICE_ASSIST (Google TV, Chromecast, Xiaomi Box, Onn TV)
+            219, // KEYCODE_ASSIST (Android Box AOSP, Tanix, Mecool, Tx3)
+            229, // KEYCODE_LAST_CHANNEL (Quick action / Custom voice key)
+            222, // KEYCODE_MEDIA_AUDIO_TRACK (Audio / Voice switch)
+            259, // KEYCODE_HELP (Sony Bravia, Sharp)
+            170, // KEYCODE_TV_INPUT (Live TV / Source key)
+            188, // KEYCODE_BOOKMARK / CUSTOM_BUTTON_1
+            187, // KEYCODE_APP_SWITCH
+            64,  // KEYCODE_EXPLORER
+            183, // KEYCODE_PROG_RED
+            184, // KEYCODE_PROG_GREEN
+            185, // KEYCODE_PROG_YELLOW
+            186  // KEYCODE_PROG_BLUE
+    };
 
     private static final String KEY_MODE = "mode";
     private static final String KEY_KEY_CODE = "key_code";

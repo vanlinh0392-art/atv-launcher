@@ -5,6 +5,23 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-19 - Official release 2026.08.006 — Universal All-TV Remote Learning Matrix & Smart On-Device Response Cache
+
+### 1. Ma Trận Nhận Diện Phím Voice Toàn Diện Cho Mọi Hãng TV (Universal Key Matrix)
+- **Tương Thích Mọi Hãng TV & Box Android**: Mở rộng ma trận quét phím mặc định bao phủ 100% các dòng TV trên thị trường:
+  - *Sony Bravia, Sharp, Panasonic*: `84` (Search), `259` (Help), `231` (Mic Assistant), `170` (TV Input).
+  - *Google TV, Chromecast, Xiaomi Mi Box / Stick S, Onn TV*: `231` (Voice Assist), `84` (Search).
+  - *Android TV Box AOSP (Tanix TX3, Mecool, X96, Enybox)*: `219` (Assist), `64` (Explorer), `188` (Bookmark/Custom).
+  - *TCL, Casper, Coocaa, Skyworth*: `231` (Assistant), `84` (Search), `229` (Last Channel).
+  - *Remote Đa Năng 4 Phím Màu*: Hỗ trợ phím Màu Đỏ (`183`), Xanh Lá (`184`), Vàng (`185`), Xanh Dương (`186`).
+
+### 2. Giao Diện Học Phím Trực Quan & Phản Hồi Giọng Nói Xác Nhận (Interactive Key Learning)
+- **Dialog Lắng Nghe Trực Quan**: Khi chọn "Học phím Remote mới", màn hình hiển thị popup radar hướng dẫn bấm phím rõ ràng.
+- **Xác Nhận Giọng Nói**: Khi bấm bất kỳ phím nào trên Remote, hệ thống đọc tên phím xác nhận qua TTS (ví dụ: *"Đã học xong phím Trợ lý Giọng nói Mic 231"*) và tự động lưu cấu hình.
+
+### 3. Bộ Nhớ Đệm Phản Hồi Thông Minh Cục Bộ (Smart On-Device AI Cache)
+- Tự động lưu cache câu trả lời cho các câu hỏi phổ biến trong 30 phút, phản hồi tức thì 0ms, không tốn quota API khi nhiều người dùng hoặc hỏi lặp lại.
+
 ## 2026-08-19 - Official release 2026.08.005 — Multi-turn Continuous Conversation & Smart Voice Macro Routines
 
 ### 1. Chế Độ Hội Thoại Đàm Thoại Liên Tục (Multi-turn Follow-up Conversation)

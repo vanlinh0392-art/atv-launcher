@@ -44,6 +44,13 @@ public final class VoiceKeyHandler {
             Log.i(tag, source + " learned_key code=" + keyCode);
             BridgeStateStore.setKeyCode(context, keyCode);
             BridgeStateStore.setLearningMode(context, false);
+            String name = getKeyFriendlyName(keyCode);
+            String msg = "Đã học xong phím " + name;
+            try {
+                com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(context).speak(context, msg, null);
+                VoiceFloatingOverlayManager.getInstance(context).updateSubtitle(msg, 0xFF00E5FF);
+                VoiceFloatingOverlayManager.getInstance(context).scheduleDismiss(2200);
+            } catch (Exception ignored) {}
             return true;
         }
 
@@ -213,5 +220,28 @@ public final class VoiceKeyHandler {
     private void launchVoice(Context context) {
         boolean launched = VoiceSearchLauncher.launch(context);
         Log.i(tag, source + " launch_result success=" + launched);
+    }
+
+    public static String getKeyFriendlyName(int keyCode) {
+        switch (keyCode) {
+            case 231: return "Trợ lý Giọng nói (Mic 231)";
+            case 84: return "Tìm kiếm (Search 84)";
+            case 219: return "Assist (219)";
+            case 3: return "Phím Home";
+            case 23: return "Phím OK / Center";
+            case 82: return "Phím Menu";
+            case 170: return "Phím TV / Live / Source";
+            case 259: return "Phím Help Sony (259)";
+            case 183: return "Phím Màu Đỏ (Red 183)";
+            case 184: return "Phím Màu Xanh Lá (Green 184)";
+            case 185: return "Phím Màu Vàng (Yellow 185)";
+            case 186: return "Phím Màu Xanh Dương (Blue 186)";
+            case 187: return "Phím Đa nhiệm (App Switch 187)";
+            case 188: return "Phím Bookmark / Custom 1 (188)";
+            case 222: return "Phím Audio Track (222)";
+            case 229: return "Phím Last Channel (229)";
+            case 4: return "Phím Back";
+            default: return "KeyCode " + keyCode;
+        }
     }
 }

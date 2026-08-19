@@ -188,49 +188,91 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     options: const <SettingsChoiceOption<int>>[
                       SettingsChoiceOption<int>(
                         value: 0,
-                        label: 'Tự động (Phím Mic mặc định [231, 84])',
+                        label: 'Tự động đa năng (Nhận diện mọi hãng TV [231, 84, 219, 259, 170...])',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 231,
+                        label: 'Google TV / Chromecast / Xiaomi (Phím Mic 231)',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 84,
+                        label: 'Sony Bravia / Casper / TCL (Phím Search 84)',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 219,
+                        label: 'Android Box AOSP / Tanix / Mecool (Phím Assist 219)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 3,
-                        label: 'Phím Home (Nhấn giữ) - Chuẩn 100% mọi TV',
-                      ),
-                      SettingsChoiceOption<int>(
-                        value: 82,
-                        label: 'Phím Menu / Cài đặt (Menu Key)',
+                        label: 'Phím Home (Nhấn giữ - Chuẩn 100% mọi TV)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 23,
                         label: 'Phím OK / D-pad Center (Nhấn giữ)',
                       ),
                       SettingsChoiceOption<int>(
+                        value: 82,
+                        label: 'Phím Menu / Cài đặt (Menu Key 82)',
+                      ),
+                      SettingsChoiceOption<int>(
                         value: 170,
-                        label: 'Phím Live TV / Kênh (TV Key)',
+                        label: 'Phím Live TV / Kênh (TV Key 170)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 183,
-                        label: 'Phím Màu Đỏ (Color Key Red)',
+                        label: 'Phím Màu Đỏ (Color Key Red 183)',
                       ),
                       SettingsChoiceOption<int>(
-                        value: 231,
-                        label: 'Phím Mic Assistant (231)',
+                        value: 184,
+                        label: 'Phím Màu Xanh Lá (Color Key Green 184)',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 185,
+                        label: 'Phím Màu Vàng (Color Key Yellow 185)',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 186,
+                        label: 'Phím Màu Xanh Dương (Color Key Blue 186)',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 259,
+                        label: 'Phím Help / Hỗ trợ Sony (Key 259)',
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 188,
+                        label: 'Phím Bookmark / Custom 1 (Key 188)',
                       ),
                     ],
                     valueLabelBuilder: (value) {
                       switch (value) {
+                        case 231:
+                          return 'Google TV / Xiaomi (Phím 231)';
+                        case 84:
+                          return 'Sony / Casper / TCL (Phím 84)';
+                        case 219:
+                          return 'Android Box AOSP (Phím 219)';
                         case 3:
                           return 'Phím Home (Nhấn giữ)';
                         case 82:
-                          return 'Phím Menu';
+                          return 'Phím Menu (82)';
                         case 23:
                           return 'Phím OK (Nhấn giữ)';
                         case 170:
-                          return 'Phím TV/Live';
+                          return 'Phím TV / Live (170)';
                         case 183:
-                          return 'Phím Màu Đỏ';
-                        case 231:
-                          return 'Phím Mic Assistant (231)';
+                          return 'Phím Màu Đỏ (183)';
+                        case 184:
+                          return 'Phím Màu Xanh Lá (184)';
+                        case 185:
+                          return 'Phím Màu Vàng (185)';
+                        case 186:
+                          return 'Phím Màu Xanh Dương (186)';
+                        case 259:
+                          return 'Phím Help Sony (259)';
+                        case 188:
+                          return 'Phím Bookmark (188)';
                         default:
-                          return 'Tự động (Phím Mic)';
+                          return 'Tự động đa năng (Mọi TV)';
                       }
                     },
                     onChanged: (value) async {
@@ -261,10 +303,63 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                         onPressed: () async {
                           await bridgeService.startKeyLearning();
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Đang lắng nghe: Hãy bấm nút Mic trên Remote TV ngay bây giờ!'),
-                              duration: Duration(seconds: 5),
+                          showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (dialogCtx) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+                              ),
+                              backgroundColor: const Color(0xFF141721),
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.sensors, color: Color(0xFF38BDF8), size: 28),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Đang Lắng Nghe Remote TV',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Hãy hướng Remote về phía TV và BẤM 1 PHÍM BẤT KỲ bạn muốn dùng để gọi Trợ lý Voice AI (Nút Mic, Nút Sao ★, Nút Màu, Nút Số...).',
+                                    style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 14, height: 1.4),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0x3338BDF8),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle_outline, color: Color(0xFF38BDF8), size: 20),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Khi bạn bấm phím, hệ thống sẽ tự động ghi nhớ và đọc xác nhận.',
+                                            style: TextStyle(color: Color(0xFF38BDF8), fontSize: 13),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(dialogCtx);
+                                  },
+                                  child: const Text('Đóng / Hoàn tất', style: TextStyle(color: Colors.white70)),
+                                ),
+                              ],
                             ),
                           );
                         },
