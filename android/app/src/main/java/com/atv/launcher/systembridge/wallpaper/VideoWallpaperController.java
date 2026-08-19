@@ -162,13 +162,8 @@ public final class VideoWallpaperController {
     public void onStart() {
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
         foregroundActive = true;
-        if (!startupWarmupReady) {
-            return;
-        }
-        if (deferForegroundResume) {
-            return;
-        }
-        maybeStartPlayback(false);
+        startupWarmupReady = true;
+        maybeStartPlayback(true);
     }
 
     public void onScreenWake(String reason) {
@@ -497,9 +492,17 @@ public final class VideoWallpaperController {
             return;
         }
         List<MediaItem> mediaItems = new ArrayList<>();
-        for (String uri : resolvedPlaylistUris) {
-            if (!TextUtils.isEmpty(uri)) {
-                mediaItems.add(MediaItem.fromUri(Uri.parse(uri)));
+        for (String uriStr : resolvedPlaylistUris) {
+            if (!TextUtils.isEmpty(uriStr)) {
+                try {
+                    Uri parsedUri;
+                    if (uriStr.startsWith("/") || uriStr.startsWith("file://")) {
+                        parsedUri = uriStr.startsWith("/") ? Uri.fromFile(new java.io.File(uriStr)) : Uri.parse(uriStr);
+                    } else {
+                        parsedUri = Uri.parse(uriStr);
+                    }
+                    mediaItems.add(MediaItem.fromUri(parsedUri));
+                } catch (Exception ignored) {}
             }
         }
         player.setMediaItems(mediaItems, false);
@@ -647,7 +650,13 @@ public final class VideoWallpaperController {
 
     private void resumeExistingPlayerIfNeeded() {
         if (player == null) {
+            maybeStartPlayback(true);
             return;
+        }
+        if (surface != null) {
+            try {
+                player.setVideoSurface(surface);
+            } catch (Exception ignored) {}
         }
         int playbackState = player.getPlaybackState();
         if (playbackState == Player.STATE_IDLE) {
@@ -656,9 +665,8 @@ public final class VideoWallpaperController {
             int currentMediaItemIndex = Math.max(0, player.getCurrentMediaItemIndex());
             player.seekToDefaultPosition(currentMediaItemIndex);
         }
-        if (!player.isPlaying() || !player.getPlayWhenReady()) {
-            player.play();
-        }
+        player.setPlayWhenReady(true);
+        player.play();
     }
 
     private boolean shouldResumeWhenUnsuppressed() {

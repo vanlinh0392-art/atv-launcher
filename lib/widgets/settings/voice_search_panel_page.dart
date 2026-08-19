@@ -271,7 +271,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       ),
                       actionCard(
                         title: 'Khôi phục phím Xiaomi / Mặc định',
-                        subtitle: 'Gán lại các mã phím mặc định của Android TV Box',
+                        subtitle: 'Gán lại các mã phím gốc của Android TV Box',
                         icon: Icons.restart_alt,
                         onPressed: () async {
                           await bridgeService.resetVoiceMapping();
@@ -289,74 +289,9 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 2: TRÍ TUỆ NHÂN TẠO AI & MÔ HÌNH LLM
+            // SECTION 2: TRÍ TUỆ NHÂN TẠO AI & GIỌNG ĐỌC TTS
             // ==========================================
-            sectionHeader('TRÍ TUỆ NHÂN TẠO AI & MÔ HÌNH LLM', Icons.auto_awesome),
-            SettingsSurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.hub_outlined, color: Color(0xFF818CF8)),
-                    title: const Text('Ma trận Fallback 4 tầng (High Availability)'),
-                    subtitle: const Text(
-                      'Tự động luân chuyển: Google Gemini 2.5 Flash Lite → NVIDIA Llama 3.1 8B → OpenRouter Matrix → Offline Engine',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SettingsAdaptiveGrid(
-                    spacing: 12,
-                    runSpacing: 12,
-                    minChildWidth: 240,
-                    maxColumns: 2,
-                    children: [
-                      actionCard(
-                        title: 'Cập nhật Model AI Free mới nhất',
-                        subtitle: 'Tự động quét và kích hoạt Top Model AI miễn phí thông minh nhất',
-                        icon: Icons.refresh_outlined,
-                        onPressed: () async {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đang quét và kết nối máy chủ AI...')),
-                          );
-                          final res = await bridgeService.updateDynamicFreeAiModels();
-                          if (!context.mounted) return;
-                          final message = res['message']?.toString() ??
-                              (res['success'] == true
-                                  ? 'Đã cập nhật danh sách Model AI Free thành công!'
-                                  : 'Không thể kết nối đến máy chủ AI');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
-                          );
-                        },
-                      ),
-                      actionCard(
-                        title: 'Thử nghiệm tìm kiếm & Thu âm Mic',
-                        subtitle: 'Kiểm tra mic thu âm và nhận diện giọng nói',
-                        icon: Icons.mic_none_outlined,
-                        onPressed: () async {
-                          final result = await searchService.startSpeechRecognizer();
-                          if (!context.mounted) return;
-                          final text = result['text']?.toString() ?? '';
-                          final message = text.trim().isNotEmpty
-                              ? localizations.speechCapturedMessage(text)
-                              : (result['message']?.toString() ?? localizations.speechCaptureNoTextMessage);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(message)),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ==========================================
-            // SECTION 3: GIỌNG ĐỌC PHẢN HỒI (TEXT-TO-SPEECH)
-            // ==========================================
-            sectionHeader('GIỌNG ĐỌC PHẢN HỒI (TEXT-TO-SPEECH)', Icons.record_voice_over_outlined),
+            sectionHeader('TRÍ TUỆ NHÂN TẠO AI & GIỌNG ĐỌC TTS', Icons.auto_awesome),
             SettingsSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,17 +324,60 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  actionCard(
-                    title: 'Thử phát giọng đọc TV',
-                    subtitle: 'Phát thử âm thanh giọng đọc tiếng Việt qua loa TV',
-                    icon: Icons.volume_up_outlined,
-                    onPressed: () async {
-                      await bridgeService.testTtsVoice('Xin chào! Trợ lý FLauncher TV đã sẵn sàng phục vụ bạn.');
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Đang phát giọng đọc mẫu qua loa TV...')),
-                      );
-                    },
+                  SettingsAdaptiveGrid(
+                    spacing: 12,
+                    runSpacing: 12,
+                    minChildWidth: 240,
+                    maxColumns: 2,
+                    children: [
+                      actionCard(
+                        title: 'Cập nhật Model AI Free mới nhất',
+                        subtitle: 'Quét và kích hoạt Top Model AI miễn phí',
+                        icon: Icons.refresh_outlined,
+                        onPressed: () async {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đang quét máy chủ AI...')),
+                          );
+                          final res = await bridgeService.updateDynamicFreeAiModels();
+                          if (!context.mounted) return;
+                          final message = res['message']?.toString() ??
+                              (res['success'] == true
+                                  ? 'Đã cập nhật danh sách Model AI Free thành công!'
+                                  : 'Không thể kết nối đến máy chủ AI');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
+                          );
+                        },
+                      ),
+                      actionCard(
+                        title: 'Thử nghiệm tìm kiếm & Thu âm Mic',
+                        subtitle: 'Kiểm tra độ nhạy của micro',
+                        icon: Icons.mic_none_outlined,
+                        onPressed: () async {
+                          final result = await searchService.startSpeechRecognizer();
+                          if (!context.mounted) return;
+                          final text = result['text']?.toString() ?? '';
+                          final message = text.trim().isNotEmpty
+                              ? localizations.speechCapturedMessage(text)
+                              : (result['message']?.toString() ?? localizations.speechCaptureNoTextMessage);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(message)),
+                          );
+                        },
+                      ),
+                      actionCard(
+                        title: 'Thử phát giọng đọc TV',
+                        subtitle: 'Phát thử giọng nói qua loa TV',
+                        icon: Icons.volume_up_outlined,
+                        onPressed: () async {
+                          await bridgeService.testTtsVoice('Xin chào! Trợ lý FLauncher TV đã sẵn sàng phục vụ bạn.');
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đang phát giọng đọc mẫu qua loa TV...')),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -407,7 +385,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 4: GIAO DIỆN & PHỤ ĐỀ AI
+            // SECTION 3: GIAO DIỆN & PHỤ ĐỀ AI
             // ==========================================
             sectionHeader('GIAO DIỆN & PHỤ ĐỀ AI TRÊN MÀN HÌNH', Icons.palette_outlined),
             SettingsSurfaceCard(
@@ -442,8 +420,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     icon: Icons.palette_outlined,
                     value: _subtitleColor,
                     options: const <SettingsChoiceOption<int>>[
+                      SettingsChoiceOption<int>(value: 0xFF00E5FF, label: 'Xanh Cyan Gemini (Mặc định)'),
                       SettingsChoiceOption<int>(value: 0xFFFFFFFF, label: 'Trắng tinh khôi'),
-                      SettingsChoiceOption<int>(value: 0xFF00E5FF, label: 'Xanh Cyan Gemini'),
                       SettingsChoiceOption<int>(value: 0xFF00E676, label: 'Xanh Lục Ngọc'),
                       SettingsChoiceOption<int>(value: 0xFFFFD700, label: 'Vàng Hổ Phách'),
                       SettingsChoiceOption<int>(value: 0xFFF472B6, label: 'Hồng Pastel'),
@@ -513,7 +491,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 5: CHẨN ĐOÁN & QUẢN TRỊ HỆ THỐNG
+            // SECTION 4: CHẨN ĐOÁN & QUẢN TRỊ HỆ THỐNG
             // ==========================================
             sectionHeader('CHẨN ĐOÁN & QUẢN TRỊ HỆ THỐNG', Icons.build_circle_outlined),
             SettingsSurfaceCard(
@@ -521,11 +499,11 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 spacing: 12,
                 runSpacing: 12,
                 minChildWidth: 240,
-                maxColumns: 2,
+                maxColumns: 3,
                 children: [
                   actionCard(
                     title: 'Thử mở Voice AI Overlay',
-                    subtitle: 'Kiểm tra giao diện sóng cực quang và nhận diện ngay',
+                    subtitle: 'Kiểm tra giao diện sóng cực quang',
                     icon: Icons.play_circle_outline,
                     onPressed: () async => _showResult(
                       context,
@@ -533,35 +511,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     ),
                   ),
                   actionCard(
-                    title: 'Vô hiệu hóa Google Katniss',
-                    subtitle: 'Chặn hoàn toàn popup Google Assistant khi bấm Voice',
-                    icon: Icons.block_outlined,
-                    onPressed: () async {
-                      final res = await bridgeService.disableGoogleKatniss();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(res['success'] == true
-                            ? 'Đã vô hiệu hóa Google Katniss thành công!'
-                            : 'Thất bại: ${res['message']}')),
-                      );
-                    },
-                  ),
-                  actionCard(
-                    title: 'Bật lại Google Katniss',
-                    subtitle: 'Khôi phục lại Google Assistant mặc định',
-                    icon: Icons.restore_outlined,
-                    onPressed: () async {
-                      final res = await bridgeService.enableGoogleKatniss();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(res['success'] == true
-                            ? 'Đã bật lại Google Katniss!'
-                            : 'Thất bại: ${res['message']}')),
-                      );
-                    },
-                  ),
-                  actionCard(
                     title: localizations.repairAccessibility,
+                    subtitle: 'Tự động sửa lỗi mất quyền Trợ năng',
                     icon: Icons.build_circle_outlined,
                     onPressed: () async => _showResult(
                       context,
@@ -570,6 +521,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   ),
                   actionCard(
                     title: localizations.openAccessibilitySettings,
+                    subtitle: 'Mở màn hình cài đặt của Android',
                     icon: Icons.settings_accessibility,
                     onPressed: () async {
                       bridgeService.openAccessibilitySettings();

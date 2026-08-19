@@ -67,6 +67,27 @@ public final class VietnameseTtsEngine {
     private volatile boolean isStopped = false;
     private TtsCallback activeCallback;
 
+    public boolean isSpeaking() {
+        try {
+            if (isPlayingQueue || !playbackQueue.isEmpty()) return true;
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) return true;
+            if (nativeTts != null && nativeTts.isSpeaking()) return true;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    public static boolean isSpeakingAny() {
+        return instance != null && instance.isSpeaking();
+    }
+
+    public void setPreferredEngine(Context context, String engine) {
+        if (!TextUtils.isEmpty(engine)) {
+            this.preferredEngine = engine;
+            com.atv.launcher.systembridge.shared.state.BridgeStateStore.setTtsEngine(context, engine);
+            Log.i(TAG, "Preferred TTS engine set to: " + engine);
+        }
+    }
+
     public void setPreferredEngine(String engine) {
         if (!TextUtils.isEmpty(engine)) {
             this.preferredEngine = engine;
@@ -86,7 +107,9 @@ public final class VietnameseTtsEngine {
     }
 
     private VietnameseTtsEngine(Context context) {
-        initNativeTts(context.getApplicationContext());
+        Context appContext = context.getApplicationContext();
+        this.preferredEngine = com.atv.launcher.systembridge.shared.state.BridgeStateStore.getTtsEngine(appContext);
+        initNativeTts(appContext);
     }
 
     public static VietnameseTtsEngine getInstance(Context context) {
@@ -262,6 +285,23 @@ public final class VietnameseTtsEngine {
                 });
 
                 mediaPlayer.prepare();
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    try {
+                        String eng = getPreferredEngine();
+                        android.media.PlaybackParams params = mediaPlayer.getPlaybackParams();
+                        if ("edge_namminh".equals(eng) || "namminh".equals(eng)) {
+                            params.setPitch(0.78f);
+                            params.setSpeed(0.96f);
+                        } else if ("edge_hoaimy".equals(eng) || "hoaimy".equals(eng)) {
+                            params.setPitch(1.22f);
+                            params.setSpeed(1.02f);
+                        } else {
+                            params.setPitch(1.0f);
+                            params.setSpeed(1.0f);
+                        }
+                        mediaPlayer.setPlaybackParams(params);
+                    } catch (Exception ignored) {}
+                }
                 mediaPlayer.start();
                 Log.i(TAG, "MediaPlayer playing chunk [" + (nextItem.index + 1) + "/" + nextItem.total + "]: " + nextItem.file.getName());
             } catch (Exception e) {
@@ -403,6 +443,18 @@ public final class VietnameseTtsEngine {
                     notifyComplete(callback);
                 }
             });
+
+            String eng = getPreferredEngine();
+            if ("edge_namminh".equals(eng) || "namminh".equals(eng)) {
+                nativeTts.setPitch(0.78f);
+                nativeTts.setSpeechRate(0.96f);
+            } else if ("edge_hoaimy".equals(eng) || "hoaimy".equals(eng)) {
+                nativeTts.setPitch(1.22f);
+                nativeTts.setSpeechRate(1.02f);
+            } else {
+                nativeTts.setPitch(1.0f);
+                nativeTts.setSpeechRate(1.0f);
+            }
 
             int result = nativeTts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId);
             return result == TextToSpeech.SUCCESS;

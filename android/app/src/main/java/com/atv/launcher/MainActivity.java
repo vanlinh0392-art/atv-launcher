@@ -449,6 +449,24 @@ public class MainActivity extends FlutterActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event != null && event.getAction() == KeyEvent.ACTION_DOWN) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME) {
+                if (com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.isOverlayShowing()
+                        || com.atv.launcher.systembridge.tts.VietnameseTtsEngine.isSpeakingAny()) {
+                    Log.i(TAG, "BACK/HOME intercepted in MainActivity - dismissing voice & stopping TTS");
+                    try {
+                        com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).stop();
+                    } catch (Exception ignored) {}
+                    try {
+                        com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.getInstance(this).dismiss();
+                    } catch (Exception ignored) {}
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        return true;
+                    }
+                }
+            }
+        }
         if (foregroundVoiceKeyHandler.handle(this, event)) {
             return true;
         }
@@ -2883,17 +2901,18 @@ public class MainActivity extends FlutterActivity {
 
     private Map<String, Object> setTtsEngine(MethodCall call) {
         String engine = call.argument("engine");
-        com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).setPreferredEngine(engine);
+        com.atv.launcher.systembridge.shared.state.BridgeStateStore.setTtsEngine(this, engine);
+        com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).setPreferredEngine(this, engine);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
-        result.put("engine", com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).getPreferredEngine());
+        result.put("engine", com.atv.launcher.systembridge.shared.state.BridgeStateStore.getTtsEngine(this));
         return result;
     }
 
     private Map<String, Object> getTtsEngine() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
-        result.put("engine", com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).getPreferredEngine());
+        result.put("engine", com.atv.launcher.systembridge.shared.state.BridgeStateStore.getTtsEngine(this));
         return result;
     }
 

@@ -522,6 +522,16 @@ public final class BridgeStateStore {
         prefs(context).edit().putString(KEY_LAST_BACKUP_RESTORE_SUMMARY, value == null ? "" : value).apply();
     }
 
+    private static final String KEY_TTS_ENGINE = "tts_engine";
+
+    public static String getTtsEngine(Context context) {
+        return prefs(context).getString(KEY_TTS_ENGINE, "auto");
+    }
+
+    public static void setTtsEngine(Context context, String engine) {
+        prefs(context).edit().putString(KEY_TTS_ENGINE, TextUtils.isEmpty(engine) ? "auto" : engine).apply();
+    }
+
     public static long getLastBackupRestoreAt(Context context) {
         return prefs(context).getLong(KEY_LAST_BACKUP_RESTORE_AT, 0L);
     }

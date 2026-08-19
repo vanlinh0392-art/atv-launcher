@@ -118,64 +118,52 @@ public final class AiVoiceAssistantClient {
         }
     }
 
-    // Danh sách các Model AI Hoàn Toàn Miễn Phí (Free Models Matrix)
+    // Danh sách 8 Model AI Fallback Miễn Phí (4 NVIDIA NIM + 4 OpenRouter Free)
     private static final List<ModelTarget> FALLBACK_MODELS = new ArrayList<>();
 
     static {
-        // 1. Google Gemini 2.5 Flash Lite (Chính thức, phản hồi 1.1s, Tiếng Việt chuẩn 100%)
-        FALLBACK_MODELS.add(new ModelTarget(
-                "Gemini", GEMINI_API_URL, "gemini-2.5-flash-lite",
-                "Google Gemini 2.5 Flash Lite Free"
-        ));
-        // 2. NVIDIA NIM Llama 3.1 8B (Phản hồi siêu tốc 340ms trên NVIDIA GPU Cloud)
+        // --- 4 MODELS TỪ NVIDIA NIM CLOUD ---
+        // 1. Meta Llama 3.1 8B Instruct (NVIDIA GPU Cloud - Siêu tốc 340ms)
         FALLBACK_MODELS.add(new ModelTarget(
                 "NVIDIA NIM", NVIDIA_ENDPOINT, "meta/llama-3.1-8b-instruct",
-                "Meta Llama 3.1 8B Instruct (NVIDIA Cloud - 340ms)"
+                "Meta Llama 3.1 8B Instruct (NVIDIA Cloud - Siêu tốc)"
         ));
-        // 3. OpenRouter Nemotron 3.5 Lightning Free
+        // 2. Google Gemma 4 31B Instruct (NVIDIA GPU Cloud - Đỉnh cao)
+        FALLBACK_MODELS.add(new ModelTarget(
+                "NVIDIA NIM", NVIDIA_ENDPOINT, "google/gemma-4-31b-it",
+                "Google Gemma 4 31B (NVIDIA Cloud - Thông minh)"
+        ));
+        // 3. Google Diffusion Gemma 26B (NVIDIA GPU Cloud - Đa nhiệm)
+        FALLBACK_MODELS.add(new ModelTarget(
+                "NVIDIA NIM", NVIDIA_ENDPOINT, "google/diffusiongemma-26b-a4b-it",
+                "Google Diffusion Gemma 26B (NVIDIA Cloud)"
+        ));
+        // 4. Meta Llama 3.2 11B Instruct (NVIDIA GPU Cloud)
+        FALLBACK_MODELS.add(new ModelTarget(
+                "NVIDIA NIM", NVIDIA_ENDPOINT, "meta/llama-3.2-11b-vision-instruct",
+                "Meta Llama 3.2 11B (NVIDIA Cloud - Chuẩn xác)"
+        ));
+
+        // --- 4 MODELS TỪ OPENROUTER FREE ---
+        // 5. NVIDIA Nemotron 3.5 Lightning Free
         FALLBACK_MODELS.add(new ModelTarget(
                 "OpenRouter", OPENROUTER_ENDPOINT, "nvidia/nemotron-3.5-lightning:free",
-                "NVIDIA Nemotron 3.5 Lightning Free"
+                "NVIDIA Nemotron 3.5 Lightning (OpenRouter Free)"
         ));
-        // 4. OpenRouter Gemma 4 31B Free
+        // 6. Google Gemma 4 31B Free
         FALLBACK_MODELS.add(new ModelTarget(
                 "OpenRouter", OPENROUTER_ENDPOINT, "google/gemma-4-31b-it:free",
-                "Google Gemma 4 31B Free"
+                "Google Gemma 4 31B (OpenRouter Free)"
         ));
-        // 5. OpenRouter Gemini 2.0 Flash
+        // 7. Google Gemma 4 26B Free
         FALLBACK_MODELS.add(new ModelTarget(
-                "OpenRouter", OPENROUTER_ENDPOINT, "google/gemini-2.0-flash-exp:free",
-                "Google Gemini 2.0 Flash Free"
+                "OpenRouter", OPENROUTER_ENDPOINT, "google/gemma-4-26b-a4b-it:free",
+                "Google Gemma 4 26B (OpenRouter Free)"
         ));
-        // 6. OpenRouter Llama 3.3 70B
+        // 8. OpenAI GPT-OSS 20B Free
         FALLBACK_MODELS.add(new ModelTarget(
-                "OpenRouter", OPENROUTER_ENDPOINT, "meta-llama/llama-3.3-70b-instruct",
-                "Meta Llama 3.3 70B Instruct"
-        ));
-        // 7. NVIDIA NIM Mistral Large 2
-        FALLBACK_MODELS.add(new ModelTarget(
-                "NVIDIA NIM", NVIDIA_ENDPOINT, "mistralai/mistral-large-2-instruct",
-                "Mistral Large 2 Instruct"
-        ));
-        // 8. OpenRouter DeepSeek V3
-        FALLBACK_MODELS.add(new ModelTarget(
-                "OpenRouter", OPENROUTER_ENDPOINT, "deepseek/deepseek-chat",
-                "DeepSeek-V3 Chat"
-        ));
-        // 9. NVIDIA NIM Nemotron 70B
-        FALLBACK_MODELS.add(new ModelTarget(
-                "NVIDIA NIM", NVIDIA_ENDPOINT, "nvidia/llama-3.1-nemotron-70b-instruct",
-                "NVIDIA Nemotron 70B Instruct"
-        ));
-        // 10. OpenRouter Mistral 7B Free
-        FALLBACK_MODELS.add(new ModelTarget(
-                "OpenRouter", OPENROUTER_ENDPOINT, "mistralai/mistral-7b-instruct:free",
-                "Mistral 7B Instruct Free"
-        ));
-        // 11. NVIDIA NIM Qwen 2.5 7B
-        FALLBACK_MODELS.add(new ModelTarget(
-                "NVIDIA NIM", NVIDIA_ENDPOINT, "qwen/qwen2.5-7b-instruct",
-                "Qwen 2.5 7B Instruct"
+                "OpenRouter", OPENROUTER_ENDPOINT, "openai/gpt-oss-20b:free",
+                "OpenAI GPT-OSS 20B (OpenRouter Free)"
         ));
     }
 
@@ -557,45 +545,11 @@ public final class AiVoiceAssistantClient {
 
     public static java.util.Map<String, Object> fetchAndRankFreeModels(Context context) {
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
-        List<String> discoveredModels = new ArrayList<>();
-        int updatedCount = 0;
+        List<ModelTarget> nvidiaList = new ArrayList<>();
+        List<ModelTarget> openRouterList = new ArrayList<>();
         long t0 = System.currentTimeMillis();
 
-        // 1. Quét OpenRouter Models
-        try {
-            URL url = new URL("https://openrouter.ai/api/v1/models");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Authorization", "Bearer " + openRouterKey);
-            conn.setConnectTimeout(4000);
-            conn.setReadTimeout(6000);
-
-            if (conn.getResponseCode() == 200) {
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        sb.append(line);
-                    }
-                }
-                JSONObject obj = new JSONObject(sb.toString());
-                JSONArray data = obj.optJSONArray("data");
-                if (data != null) {
-                    for (int i = 0; i < data.length(); i++) {
-                        JSONObject m = data.getJSONObject(i);
-                        String id = m.optString("id", "");
-                        if (id.contains(":free")) {
-                            discoveredModels.add(id);
-                        }
-                    }
-                }
-            }
-            conn.disconnect();
-        } catch (Exception e) {
-            Log.w(TAG, "fetch OpenRouter models failed: " + e.getMessage());
-        }
-
-        // 2. Quét NVIDIA NIM Models
+        // 1. Quét NVIDIA NIM Models (Lấy 4 model tốt nhất)
         try {
             URL url = new URL("https://integrate.api.nvidia.com/v1/models");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -618,8 +572,11 @@ public final class AiVoiceAssistantClient {
                     for (int i = 0; i < data.length(); i++) {
                         JSONObject m = data.getJSONObject(i);
                         String id = m.optString("id", "");
-                        if (id.startsWith("meta/llama") || id.startsWith("google/gemma") || id.startsWith("nvidia/")) {
-                            discoveredModels.add(id);
+                        if ("meta/llama-3.1-8b-instruct".equals(id) ||
+                                "google/gemma-4-31b-it".equals(id) ||
+                                "google/diffusiongemma-26b-a4b-it".equals(id) ||
+                                "meta/llama-3.2-11b-vision-instruct".equals(id)) {
+                            nvidiaList.add(new ModelTarget("NVIDIA NIM", NVIDIA_ENDPOINT, id, id + " (NVIDIA Cloud)"));
                         }
                     }
                 }
@@ -629,14 +586,58 @@ public final class AiVoiceAssistantClient {
             Log.w(TAG, "fetch NVIDIA models failed: " + e.getMessage());
         }
 
+        // 2. Quét OpenRouter Models (Lấy 4 model free tốt nhất)
+        try {
+            URL url = new URL("https://openrouter.ai/api/v1/models");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Authorization", "Bearer " + openRouterKey);
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(6000);
+
+            if (conn.getResponseCode() == 200) {
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                }
+                JSONObject obj = new JSONObject(sb.toString());
+                JSONArray data = obj.optJSONArray("data");
+                if (data != null) {
+                    for (int i = 0; i < data.length(); i++) {
+                        JSONObject m = data.getJSONObject(i);
+                        String id = m.optString("id", "");
+                        if ("nvidia/nemotron-3.5-lightning:free".equals(id) ||
+                                "google/gemma-4-31b-it:free".equals(id) ||
+                                "google/gemma-4-26b-a4b-it:free".equals(id) ||
+                                "openai/gpt-oss-20b:free".equals(id)) {
+                            openRouterList.add(new ModelTarget("OpenRouter", OPENROUTER_ENDPOINT, id, id + " (OpenRouter Free)"));
+                        }
+                    }
+                }
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.w(TAG, "fetch OpenRouter models failed: " + e.getMessage());
+        }
+
+        synchronized (FALLBACK_MODELS) {
+            if (nvidiaList.size() >= 2 && openRouterList.size() >= 2) {
+                FALLBACK_MODELS.clear();
+                FALLBACK_MODELS.addAll(nvidiaList);
+                FALLBACK_MODELS.addAll(openRouterList);
+            }
+        }
+
         long elapsed = System.currentTimeMillis() - t0;
-        updatedCount = discoveredModels.size();
+        int updatedCount = FALLBACK_MODELS.size();
 
         result.put("success", true);
         result.put("discoveredCount", updatedCount);
         result.put("elapsedMs", elapsed);
-        result.put("topModels", discoveredModels.isEmpty() ? "Gemini 2.5 Flash Lite, Llama 3.1 8B" : TextUtils.join(", ", discoveredModels.subList(0, Math.min(3, discoveredModels.size()))));
-        result.put("message", "Đã quét và kích hoạt " + (updatedCount > 0 ? updatedCount : "Top 8") + " Model AI Free (Thời gian: " + elapsed + "ms)");
+        result.put("message", "Đã cập nhật ma trận 8 Model AI (4 NVIDIA Cloud + 4 OpenRouter Free) trong " + elapsed + "ms");
 
         Log.i(TAG, "fetchAndRankFreeModels completed: " + result);
         return result;

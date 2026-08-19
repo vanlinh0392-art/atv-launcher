@@ -41,6 +41,31 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
 
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
+        if (event != null && event.getAction() == KeyEvent.ACTION_DOWN) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME) {
+                if (com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.isOverlayShowing()
+                        || com.atv.launcher.systembridge.tts.VietnameseTtsEngine.isSpeakingAny()) {
+                    Log.i(TAG, "BACK/HOME intercepted during Voice/TTS active - dismissing voice & stopping TTS");
+                    try {
+                        com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).stop();
+                    } catch (Exception ignored) {}
+                    try {
+                        com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.getInstance(this).dismiss();
+                    } catch (Exception ignored) {}
+                    try {
+                        com.atv.launcher.systembridge.shared.voice.VoiceCaptureTransparentActivity activity =
+                                com.atv.launcher.systembridge.shared.voice.VoiceCaptureTransparentActivity.getActiveInstance();
+                        if (activity != null) {
+                            activity.finish();
+                        }
+                    } catch (Exception ignored) {}
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        return true;
+                    }
+                }
+            }
+        }
         return voiceKeyHandler.handle(this, event) || super.onKeyEvent(event);
     }
 

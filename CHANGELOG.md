@@ -5,6 +5,38 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-19 - Official release 2026.08.003 — Đổi Giọng TTS Tiếng Việt, Ma Trận 8 Model AI, Video Wallpaper Universal & Dpad Unification
+
+### 1. Trợ Lý Voice AI & Đổi Giọng Đọc TTS Tiếng Việt
+- **Chuyển Đổi Giọng Đọc Đa Dạng**: Hỗ trợ chuyển đổi tức thì giữa các profile giọng đọc:
+  - *Nam Minh (Trầm Ấm)*: Pitch `0.78`, Speed `0.96` cho âm sắc nam trầm hùng ấm áp.
+  - *Hoài My (Ngọt Ngào)*: Pitch `1.22`, Speed `1.02` cho âm sắc nữ trẻ trung, trong trẻo.
+  - *Tự Nhiên (Tiêu Chuẩn)*: Pitch `1.0`, Speed `1.0` nguyên bản.
+- **Lưu Cấu Hình Vĩnh Viễn**: Tự động lưu lựa chọn giọng TTS vào `BridgeStateStore` (SharedPreferences) và nạp lại chính xác khi khởi động.
+- **Ngắt Tức Thì Khi Bấm BACK / HOME**: Bấm phím Back hoặc Home trên remote TV sẽ lập tức dừng phát âm thanh TTS và đóng floating overlay Voice AI mà không làm gián đoạn ứng dụng đang chạy.
+
+### 2. Ma Trận 8 Model AI Fallback Độc Lập (4 NVIDIA + 4 OpenRouter)
+- **4 Model NVIDIA NIM GPU Cloud**:
+  - `meta/llama-3.1-8b-instruct` (Siêu tốc ~340ms)
+  - `google/gemma-4-31b-it` (Thông minh đỉnh cao)
+  - `google/diffusiongemma-26b-a4b-it` (Đa nhiệm)
+  - `meta/llama-3.2-11b-vision-instruct` (Chuẩn xác)
+- **4 Model OpenRouter Free**:
+  - `nvidia/nemotron-3.5-lightning:free`
+  - `google/gemma-4-31b-it:free`
+  - `google/gemma-4-26b-a4b-it:free`
+  - `openai/gpt-oss-20b:free`
+- **Bộ Quét Cập Nhật Model Free Mới Trong Settings**: Tự động đồng bộ và nạp ma trận 8 model AI mới nhất với 1 chạm.
+
+### 3. Tương Thích Hình Nền & Video Wallpaper Universal
+- **Hỗ Trợ Toàn Diện Định Dạng**: `.mp4`, `.mkv`, `.webm`, `.avi`, `.ts`, `.m2ts`, `.m4v`, `.3gp`, `.flv`, `.wmv`, `.mov`.
+- **Phân Giải Đường Dẫn Thông Minh**: Tự động xử lý an toàn các định dạng đường dẫn `file://`, absolute storage path `/storage/...`, `/sdcard/...` và MediaStore `content://` URI.
+- **Tắt Audio Track Khi Mute**: Ngăn chặn ExoPlayer khởi tạo Audio Decoder đối với video hình nền có track âm thanh Dolby/DTS, triệt tiêu lỗi decoder trên chip TV Xiaomi, TCL, Casper, Sony Bravia.
+- **Khôi Phục Tự Động 100%**: Video luôn tự phát lại mượt mà khi quay lại Launcher từ ứng dụng khác hoặc sau khi TV thức dậy từ Sleep.
+
+### 4. Dọn Dẹp Giao Diện Cài Đặt & Chuẩn Hóa Điều Hướng Dpad
+- **Đồng Bộ Dpad Navigation**: Tích hợp `SettingsFocusFrame` và `EnsureVisible` đồng nhất 100% giữa tất cả các trang cài đặt (Voice AI, Hình nền, Thanh trạng thái, Ứng dụng, Danh mục).
+
 ## 2026-08-19 - Official release 2026.08.002 — Voice AI Toàn Diện, Zero-Flicker Overlay, Khớp Mờ 54 App & Backup
 
 ### Nâng Cấp Toàn Diện Voice AI Assistant & TTS Đa Tầng

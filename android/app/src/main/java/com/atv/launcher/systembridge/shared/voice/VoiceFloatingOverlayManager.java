@@ -61,6 +61,10 @@ public final class VoiceFloatingOverlayManager {
         this.audioManager = (AudioManager) this.context.getSystemService(Context.AUDIO_SERVICE);
     }
 
+    public static boolean isOverlayShowing() {
+        return instance != null && instance.overlayView != null;
+    }
+
     public static VoiceFloatingOverlayManager getInstance(Context context) {
         if (instance == null) {
             synchronized (VoiceFloatingOverlayManager.class) {
@@ -432,6 +436,9 @@ public final class VoiceFloatingOverlayManager {
 
     public void dismiss() {
         mainHandler.post(() -> {
+            try {
+                VietnameseTtsEngine.getInstance(context).stop();
+            } catch (Exception ignored) {}
             stopSpeechRecognition();
             cancelDismissTimer();
             if (overlayView != null) {

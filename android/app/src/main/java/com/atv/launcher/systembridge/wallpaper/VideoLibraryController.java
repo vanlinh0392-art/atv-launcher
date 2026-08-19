@@ -323,6 +323,11 @@ public final class VideoLibraryController {
                 || lower.endsWith(".webm")
                 || lower.endsWith(".avi")
                 || lower.endsWith(".ts")
+                || lower.endsWith(".m2ts")
+                || lower.endsWith(".m4v")
+                || lower.endsWith(".3gp")
+                || lower.endsWith(".flv")
+                || lower.endsWith(".wmv")
                 || lower.endsWith(".mov");
     }
 
