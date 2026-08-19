@@ -5,6 +5,27 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-19 - Official release 2026.08.002 — Voice AI Toàn Diện, Zero-Flicker Overlay, Khớp Mờ 54 App & Backup
+
+### Nâng Cấp Toàn Diện Voice AI Assistant & TTS Đa Tầng
+- **Zero-Flicker WindowManager Overlay**: Chuyển đổi lớp phủ Voice AI sang `WindowManager.addView()` với `TYPE_ACCESSIBILITY_OVERLAY`, loại bỏ hoàn toàn việc chuyển Task/Activity, triệt tiêu 100% hiện tượng nháy màn hình.
+- **Lập Chỉ Mục & Khớp Mờ Ứng Dụng (`AppIndexStore`)**: Tự động quét 54 ứng dụng trên TV khi Boot/Cài đặt mới, tạo chỉ mục từ đồng nghĩa, từ viết tắt và thuật toán Levenshtein $\ge 70\%$ (*"dút túp"*, *"kho phim"*, *"chợ ứng dụng"*, *"trình duyệt web"*, *"ép pê tê"*...).
+- **Tìm Kiếm Bài Hát & YouTube**: Tự động phân loại từ khóa âm nhạc/karaoke/clip và điều hướng sang SmartTube / YouTube TV / Google Katniss.
+- **Hỏi Đáp AI Ma Trận 8 Model Miễn Phí**: Gemini 2.0 Flash Exp $\leftrightarrow$ Llama 3.1 8B $\leftrightarrow$ Llama 3.3 70B $\leftrightarrow$ Mistral Large 2 $\leftrightarrow$ DeepSeek Chat $\leftrightarrow$ Nemotron 70B $\leftrightarrow$ Mistral 7B $\leftrightarrow$ Qwen 2.5 7B.
+- **Phát Giọng Đọc Đa Đoạn (Multi-Chunk TTS)**: Kể chuyện dài thành nhiều câu, đồng bộ phụ đề Karaoke từng đoạn và tự động đóng sau 2.5s khi đọc xong.
+- **Màu Chữ Mặc Định Xanh Ngọc Gemini AI (`0xFF00E5FF`)**: Chữ phụ đề nổi bật sắc nét với đổ bóng đen sâu 100% trên nền kính mờ Frosted Glass.
+- **Sao Lưu & Phục Hồi Cấu Hình Đầy Đủ**: Hỗ trợ lưu trữ và khôi phục trọn bộ cấu hình Voice AI, phím bấm, kích cỡ/màu sắc phụ đề, và bộ đọc giọng nói tiếng Việt.
+
+## 2026-08-19 - Official release 2026.08.001 — Tích hợp Trợ lý Giọng nói Thông minh & Mở kênh XemTV
+
+### Trợ lý Giọng nói Thông minh (Smart Voice Assistant)
+- **Tích hợp Native `SmartVoiceDispatcher`**: Phân tích câu lệnh giọng nói tiếng Việt tức thì, không phụ thuộc ứng dụng trung gian bên ngoài.
+- **Mở Kênh Truyền hình `XemTV` Tức Thì**: Nhận diện thông minh các kênh VTV1-VTV9, VTV Cần Thơ, HTV, THVL, VTC, SCTV... (ví dụ: *"Mở VTV1"*, *"Xem VTV 3"*, *"Bật kênh VTV2"*, *"Kênh VTV5"*) -> Tự động chuyển thẳng vào màn hình phát video của kênh trong app `com.xemtv.app`.
+- **Mở Bất Kỳ Ứng Dụng Nào**: Nhận diện *"Mở YouTube"*, *"Bật Cốc Cốc"*, *"Mở Cài đặt"*, *"Mở SmartTube"*, *"Mở Kho phim"*... và tra cứu danh sách ứng dụng đã cài đặt trên TV.
+- **Tìm kiếm Video & Media**: Nhận diện *"Tìm karaoke..."*, *"Tìm phim..."* và tự động chuyển hướng tìm kiếm sang SmartTube / YouTube.
+- **Tương thích 100% Cài đặt Map Voice**: Hoạt động xuyên suốt toàn hệ thống mọi lúc mọi nơi thông qua `VoiceBridgeAccessibilityService`, tương thích trọn vẹn với các chế độ Nhấn 1 lần, Nhấn đúp, Nhấn giữ, Học phím remote mới.
+- **Giao diện Voice Hiện Đại**: Bổ sung `VoiceListeningBar` dạng floating pill với hiệu ứng sóng âm 4 màu phát sáng sang trọng, nhỏ gọn và không che khuất màn hình.
+
 ## 2026-07-28 - Official release 2026.07.012 — Fix video nền không play khi về Home (Smooth mode)
 
 ### Sửa lỗi Video Wallpaper không phát lại ở chế độ Smooth

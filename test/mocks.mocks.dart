@@ -3981,6 +3981,67 @@ class MockSystemBridgeService extends _i1.Mock
       ) as _i2.Future<Map<String, dynamic>>);
 
   @override
+  _i2.Future<Map<String, dynamic>> getVoiceSubtitleConfig() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getVoiceSubtitleConfig,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{'size': 20, 'color': 0xFF00E5FF}),
+        returnValueForMissingStub:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{'size': 20, 'color': 0xFF00E5FF}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<bool> setVoiceSubtitleConfig({int? size, int? color}) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setVoiceSubtitleConfig,
+          [],
+          {#size: size, #color: color},
+        ),
+        returnValue: _i2.Future<bool>.value(true),
+        returnValueForMissingStub: _i2.Future<bool>.value(true),
+      ) as _i2.Future<bool>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> getTtsEngine() => (super.noSuchMethod(
+        Invocation.method(
+          #getTtsEngine,
+          [],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{'engine': 'auto'}),
+        returnValueForMissingStub:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{'engine': 'auto'}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<Map<String, dynamic>> setTtsEngine(String? engine) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setTtsEngine,
+          [engine],
+        ),
+        returnValue:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+        returnValueForMissingStub:
+            _i2.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i2.Future<Map<String, dynamic>>);
+
+  @override
+  _i2.Future<bool> testTtsVoice([String? text]) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #testTtsVoice,
+          [text],
+        ),
+        returnValue: _i2.Future<bool>.value(true),
+        returnValueForMissingStub: _i2.Future<bool>.value(true),
+      ) as _i2.Future<bool>);
+
+  @override
   _i2.Future<void> openAccessibilitySettings() => (super.noSuchMethod(
         Invocation.method(
           #openAccessibilitySettings,

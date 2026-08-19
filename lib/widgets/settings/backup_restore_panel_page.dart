@@ -490,6 +490,9 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
           'mode': bridge.voiceStatus['mode'],
           'keyCode': bridge.voiceStatus['keyCode'],
           'interceptEnabled': bridge.voiceStatus['interceptEnabled'],
+          'subtitleSize': bridge.voiceStatus['subtitleSize'],
+          'subtitleColor': bridge.voiceStatus['subtitleColor'],
+          'ttsEngine': bridge.voiceStatus['ttsEngine'],
         },
         'accessibility': <String, dynamic>{
           'managedPackages': managedPackages,
@@ -540,6 +543,15 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
           keyCode: (voice['keyCode'] as num?)?.toInt(),
           interceptEnabled: voice['interceptEnabled'] as bool?,
         );
+        if (voice.containsKey('subtitleSize') || voice.containsKey('subtitleColor')) {
+          await bridge.setVoiceSubtitleConfig(
+            size: (voice['subtitleSize'] as num?)?.toInt(),
+            color: (voice['subtitleColor'] as num?)?.toInt(),
+          );
+        }
+        if (voice.containsKey('ttsEngine')) {
+          await bridge.setTtsEngine(voice['ttsEngine']?.toString() ?? 'online_edge');
+        }
         return result['success'] != false
             ? null
             : result['message']?.toString();

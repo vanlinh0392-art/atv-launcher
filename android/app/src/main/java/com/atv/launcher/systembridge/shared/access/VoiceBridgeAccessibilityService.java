@@ -17,11 +17,22 @@ import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
 public class VoiceBridgeAccessibilityService extends AccessibilityService {
     private static final String TAG = "VoiceBridge";
 
+    private static volatile String currentForegroundPackage = "com.atv.launcher";
     private final VoiceKeyHandler voiceKeyHandler = new VoiceKeyHandler(TAG, "accessibility");
     private BroadcastReceiver wakeReceiver;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event != null && event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            CharSequence pkg = event.getPackageName();
+            if (pkg != null && pkg.length() > 0) {
+                currentForegroundPackage = pkg.toString();
+            }
+        }
+    }
+
+    public static boolean isLauncherForeground(Context context) {
+        return context.getPackageName().equals(currentForegroundPackage);
     }
 
     @Override
@@ -39,6 +50,7 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
         Log.i(TAG, "connected process=" + getPackageName()
                 + " key=" + BridgeStateStore.getKeyCode(this)
                 + " mode=" + BridgeStateStore.getMode(this));
+        com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.setAccessibilityService(this);
         registerWakeReceiver();
         SystemBridgeCoordinator.startCore(this, "accessibility_connected");
         SystemBridgeCoordinator.scheduleWakeBackstop(this, "accessibility_connected");
@@ -47,6 +59,7 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() {
         Log.i(TAG, "destroyed");
+        com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.setAccessibilityService(null);
         voiceKeyHandler.clearPendingActions();
         unregisterWakeReceiver();
         SystemBridgeCoordinator.startCore(this, "accessibility_destroyed");

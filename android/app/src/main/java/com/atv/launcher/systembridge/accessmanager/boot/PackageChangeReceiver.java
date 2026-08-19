@@ -26,6 +26,7 @@ public class PackageChangeReceiver extends BroadcastReceiver {
         Log.i(TAG, "Package trigger accepted: " + reason);
         AccessibilityGrantCoordinator.startGuardian(appContext, reason);
         AccessibilityGrantCoordinator.scheduleWakeBackstop(appContext, reason);
+        com.atv.launcher.systembridge.shared.appindex.AppIndexStore.getInstance(appContext).syncAppsAsync();
     }
 }
 

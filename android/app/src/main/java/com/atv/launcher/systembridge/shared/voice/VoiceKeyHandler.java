@@ -3,6 +3,7 @@ package com.atv.launcher.systembridge.shared.voice;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.KeyEvent;
 
@@ -12,6 +13,7 @@ public final class VoiceKeyHandler {
     private static final long DOUBLE_CLICK_TIMEOUT_MS = 600L;
     private static final long LONG_PRESS_TIMEOUT_MS = 600L;
     private static final long SECOND_HOLD_TIMEOUT_MS = 600L;
+    private static final long DOUBLE_TAP_WINDOW_MS = 500L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final String tag;
@@ -19,6 +21,8 @@ public final class VoiceKeyHandler {
     private int pressStage;
     private boolean longPressTriggered;
     private boolean secondHoldTriggered;
+    private long lastTapUpTime;
+    private boolean isSecondPressIgnored;
     private Runnable longPressRunnable;
     private Runnable secondHoldRunnable;
     private Runnable resetRunnable;
@@ -74,6 +78,8 @@ public final class VoiceKeyHandler {
         pressStage = 0;
         longPressTriggered = false;
         secondHoldTriggered = false;
+        lastTapUpTime = 0L;
+        isSecondPressIgnored = false;
     }
 
     private boolean matchesConfiguredKey(Context context, int keyCode) {
@@ -109,8 +115,18 @@ public final class VoiceKeyHandler {
     }
 
     private boolean handleLongPress(Context context, KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+        int action = event.getAction();
+        if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             cancelLongPress();
+            long now = SystemClock.uptimeMillis();
+            if (now - lastTapUpTime < DOUBLE_TAP_WINDOW_MS) {
+                // Nhấn 2 lần liên tiếp, giữ ở lần 2: Không gọi Voice AI, nhường cho Katniss/Hệ thống
+                isSecondPressIgnored = true;
+                Log.i(tag, source + " ignored_second_press_hold (reserved for Katniss/System)");
+                return false;
+            }
+
+            isSecondPressIgnored = false;
             longPressTriggered = false;
             longPressRunnable = () -> {
                 longPressTriggered = true;
@@ -120,9 +136,16 @@ public final class VoiceKeyHandler {
             handler.postDelayed(longPressRunnable, LONG_PRESS_TIMEOUT_MS);
             return true;
         }
-        if (event.getAction() == KeyEvent.ACTION_UP) {
+        if (action == KeyEvent.ACTION_UP) {
             cancelLongPress();
+            if (!longPressTriggered && !isSecondPressIgnored) {
+                lastTapUpTime = SystemClock.uptimeMillis();
+            } else {
+                lastTapUpTime = 0L;
+            }
             longPressTriggered = false;
+            isSecondPressIgnored = false;
+            return true;
         }
         return true;
     }

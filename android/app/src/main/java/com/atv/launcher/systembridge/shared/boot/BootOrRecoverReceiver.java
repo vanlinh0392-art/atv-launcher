@@ -24,6 +24,7 @@ public class BootOrRecoverReceiver extends BroadcastReceiver {
                 SystemBridgeCoordinator.kickAccessManager(appContext, action);
                 SystemBridgeCoordinator.startCore(appContext, action);
                 SystemBridgeCoordinator.scheduleWakeBackstop(appContext, action);
+                com.atv.launcher.systembridge.shared.appindex.AppIndexStore.getInstance(appContext).syncAppsAsync();
             } finally {
                 pendingResult.finish();
             }

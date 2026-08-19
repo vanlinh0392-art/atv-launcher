@@ -115,6 +115,16 @@ class FLauncherChannel {
   Future<Map<String, dynamic>> testVoiceSearch() async =>
       _invokeMapMethod('testVoiceSearch');
 
+  Future<Map<String, dynamic>> getVoiceSubtitleConfig() async =>
+      _invokeMapMethod('getVoiceSubtitleConfig');
+
+  Future<bool> setVoiceSubtitleConfig({int? size, int? color}) async =>
+      await _methodChannel.invokeMethod<bool>('setVoiceSubtitleConfig', {
+        if (size != null) 'size': size,
+        if (color != null) 'color': color,
+      }) ??
+      false;
+
   Future<void> openAccessibilitySettings() async =>
       await _methodChannel.invokeMethod('openAccessibilitySettings');
 
@@ -210,6 +220,20 @@ class FLauncherChannel {
 
   Future<Map<String, dynamic>> startSpeechRecognizer() async =>
       _invokeMapMethod('startSpeechRecognizer');
+
+  Future<Map<String, dynamic>> dispatchVoiceCommand(String query) async =>
+      _invokeMapMethod('dispatchVoiceCommand', {'query': query});
+
+  Future<Map<String, dynamic>> setTtsEngine(String engine) async =>
+      _invokeMapMethod('setTtsEngine', {'engine': engine});
+
+  Future<Map<String, dynamic>> getTtsEngine() async =>
+      _invokeMapMethod('getTtsEngine');
+
+  Future<bool> testTtsVoice([String? text]) async {
+    final res = await _methodChannel.invokeMethod<bool>('testTtsVoice', {'text': text});
+    return res ?? true;
+  }
 
   Future<Map<String, dynamic>> pickWallpaperAsset(
           {String kind = 'mixed'}) async =>
@@ -324,6 +348,20 @@ class FLauncherChannel {
 
   Future<String> getDiagnosticsReport() async =>
       await _methodChannel.invokeMethod<String>('getDiagnosticsReport') ?? '';
+
+  Future<Map<String, dynamic>> disableGoogleKatniss() =>
+      _invokeMapMethod('disableGoogleKatniss');
+
+  Future<Map<String, dynamic>> enableGoogleKatniss() =>
+      _invokeMapMethod('enableGoogleKatniss');
+
+  Future<bool> isGoogleKatnissDisabled() async {
+    final result = await _methodChannel.invokeMethod<bool>('isGoogleKatnissDisabled');
+    return result ?? false;
+  }
+
+  Future<Map<String, dynamic>> updateDynamicFreeAiModels() =>
+      _invokeMapMethod('updateDynamicFreeAiModels');
 
   void addAppsChangedListener(void Function(Map<String, dynamic>) listener) =>
       _appsEventChannel.receiveBroadcastStream().listen((event) {

@@ -100,6 +100,9 @@ class SearchService extends ChangeNotifier {
   Future<Map<String, dynamic>> startSpeechRecognizer() =>
       _channel.startSpeechRecognizer();
 
+  Future<Map<String, dynamic>> dispatchVoiceCommand(String query) =>
+      _channel.dispatchVoiceCommand(query);
+
   Future<bool> launchTvInput(String inputId) => _channel.launchTvInput(inputId);
 
   Future<bool> launchMediaUri(String uri) => _channel.launchMediaUri(uri);

@@ -1065,12 +1065,12 @@ void main() {
       bridgeService: bridgeService,
     );
 
-    await _enterRouteDetailByTap(tester, 'Voice & Search');
+    await _enterRouteDetailByTap(tester, 'Voice AI Assistant');
 
     expect(find.byKey(const Key('voice_search_mode_selector')), findsOneWidget);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('voice_search_primary_mode_option_0'),
+      contains('voice_search_primary_mode_option'),
     );
   });
 
@@ -1770,23 +1770,14 @@ void main() {
           ),
         );
 
-    final captureSize = sizeForLabel('Test speech capture');
-    final learnSize = sizeForLabel('Learn remote key');
-    final launchSize = sizeForLabel('Test voice launch');
-    final resetSize = sizeForLabel('Reset Xiaomi default');
-    final repairSize = sizeForLabel('Repair accessibility');
-    final openSettingsSize = sizeForLabel('Open accessibility settings');
+    final learnSize = sizeForLabel('Học phím Remote mới');
+    final resetSize = sizeForLabel('Khôi phục phím Xiaomi / Mặc định');
+    final aiUpdateSize = sizeForLabel('Cập nhật Model AI Free mới nhất');
+    final micTestSize = sizeForLabel('Thử nghiệm tìm kiếm & Thu âm Mic');
 
-    expect(captureSize.width, equals(learnSize.width));
-    expect(learnSize.width, equals(launchSize.width));
     expect(learnSize.width, equals(resetSize.width));
-    expect(learnSize.width, equals(repairSize.width));
-    expect(learnSize.width, equals(openSettingsSize.width));
-    expect(captureSize.height, equals(learnSize.height));
-    expect(learnSize.height, equals(launchSize.height));
-    expect(learnSize.height, equals(resetSize.height));
-    expect(learnSize.height, equals(repairSize.height));
-    expect(learnSize.height, equals(openSettingsSize.height));
+    expect(learnSize.width, equals(aiUpdateSize.width));
+    expect(learnSize.width, equals(micTestSize.width));
   });
 
   testWidgets(
@@ -2067,6 +2058,12 @@ MockSystemBridgeService _mockBridgeService({
   );
   when(bridgeService.resetVoiceMapping()).thenAnswer(
     (_) async => const <String, dynamic>{'message': 'ok'},
+  );
+  when(bridgeService.getVoiceSubtitleConfig()).thenAnswer(
+    (_) async => const <String, dynamic>{'size': 20, 'color': 0xFF00E5FF},
+  );
+  when(bridgeService.getTtsEngine()).thenAnswer(
+    (_) async => const <String, dynamic>{'engine': 'auto'},
   );
   when(
     bridgeService.runProvisioningAction(

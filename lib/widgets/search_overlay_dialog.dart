@@ -437,19 +437,6 @@ class _SearchOverlayDialogState extends State<SearchOverlayDialog> {
     required SearchService searchService,
     required SystemBridgeService bridgeService,
   }) async {
-    if (searchService.defaultSearchMode !=
-        SearchService.searchModeLocalOverlay) {
-      final result = await bridgeService.testVoiceSearch();
-      if (!mounted) {
-        return;
-      }
-      final message = result['message']?.toString() ??
-          AppLocalizations.of(context)!.actionCompleted;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
-      return;
-    }
-
     final result = await searchService.startSpeechRecognizer();
     if (!mounted) {
       return;

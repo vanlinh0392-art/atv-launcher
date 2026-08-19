@@ -128,8 +128,22 @@ class SystemBridgeService extends ChangeNotifier {
     return result;
   }
 
-  Future<Map<String, dynamic>> testVoiceSearch() async =>
-      _channel.testVoiceSearch();
+  Future<Map<String, dynamic>> testVoiceSearch() => _channel.testVoiceSearch();
+
+  Future<Map<String, dynamic>> getVoiceSubtitleConfig() =>
+      _channel.getVoiceSubtitleConfig();
+
+  Future<bool> setVoiceSubtitleConfig({int? size, int? color}) =>
+      _channel.setVoiceSubtitleConfig(size: size, color: color);
+
+  Future<Map<String, dynamic>> setTtsEngine(String engine) =>
+      _channel.setTtsEngine(engine);
+
+  Future<Map<String, dynamic>> getTtsEngine() =>
+      _channel.getTtsEngine();
+
+  Future<bool> testTtsVoice([String? text]) =>
+      _channel.testTtsVoice(text);
 
   Future<void> openAccessibilitySettings() async =>
       _channel.openAccessibilitySettings();
@@ -270,6 +284,24 @@ class SystemBridgeService extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> getLocalBackups() => _channel.getLocalBackups();
   Future<String> readLocalBackup(String fileName) => _channel.readLocalBackup(fileName);
   Future<bool> deleteLocalBackup(String fileName) => _channel.deleteLocalBackup(fileName);
+
+  Future<Map<String, dynamic>> disableGoogleKatniss() async {
+    final result = await _channel.disableGoogleKatniss();
+    await refreshLite();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> enableGoogleKatniss() async {
+    final result = await _channel.enableGoogleKatniss();
+    await refreshLite();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> updateDynamicFreeAiModels() async {
+    final result = await _channel.updateDynamicFreeAiModels();
+    await refreshLite();
+    return result;
+  }
 
   Future<Map<String, dynamic>> recordBackupRestoreResult({
     required String importName,

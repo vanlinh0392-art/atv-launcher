@@ -642,7 +642,7 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
         ),
         _SettingsDestination(
           route: VoiceSearchPanelPage.routeName,
-          icon: Icons.mic_none_outlined,
+          icon: Icons.auto_awesome,
           title: localizations.settingsDestinationVoiceTitle,
           subtitle: localizations.settingsDestinationVoiceSubtitle,
         ),

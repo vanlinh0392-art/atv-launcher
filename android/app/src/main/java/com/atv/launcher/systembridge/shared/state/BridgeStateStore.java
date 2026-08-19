@@ -99,7 +99,7 @@ public final class BridgeStateStore {
     }
 
     public static int getMode(Context context) {
-        return prefs(context).getInt(KEY_MODE, MODE_DOUBLE);
+        return prefs(context).getInt(KEY_MODE, MODE_LONG);
     }
 
     public static void setMode(Context context, int mode) {
@@ -128,6 +128,22 @@ public final class BridgeStateStore {
 
     public static void setVoiceInterceptEnabled(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_INTERCEPT, enabled).commit();
+    }
+
+    public static int getVoiceSubtitleSize(Context context) {
+        return prefs(context).getInt("voice_subtitle_size", 20);
+    }
+
+    public static void setVoiceSubtitleSize(Context context, int size) {
+        prefs(context).edit().putInt("voice_subtitle_size", size).commit();
+    }
+
+    public static int getVoiceSubtitleColor(Context context) {
+        return prefs(context).getInt("voice_subtitle_color", 0xFF00E5FF);
+    }
+
+    public static void setVoiceSubtitleColor(Context context, int color) {
+        prefs(context).edit().putInt("voice_subtitle_color", color).commit();
     }
 
     public static void resetDefaultMapping(Context context) {

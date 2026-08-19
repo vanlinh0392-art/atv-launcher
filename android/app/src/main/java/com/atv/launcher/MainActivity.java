@@ -78,6 +78,7 @@ import com.atv.launcher.systembridge.dns.PrivateDnsController;
 import com.atv.launcher.systembridge.shared.control.VoiceModeControlContract;
 import com.atv.launcher.systembridge.shared.service.SystemBridgeCoordinator;
 import com.atv.launcher.systembridge.shared.state.BridgeStateStore;
+import com.atv.launcher.systembridge.shared.voice.SmartVoiceDispatcher;
 import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
 import com.atv.launcher.systembridge.shared.voice.VoiceSearchLauncher;
 import com.atv.launcher.systembridge.wallpaper.VideoLibraryController;
@@ -266,6 +267,7 @@ public class MainActivity extends FlutterActivity {
         }
         super.onCreate(savedInstanceState);
         registerWallpaperWakeReceiver();
+        com.atv.launcher.systembridge.shared.appindex.AppIndexStore.getInstance(this).syncAppsAsync();
     }
 
     @Override
@@ -420,6 +422,10 @@ public class MainActivity extends FlutterActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        if ("com.atv.launcher.ACTION_VOICE_CAPTURE".equals(intent.getAction())) {
+            triggerVoiceCapture();
+            return;
+        }
         if (recordBenchmarkCommand(intent)) {
             return;
         }
@@ -652,6 +658,24 @@ public class MainActivity extends FlutterActivity {
             case "querySearchableMedia" -> result.success(querySearchableMedia());
             case "launchMediaUri" -> result.success(launchMediaUri(call));
             case "startSpeechRecognizer" -> startSpeechRecognizer(result);
+            case "dispatchVoiceCommand" -> result.success(dispatchVoiceCommand(call));
+            case "setTtsEngine" -> result.success(setTtsEngine(call));
+            case "getTtsEngine" -> result.success(getTtsEngine());
+            case "testTtsVoice" -> {
+                String sample = call.hasArgument("text") ? (String) call.argument("text") : "Xin chào! Trợ lý FLauncher TV đã sẵn sàng phục vụ bạn.";
+                com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).speak(this, sample, null);
+                result.success(true);
+            }
+            case "disableGoogleKatniss" ->
+                    runMethodCallAsync(result, this::disableGoogleKatniss);
+            case "enableGoogleKatniss" ->
+                    runMethodCallAsync(result, this::enableGoogleKatniss);
+            case "isGoogleKatnissDisabled" ->
+                    result.success(isGoogleKatnissDisabled());
+            case "updateDynamicFreeAiModels" ->
+                    runMethodCallAsync(result, () -> com.atv.launcher.systembridge.ai.AiVoiceAssistantClient.fetchAndRankFreeModels(this));
+            case "getVoiceSubtitleConfig" -> result.success(getVoiceSubtitleConfig());
+            case "setVoiceSubtitleConfig" -> result.success(setVoiceSubtitleConfig(call));
             case "pickWallpaperAsset" -> pickWallpaperAsset(call, result);
             case "pickWallpaperFiles" -> pickWallpaperFiles(result);
             case "pickWallpaperFolder" -> pickWallpaperFolder(result);
@@ -1326,6 +1350,8 @@ public class MainActivity extends FlutterActivity {
         voice.put("defaultKeySummary", BridgeStateStore.defaultVoiceKeySummary());
         voice.put("learningMode", learningMode);
         voice.put("interceptEnabled", BridgeStateStore.isVoiceInterceptEnabled(this));
+        voice.put("subtitleSize", BridgeStateStore.getVoiceSubtitleSize(this));
+        voice.put("subtitleColor", BridgeStateStore.getVoiceSubtitleColor(this));
         voice.put("accessibilityEnabled", coreAccessibilityEnabled);
         voice.put("globalVoiceActive", globalVoiceActive);
         voice.put("coreHelperInstalled", coreHelperInstalled);
@@ -2804,10 +2830,20 @@ public class MainActivity extends FlutterActivity {
         emitSystemSnapshot();
     }
 
-    private void handleSpeechRecognizerResult(int resultCode, Intent data) {
-        if (pendingSpeechRecognizerResult == null) {
-            return;
+    @SuppressWarnings("deprecation")
+    private void triggerVoiceCapture() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Nói câu lệnh: Mở VTV1, Mở Youtube, Hỏi thời tiết...");
+        try {
+            startActivityForResult(intent, REQUEST_SPEECH_RECOGNIZER);
+        } catch (Exception e) {
+            Log.w(TAG, "Cannot start voice capture", e);
         }
+    }
+
+    private void handleSpeechRecognizerResult(int resultCode, Intent data) {
         MethodChannel.Result result = pendingSpeechRecognizerResult;
         pendingSpeechRecognizerResult = null;
 
@@ -2822,13 +2858,62 @@ public class MainActivity extends FlutterActivity {
             String text = (matches == null || matches.isEmpty()) ? "" : matches.get(0);
             map.put("text", text == null ? "" : text);
             map.put("success", !TextUtils.isEmpty(text));
-            map.put("message", TextUtils.isEmpty(text)
-                    ? "No speech was recognized."
-                    : "Speech recognized.");
+            if (!TextUtils.isEmpty(text)) {
+                Log.i(TAG, "Speech captured: '" + text + "', dispatching...");
+                Map<String, Object> dispatchResult = SmartVoiceDispatcher.dispatch(this, text);
+                map.put("dispatchResult", dispatchResult);
+                map.put("message", dispatchResult.get("message") != null
+                        ? dispatchResult.get("message").toString()
+                        : "Speech recognized.");
+            } else {
+                map.put("message", "No speech was recognized.");
+            }
         } else {
             map.put("message", "Speech recognition was cancelled.");
         }
-        result.success(map);
+        if (result != null) {
+            result.success(map);
+        }
+    }
+
+    private Map<String, Object> dispatchVoiceCommand(MethodCall call) {
+        String query = call.argument("query");
+        return SmartVoiceDispatcher.dispatch(this, query);
+    }
+
+    private Map<String, Object> setTtsEngine(MethodCall call) {
+        String engine = call.argument("engine");
+        com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).setPreferredEngine(engine);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("engine", com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).getPreferredEngine());
+        return result;
+    }
+
+    private Map<String, Object> getTtsEngine() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("engine", com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(this).getPreferredEngine());
+        return result;
+    }
+
+    private Map<String, Object> getVoiceSubtitleConfig() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("size", com.atv.launcher.systembridge.shared.state.BridgeStateStore.getVoiceSubtitleSize(this));
+        map.put("color", com.atv.launcher.systembridge.shared.state.BridgeStateStore.getVoiceSubtitleColor(this));
+        return map;
+    }
+
+    private boolean setVoiceSubtitleConfig(MethodCall call) {
+        Integer size = call.argument("size");
+        Integer color = call.argument("color");
+        if (size != null) {
+            com.atv.launcher.systembridge.shared.state.BridgeStateStore.setVoiceSubtitleSize(this, size);
+        }
+        if (color != null) {
+            com.atv.launcher.systembridge.shared.state.BridgeStateStore.setVoiceSubtitleColor(this, color);
+        }
+        return true;
     }
 
     private Map<String, Object> recordBackupRestoreResult(MethodCall call) {
@@ -4035,5 +4120,45 @@ public class MainActivity extends FlutterActivity {
         }
         DateFormat format = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM);
         return format.format(new Date(epochMillis));
+    }
+
+    private Map<String, Object> disableGoogleKatniss() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        try {
+            String cmd = "pm disable-user --user 0 com.google.android.katniss";
+            com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.Result adbResult =
+                    com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.executeShell(this, cmd);
+            map.put("success", adbResult.success);
+            map.put("message", adbResult.detail);
+        } catch (Exception e) {
+            map.put("success", false);
+            map.put("message", e.getMessage());
+        }
+        return map;
+    }
+
+    private Map<String, Object> enableGoogleKatniss() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        try {
+            String cmd = "pm enable com.google.android.katniss";
+            com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.Result adbResult =
+                    com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.executeShell(this, cmd);
+            map.put("success", adbResult.success);
+            map.put("message", adbResult.detail);
+        } catch (Exception e) {
+            map.put("success", false);
+            map.put("message", e.getMessage());
+        }
+        return map;
+    }
+
+    private boolean isGoogleKatnissDisabled() {
+        try {
+            int state = getPackageManager().getApplicationEnabledSetting("com.google.android.katniss");
+            return state == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    || state == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
