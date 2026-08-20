@@ -540,18 +540,13 @@ public class MainActivity extends FlutterActivity {
                     return;
                 }
                 VideoWallpaperController controller = sharedVideoWallpaperController;
-                boolean allowWakeRearm = activityStarted || wakeRearmAllowedAfterStop;
-                if (allowWakeRearm) {
-                    if (recordWakeHomeNavigation()) {
-                        emitSystemSnapshot();
-                    }
-                    maybeTriggerSilentAutoGrant(action);
+                wakeRearmAllowedAfterStop = false;
+                if (recordWakeHomeNavigation()) {
+                    emitSystemSnapshot();
                 }
+                maybeTriggerSilentAutoGrant(action);
                 if (controller != null) {
-                    if (allowWakeRearm) {
-                        wakeRearmAllowedAfterStop = false;
-                    }
-                    controller.onScreenWake(action, allowWakeRearm);
+                    controller.onScreenWake(action, true);
                 }
             }
         };
@@ -560,6 +555,7 @@ public class MainActivity extends FlutterActivity {
         filter.addAction(Intent.ACTION_SCREEN_OFF);
         filter.addAction(Intent.ACTION_SCREEN_ON);
         filter.addAction(Intent.ACTION_USER_PRESENT);
+        filter.addAction(Intent.ACTION_USER_UNLOCKED);
         filter.addAction(Intent.ACTION_DREAMING_STARTED);
         filter.addAction(Intent.ACTION_DREAMING_STOPPED);
         filter.addAction("android.intent.action.SCREEN_ON");
@@ -567,10 +563,14 @@ public class MainActivity extends FlutterActivity {
         filter.addAction("android.intent.action.USER_PRESENT");
         filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_ON");
         filter.addAction("com.xiaomi.tv.ACTION_OPEN_CLOSE_SCREEN_SAVER");
+        filter.addAction("mitv.action.STR_BOOT_COMPLETED");
+        filter.addAction("com.xiaomi.mitv.action.STR_BOOT_COMPLETED");
         filter.addAction("com.tcl.tv.action.SCREEN_ON");
         filter.addAction("com.tcl.tv.action.SCREEN_OFF");
         filter.addAction("com.sony.dtv.intent.action.PANEL_ON");
         filter.addAction("com.sony.dtv.intent.action.PANEL_OFF");
+        filter.addAction("com.hisense.tv.action.PANEL_ON");
+        filter.setPriority(999999);
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(wallpaperWakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {

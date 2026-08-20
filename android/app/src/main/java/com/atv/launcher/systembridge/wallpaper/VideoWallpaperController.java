@@ -199,7 +199,11 @@ public final class VideoWallpaperController {
         pendingWakePlaylistRetryCount = 0;
         pendingWakeReason = resolvedReason;
         ensureSurface();
-        maybeStartPlayback(true, true);
+        if (player != null) {
+            resumeExistingPlayerIfNeeded();
+        } else {
+            maybeStartPlayback(true, true);
+        }
 
         scheduleMultiStageWakeRecovery(resolvedReason);
     }
@@ -731,6 +735,7 @@ public final class VideoWallpaperController {
         ensureSurface();
         if (surface != null && surface.isValid()) {
             try {
+                player.clearVideoSurface();
                 player.setVideoSurface(surface);
             } catch (Exception ignored) {}
         }

@@ -5,6 +5,17 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.017 — Xiaomi STR Sleep Wake Full Recovery & ExoPlayer Surface Re-bind
+
+### 1. Khắc Phục Triệt Để Toàn Bộ Chu Kỳ Video Nền Khi Thức Dậy Trên TV Xiaomi / Android TV
+- **Đăng Ký Broadcast `mitv.action.STR_BOOT_COMPLETED` & `com.xiaomi.mitv.action.STR_BOOT_COMPLETED`**:
+  + TV Xiaomi khi thức dậy từ chế độ ngủ sâu (Suspend-To-RAM) gửi broadcast chuyên biệt `mitv.action.STR_BOOT_COMPLETED`. Trước đây `MainActivity.java` chưa đăng ký action này nên bỏ sót sự kiện bật nguồn.
+  + Đã bổ sung đầy đủ toàn bộ broadcast đánh thức OEM (`STR_BOOT_COMPLETED`, `ACTION_USER_UNLOCKED`, `PANEL_ON`) với mức ưu tiên tối đa `setPriority(999999)`.
+- **Cơ Chế Re-bind Surface ExoPlayer Khi GPU Mali Disconnect Native Window**:
+  + Khi TV tắt màn hình, GPU Mali của TV Xiaomi ngắt kết nối `EGLNativeWindowType disconnect`. Khi thức dậy, hệ thống tạo `new_window_surface`.
+  + Triển khai cơ chế tự động gọi `player.clearVideoSurface()` và `player.setVideoSurface(surface)` trong `resumeExistingPlayerIfNeeded()` và `ensureSurface()`, buộc bộ giải mã `MediaCodecVideoRenderer` kết nối lại với Surface mới và đẩy khung hình video ngay lập tức.
+  + Gọi trực tiếp `resumeExistingPlayerIfNeeded()` khi `player != null` trong `onScreenWake()`, đảm bảo video phát lại 100% không phụ thuộc cờ hoãn khởi động.
+
 ## 2026-08-20 - Official release 2026.08.016 — Robust Video Wallpaper Auto-Resume on Sleep Wake
 
 ### 1. Khắc Phục Lỗi Video Nền Không Tự Phát Khi Thức Dậy Từ Chế Độ Ngủ
