@@ -5,6 +5,19 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.022 — Zero-Flash Video Wallpaper Transitions Across All Performance Modes
+
+### 1. Triệt Tiêu 100% Hiện Tượng Chớp Ảnh Nền Khi Mở & Quay Về Từ App Khác
+- **Giữ Frame Cuối (Texture Frame Persistence)**: 
+  + Trước đây khi mở app hoặc quay về Home, Flutter nhận `videoReady = false` và ngay lập tức thay thế video bằng ảnh nền mặc định, gây hiện tượng chớp ảnh nền trong 100ms rồi mới vào app/video.
+  + **Giải pháp**: Giữ nguyên widget `Texture` trên màn hình thay vì gỡ bỏ để bề mặt GPU hiển thị frame video cuối mượt mà (frozen frame).
+  + Tại `onPause()`: Tạm dừng phát video (`player.pause()`) thay vì hủy ngang, giữ nguyên hình ảnh video trên màn hình trong lúc hiệu ứng chuyển cảnh diễn ra.
+  + Tại `onStop()`: Giải phóng ExoPlayer để app ngoài có trọn vẹn MediaCodec.
+  + Khi về Home: Tiếp tục phát từ frame đang dừng, không bao giờ nhấp nháy sang ảnh nền tĩnh.
+
+### 2. Đồng Bộ & Tối Ưu Hóa Mọi Mode Hiệu Năng (`Quality`, `Balanced`, `Smooth`, `Off`)
+- Đảm bảo cơ chế hiển thị video mượt mà, không giật chớp trên toàn bộ 4 chế độ hiệu năng của Launcher.
+
 ## 2026-08-20 - Official release 2026.08.021 — Fix Toast Version Comparison & Eliminate Video Wallpaper Buffering Flickering
 
 ### 1. Sửa Lỗi Toast Cập Nhật Tự Động & So Sánh Phiên Bản Chuẩn Xác

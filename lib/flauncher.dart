@@ -374,20 +374,15 @@ Widget _buildWallpaperLayer(
               ),
             );
 
-  if (!wallpaper.isVideoMode || wallpaper.videoTextureId == null) {
+  if (!wallpaper.isVideoMode ||
+      wallpaper.videoTextureId == null ||
+      wallpaperStatus.lastError.isNotEmpty) {
     return RepaintBoundary(child: baseWallpaper);
   }
 
   final blurSigma = performanceProfile
       .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
   final dimOpacity = wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
-  final videoUsable = wallpaperStatus.videoReady &&
-      !wallpaperStatus.playbackSuppressed &&
-      wallpaperStatus.lastError.isEmpty;
-
-  if (!videoUsable) {
-    return RepaintBoundary(child: baseWallpaper);
-  }
 
   Widget videoLayer = SizedBox.expand(
     child: FittedBox(

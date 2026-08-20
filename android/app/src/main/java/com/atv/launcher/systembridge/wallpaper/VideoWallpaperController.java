@@ -277,7 +277,12 @@ public final class VideoWallpaperController {
         cancelWakePlaylistRetry();
         cancelPendingMultiStageWakeRecovery();
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
-        releasePlayer();
+        if (player != null) {
+            try {
+                player.pause();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     public void onStop() {
