@@ -761,11 +761,6 @@ public final class VideoWallpaperController {
     }
 
     private void scheduleWakePlaylistRetryIfNeeded() {
-        if (!BridgeStateStore.WALLPAPER_SOURCE_FOLDER.equals(
-                BridgeStateStore.getWallpaperVideoSourceType(appContext))
-        ) {
-            return;
-        }
         if (pendingWakePlaylistRetryCount >= MAX_WAKE_PLAYLIST_RETRIES) {
             logWakeInfo("wallpaper_wake_rearm_retry_exhausted reason=" + pendingWakeReason);
             return;

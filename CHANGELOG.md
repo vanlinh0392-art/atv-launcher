@@ -5,6 +5,16 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.016 — Robust Video Wallpaper Auto-Resume on Sleep Wake
+
+### 1. Khắc Phục Lỗi Video Nền Không Tự Phát Khi Thức Dậy Từ Chế Độ Ngủ
+- **Phát Hiện Nguyên Nhân Gốc (Root Cause)**:
+  1. Trong [`wallpaper_service.dart`](file:///d:/mod/android/mapvoice/flauncher-v7a/lib/providers/wallpaper_service.dart): Khi TV vào sleep rồi thức dậy, sự kiện `didChangeAppLifecycleState(AppLifecycleState.resumed)` kiểm tra `_shouldDelayVideoAfterReturningHome` (chế độ Smooth). Nếu `_videoWarmUpCompleted == true`, nó không kích hoạt lại luồng `_resumeVideoAfterForegroundReturnIfNeeded()`, khiến Flutter không gửi tín hiệu re-arm sang tầng native ExoPlayer vốn đã bị tạm dừng khi tắt màn hình.
+  2. Trong [`VideoWallpaperController.java`](file:///d:/mod/android/mapvoice/flauncher-v7a/android/app/src/main/java/com/atv/launcher/systembridge/wallpaper/VideoWallpaperController.java): Hàm `scheduleWakePlaylistRetryIfNeeded` trước đây bị giới hạn chỉ thử lại với nguồn `WALLPAPER_SOURCE_FOLDER`. Nếu người dùng chọn file SAF đơn lẻ hoặc URI tùy chỉnh, khi TV vừa bật màn hình mà bộ nhớ ngoài (`StorageManagerService`) chưa kịp mount xong (thường mất 1-2s), danh sách URI rỗng và không có cơ chế retry.
+- **Giải Pháp & Tối Ưu**:
+  + Thêm nhánh fallback `_resumeVideoAfterForegroundReturnIfNeeded(reason: 'app_resumed')` trong `didChangeAppLifecycleState` kể cả khi warmup đã từng hoàn thành.
+  + Mở rộng `scheduleWakePlaylistRetryIfNeeded()` cho mọi nguồn video, tự động thử lại sau khi ổ đĩa/storage hoàn tất mount.
+
 ## 2026-08-20 - Official release 2026.08.015 — Instant Overlay Dismissal & Anti-Kill Protection on App Switching
 
 ### 1. Khắc Phục Triệt Để Lỗi Launcher Bị Khởi Động Lại Khi Từ App Khác Về Home

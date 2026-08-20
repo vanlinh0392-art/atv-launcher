@@ -722,12 +722,18 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       if (!_canActivateVideoWallpaper) {
         return;
       }
+      _homeVisibleAndUsable = true;
       if (_shouldDelayVideoAfterReturningHome) {
-        _homeVisibleAndUsable = true;
         if (!_videoWarmUpCompleted &&
             !_videoWarmUpScheduled &&
             !settingsPlaybackSuppressed) {
           scheduleHomeVisibleVideoStart();
+        } else {
+          unawaited(
+            _resumeVideoAfterForegroundReturnIfNeeded(
+              reason: 'app_resumed',
+            ),
+          );
         }
         return;
       }
