@@ -288,19 +288,27 @@ public final class VietnameseTtsEngine {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                     try {
                         String eng = getPreferredEngine();
-                        android.media.PlaybackParams params = mediaPlayer.getPlaybackParams();
-                        if ("edge_namminh".equals(eng) || "namminh".equals(eng)) {
-                            params.setPitch(0.78f);
-                            params.setSpeed(0.96f);
-                        } else if ("edge_hoaimy".equals(eng) || "hoaimy".equals(eng)) {
-                            params.setPitch(1.22f);
+                        android.media.PlaybackParams params;
+                        try {
+                            params = mediaPlayer.getPlaybackParams();
+                        } catch (Exception ex) {
+                            params = new android.media.PlaybackParams();
+                        }
+                        if ("edge_namminh".equals(eng) || "namminh".equals(eng) || "nam_minh".equals(eng)) {
+                            params.setPitch(0.76f);
+                            params.setSpeed(0.95f);
+                        } else if ("edge_hoaimy".equals(eng) || "hoaimy".equals(eng) || "hoai_my".equals(eng)) {
+                            params.setPitch(1.26f);
                             params.setSpeed(1.02f);
                         } else {
                             params.setPitch(1.0f);
                             params.setSpeed(1.0f);
                         }
                         mediaPlayer.setPlaybackParams(params);
-                    } catch (Exception ignored) {}
+                        Log.i(TAG, "Applied TTS voice profile: " + eng + " (pitch=" + params.getPitch() + ", speed=" + params.getSpeed() + ")");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Could not set playback params", e);
+                    }
                 }
                 mediaPlayer.start();
                 Log.i(TAG, "MediaPlayer playing chunk [" + (nextItem.index + 1) + "/" + nextItem.total + "]: " + nextItem.file.getName());

@@ -11,7 +11,6 @@ import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
 import 'package:flauncher/widgets/settings/backup_restore_panel_page.dart';
 import 'package:flauncher/widgets/settings/density_panel_page.dart';
-import 'package:flauncher/widgets/settings/diagnostics_panel_page.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
@@ -656,11 +655,6 @@ class _SearchOverlayDialogState extends State<SearchOverlayDialog> {
         route: BackupRestorePanelPage.routeName,
         title: localizations.settingsDestinationBackupTitle,
         subtitle: localizations.settingsDestinationBackupSubtitle,
-      ),
-      _settingsItem(
-        route: DiagnosticsPanelPage.routeName,
-        title: localizations.settingsDestinationDiagnosticsTitle,
-        subtitle: localizations.settingsDestinationDiagnosticsSubtitle,
       ),
     ];
   }

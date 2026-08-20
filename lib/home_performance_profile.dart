@@ -224,7 +224,7 @@ class HomePerformanceProfile {
           allowVideoWallpaper: true,
           disableAudioRendererWhenMuted: true,
           startVideoAfterHomeSettles: true,
-          releasePlayerOnBackground: true,
+          releasePlayerOnBackground: false,
           wallpaperFilterQuality: FilterQuality.none,
           appCardFilterQuality: FilterQuality.low,
           wallpaperVideoWarmUpDelay: Duration(milliseconds: 400),

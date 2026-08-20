@@ -80,7 +80,7 @@ void main() {
     expect(quality.allowVideoWallpaper, isTrue);
     expect(quality.disableAudioRendererWhenMuted, isTrue);
     expect(balanced.startVideoAfterHomeSettles, isTrue);
-    expect(balanced.releasePlayerOnBackground, isTrue);
+    expect(balanced.releasePlayerOnBackground, isFalse);
     expect(balanced.allowVideoWallpaper, isTrue);
     expect(balanced.disableAudioRendererWhenMuted, isTrue);
     expect(smooth.startVideoAfterHomeSettles, isTrue);

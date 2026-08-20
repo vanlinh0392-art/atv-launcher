@@ -471,17 +471,17 @@ public final class AiVoiceAssistantClient {
 
             @Override
             public void onComplete() {
-                Log.i(TAG, "TTS Completed all chunks -> entering Follow-up listening mode");
+                Log.i(TAG, "TTS Completed all chunks -> dismissing overlay immediately after 500ms (no follow-up listening)");
                 try {
                     VoiceFloatingOverlayManager.getInstance(context).stopTtsWaveform();
-                    VoiceFloatingOverlayManager.getInstance(context).startFollowUpListening();
+                    VoiceFloatingOverlayManager.getInstance(context).scheduleDismiss(500L);
                 } catch (Exception ignored) {
                 }
                 try {
                     VoiceCaptureTransparentActivity activity = VoiceCaptureTransparentActivity.getActiveInstance();
                     if (activity != null) {
                         activity.stopTtsWaveform();
-                        activity.scheduleDismiss(2500);
+                        activity.scheduleDismiss(500L);
                     }
                 } catch (Exception ignored) {
                 }
@@ -492,14 +492,14 @@ public final class AiVoiceAssistantClient {
                 Log.w(TAG, "TTS Error: " + message);
                 try {
                     VoiceFloatingOverlayManager.getInstance(context).stopTtsWaveform();
-                    VoiceFloatingOverlayManager.getInstance(context).scheduleDismiss(3500);
+                    VoiceFloatingOverlayManager.getInstance(context).scheduleDismiss(500L);
                 } catch (Exception ignored) {
                 }
                 try {
                     VoiceCaptureTransparentActivity activity = VoiceCaptureTransparentActivity.getActiveInstance();
                     if (activity != null) {
                         activity.stopTtsWaveform();
-                        activity.scheduleDismiss(3500);
+                        activity.scheduleDismiss(500L);
                     }
                 } catch (Exception ignored) {}
             }

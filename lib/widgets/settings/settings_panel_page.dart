@@ -5,7 +5,6 @@ import 'package:flauncher/custom_traversal_policy.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
 import 'package:flauncher/widgets/settings/backup_restore_panel_page.dart';
 import 'package:flauncher/widgets/settings/density_panel_page.dart';
-import 'package:flauncher/widgets/settings/diagnostics_panel_page.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
@@ -81,8 +80,6 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
           FocusNode(debugLabel: 'accessibility_primary_toggle_apps'),
       DensityPanelPage.routeName:
           FocusNode(debugLabel: 'density_primary_apply'),
-      DiagnosticsPanelPage.routeName:
-          FocusNode(debugLabel: 'diagnostics_primary_refresh'),
       UpdatePanelPage.routeName: FocusNode(debugLabel: 'updates_primary_check'),
     };
     _selectedRoute = _detailPrimaryFocusNodes.containsKey(
@@ -689,12 +686,6 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
           subtitle: localizations.settingsDestinationBackupSubtitle,
         ),
         _SettingsDestination(
-          route: DiagnosticsPanelPage.routeName,
-          icon: Icons.receipt_long_outlined,
-          title: localizations.settingsDestinationDiagnosticsTitle,
-          subtitle: localizations.settingsDestinationDiagnosticsSubtitle,
-        ),
-        _SettingsDestination(
           route: UpdatePanelPage.routeName,
           icon: Icons.system_update_outlined,
           title: localizations.settingsDestinationUpdatesTitle,
@@ -726,8 +717,6 @@ class _SettingsPanelPageState extends State<SettingsPanelPage> {
         return PermissionsPanelPage(primaryFocusNode: primaryFocusNode);
       case BackupRestorePanelPage.routeName:
         return BackupRestorePanelPage(primaryFocusNode: primaryFocusNode);
-      case DiagnosticsPanelPage.routeName:
-        return DiagnosticsPanelPage(primaryFocusNode: primaryFocusNode);
       case UpdatePanelPage.routeName:
         return UpdatePanelPage(primaryFocusNode: primaryFocusNode);
       case StatusBarPanelPage.routeName:

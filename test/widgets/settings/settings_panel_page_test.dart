@@ -735,44 +735,6 @@ void main() {
     );
   });
 
-  testWidgets('enters Diagnostics with refresh button focused', (tester) async {
-    _prepareView(tester);
-    final settings = await _createSettingsService();
-    final appsService = MockAppsService();
-    final wallpaperService = _mockWallpaperService();
-    final bridgeService = _mockBridgeService();
-
-    await _pumpSettingsPanel(
-      tester,
-      settings: settings,
-      appsService: appsService,
-      wallpaperService: wallpaperService,
-      bridgeService: bridgeService,
-    );
-
-    await tester.drag(find.byType(ListView).first, const Offset(0, -1000));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Diagnostics').first);
-    await tester.pumpAndSettle();
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('diagnostics_refresh_button')), findsOneWidget);
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'diagnostics_primary_refresh',
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isTrue,
-    );
-  });
-
   testWidgets('diagnostics report scrolls with DPAD and keeps compact actions',
       (tester) async {
     _prepareView(tester);
@@ -1770,10 +1732,10 @@ void main() {
           ),
         );
 
-    final learnSize = sizeForLabel('Học phím Remote mới');
-    final resetSize = sizeForLabel('Khôi phục phím Xiaomi / Mặc định');
-    final aiUpdateSize = sizeForLabel('Cập nhật Model AI Free mới nhất');
-    final micTestSize = sizeForLabel('Thử nghiệm tìm kiếm & Thu âm Mic');
+    final learnSize = sizeForLabel('Học phím Remote');
+    final resetSize = sizeForLabel('Đặt lại phím mặc định');
+    final aiUpdateSize = sizeForLabel('Cập nhật Model AI');
+    final micTestSize = sizeForLabel('Thử nghiệm Micro');
 
     expect(learnSize.width, equals(resetSize.width));
     expect(learnSize.width, equals(aiUpdateSize.width));

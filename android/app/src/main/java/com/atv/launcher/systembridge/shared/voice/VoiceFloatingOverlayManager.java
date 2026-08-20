@@ -110,23 +110,8 @@ public final class VoiceFloatingOverlayManager {
 
     public void startFollowUpListening() {
         mainHandler.post(() -> {
-            try {
-                if (!isOverlayShowing()) return;
-                isFollowUpMode = true;
-                Log.i(TAG, "Starting Follow-up Multi-turn conversation mode...");
-                abandonAudioDucking();
-                requestAudioDucking();
-
-                updateSubtitle("Đang lắng nghe tiếp... 🎙️", 0xFF00E5FF);
-                if (waveformView != null) {
-                    waveformView.setTtsMode(false);
-                    waveformView.startAnimation();
-                }
-                startInProcessSpeechRecognition();
-            } catch (Exception e) {
-                Log.e(TAG, "startFollowUpListening error", e);
-                scheduleDismiss(1500);
-            }
+            isFollowUpMode = false;
+            scheduleDismiss(500);
         });
     }
 

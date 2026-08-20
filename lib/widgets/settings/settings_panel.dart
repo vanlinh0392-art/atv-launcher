@@ -23,7 +23,6 @@ import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart
 import 'package:flauncher/widgets/settings/applications_panel_page.dart';
 import 'package:flauncher/widgets/settings/backup_restore_panel_page.dart';
 import 'package:flauncher/widgets/settings/density_panel_page.dart';
-import 'package:flauncher/widgets/settings/diagnostics_panel_page.dart';
 import 'package:flauncher/widgets/settings/launcher_sections_panel_page.dart';
 import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
@@ -215,9 +214,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         case BackupRestorePanelPage.routeName:
                           return MaterialPageRoute(
                               builder: (_) => BackupRestorePanelPage());
-                        case DiagnosticsPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => DiagnosticsPanelPage());
                         case UpdatePanelPage.routeName:
                           return MaterialPageRoute(
                               builder: (_) => UpdatePanelPage());

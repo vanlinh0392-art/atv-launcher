@@ -134,9 +134,9 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 1: KÍCH HOẠT & PHÍM REMOTE TV
+            // SECTION 1: KÍCH HOẠT & PHÍM REMOTE
             // ==========================================
-            sectionHeader('KÍCH HOẠT & PHÍM REMOTE TV', Icons.touch_app_outlined),
+            sectionHeader('KÍCH HOẠT & PHÍM REMOTE', Icons.touch_app_outlined),
             SettingsSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,22 +149,22 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     ),
                     selectorKey: const Key('voice_search_mode_selector'),
                     optionKeyPrefix: 'voice_search_mode_option',
-                    title: 'Cách thức bấm phím Voice',
-                    subtitle: 'Lựa chọn thao tác bấm trên remote để kích hoạt Trợ lý Voice AI',
+                    title: 'Thao tác bấm phím',
+                    subtitle: 'Cách bấm remote để gọi Trợ lý Voice',
                     icon: Icons.tune,
                     value: mode,
                     options: <SettingsChoiceOption<int>>[
                       SettingsChoiceOption<int>(
                         value: 2,
-                        label: 'Nhấn giữ phím (Khuyên dùng)',
+                        label: 'Nhấn giữ (Khuyên dùng)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 0,
-                        label: 'Nhấn đúp (2 lần liên tiếp)',
+                        label: 'Nhấn đúp (2 lần)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 1,
-                        label: 'Nhấn 1 lần (Một chạm)',
+                        label: 'Nhấn 1 lần',
                       ),
                       SettingsChoiceOption<int>(
                         value: 3,
@@ -181,66 +181,66 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   SettingsChoiceCard<int>(
                     selectorKey: const Key('voice_search_key_selector'),
                     optionKeyPrefix: 'voice_search_key_option',
-                    title: 'Phím gán gọi Trợ lý AI (Tách biệt Katniss)',
-                    subtitle: 'Chọn phím vật lý độc lập trên remote để không bị xung đột với Google Assistant',
+                    title: 'Phím gọi Trợ lý Voice',
+                    subtitle: 'Gán phím vật lý trên remote TV',
                     icon: Icons.keyboard_outlined,
                     value: (status['keyCode'] as num?)?.toInt() ?? 0,
                     options: const <SettingsChoiceOption<int>>[
                       SettingsChoiceOption<int>(
                         value: 0,
-                        label: 'Tự động đa năng (Nhận diện mọi hãng TV [231, 84, 219, 259, 170...])',
+                        label: 'Tự động (Mọi hãng TV)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 231,
-                        label: 'Google TV / Chromecast / Xiaomi (Phím Mic 231)',
+                        label: 'Google TV / Xiaomi (Phím 231)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 84,
-                        label: 'Sony Bravia / Casper / TCL (Phím Search 84)',
+                        label: 'Sony / Casper / TCL (Phím 84)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 219,
-                        label: 'Android Box AOSP / Tanix / Mecool (Phím Assist 219)',
+                        label: 'Android Box AOSP (Phím 219)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 3,
-                        label: 'Phím Home (Nhấn giữ - Chuẩn 100% mọi TV)',
+                        label: 'Phím Home (Nhấn giữ)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 23,
-                        label: 'Phím OK / D-pad Center (Nhấn giữ)',
+                        label: 'Phím OK (Nhấn giữ)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 82,
-                        label: 'Phím Menu / Cài đặt (Menu Key 82)',
+                        label: 'Phím Menu (82)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 170,
-                        label: 'Phím Live TV / Kênh (TV Key 170)',
+                        label: 'Phím Live TV (170)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 183,
-                        label: 'Phím Màu Đỏ (Color Key Red 183)',
+                        label: 'Phím Màu Đỏ (183)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 184,
-                        label: 'Phím Màu Xanh Lá (Color Key Green 184)',
+                        label: 'Phím Màu Xanh Lá (184)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 185,
-                        label: 'Phím Màu Vàng (Color Key Yellow 185)',
+                        label: 'Phím Màu Vàng (185)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 186,
-                        label: 'Phím Màu Xanh Dương (Color Key Blue 186)',
+                        label: 'Phím Màu Xanh Dương (186)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 259,
-                        label: 'Phím Help / Hỗ trợ Sony (Key 259)',
+                        label: 'Phím Help Sony (259)',
                       ),
                       SettingsChoiceOption<int>(
                         value: 188,
-                        label: 'Phím Bookmark / Custom 1 (Key 188)',
+                        label: 'Phím Bookmark (188)',
                       ),
                     ],
                     valueLabelBuilder: (value) {
@@ -258,7 +258,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                         case 23:
                           return 'Phím OK (Nhấn giữ)';
                         case 170:
-                          return 'Phím TV / Live (170)';
+                          return 'Phím Live TV (170)';
                         case 183:
                           return 'Phím Màu Đỏ (183)';
                         case 184:
@@ -272,7 +272,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                         case 188:
                           return 'Phím Bookmark (188)';
                         default:
-                          return 'Tự động đa năng (Mọi TV)';
+                          return 'Tự động (Mọi hãng TV)';
                       }
                     },
                     onChanged: (value) async {
@@ -284,7 +284,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     value: interceptEnabled,
                     onChanged: bridgeService.setVoiceInterceptEnabled,
                     title: Text(
-                      'Bắt phím giọng nói toàn hệ thống (Cả ngoài Home và trong App)',
+                      'Bắt phím giọng nói toàn hệ thống',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     secondary: const Icon(Icons.hearing_outlined),
@@ -297,8 +297,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     maxColumns: 2,
                     children: [
                       actionCard(
-                        title: 'Học phím Remote mới',
-                        subtitle: 'Bấm nút này rồi bấm phím bất kỳ trên Remote TV để gán Voice',
+                        title: 'Học phím Remote',
+                        subtitle: 'Gán phím bất kỳ trên điều khiển',
                         icon: Icons.sensors_outlined,
                         onPressed: () async {
                           await bridgeService.startKeyLearning();
@@ -317,7 +317,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                                   Icon(Icons.sensors, color: Color(0xFF38BDF8), size: 28),
                                   SizedBox(width: 12),
                                   Text(
-                                    'Đang Lắng Nghe Remote TV',
+                                    'Đang Lắng Nghe Remote',
                                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
                                 ],
@@ -327,7 +327,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Hãy hướng Remote về phía TV và BẤM 1 PHÍM BẤT KỲ bạn muốn dùng để gọi Trợ lý Voice AI (Nút Mic, Nút Sao ★, Nút Màu, Nút Số...).',
+                                    'Hướng Remote về phía TV và BẤM 1 PHÍM BẤT KỲ để gán Voice (Nút Mic, Nút Sao ★, Nút Màu...).',
                                     style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 14, height: 1.4),
                                   ),
                                   const SizedBox(height: 16),
@@ -343,7 +343,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                                         SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            'Khi bạn bấm phím, hệ thống sẽ tự động ghi nhớ và đọc xác nhận.',
+                                            'Khi bấm phím, hệ thống sẽ tự ghi nhớ và đọc xác nhận.',
                                             style: TextStyle(color: Color(0xFF38BDF8), fontSize: 13),
                                           ),
                                         ),
@@ -357,7 +357,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                                   onPressed: () {
                                     Navigator.pop(dialogCtx);
                                   },
-                                  child: const Text('Đóng / Hoàn tất', style: TextStyle(color: Colors.white70)),
+                                  child: const Text('Đóng', style: TextStyle(color: Colors.white70)),
                                 ),
                               ],
                             ),
@@ -365,14 +365,14 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                         },
                       ),
                       actionCard(
-                        title: 'Khôi phục phím Xiaomi / Mặc định',
-                        subtitle: 'Gán lại các mã phím gốc của Android TV Box',
+                        title: 'Đặt lại phím mặc định',
+                        subtitle: 'Khôi phục cấu hình gốc',
                         icon: Icons.restart_alt,
                         onPressed: () async {
                           await bridgeService.resetVoiceMapping();
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đã khôi phục cấu hình phím mặc định!')),
+                            const SnackBar(content: Text('Đã khôi phục phím mặc định!')),
                           );
                         },
                       ),
@@ -384,9 +384,9 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 2: TRÍ TUỆ NHÂN TẠO AI & GIỌNG ĐỌC TTS
+            // SECTION 2: TRÍ TUỆ AI & GIỌNG ĐỌC TTS
             // ==========================================
-            sectionHeader('TRÍ TUỆ NHÂN TẠO AI & GIỌNG ĐỌC TTS', Icons.auto_awesome),
+            sectionHeader('TRÍ TUỆ AI & GIỌNG ĐỌC TTS', Icons.auto_awesome),
             SettingsSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,14 +394,14 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   SettingsChoiceCard<String>(
                     selectorKey: const Key('voice_tts_engine_selector'),
                     optionKeyPrefix: 'voice_tts_engine_option',
-                    title: 'Chọn giọng đọc Tiếng Việt',
-                    subtitle: 'Chất giọng phản hồi khi AI trả lời hoặc mở kênh TV',
+                    title: 'Giọng đọc Tiếng Việt',
+                    subtitle: 'Âm sắc phản hồi của Trợ lý',
                     icon: Icons.spatial_audio_off_outlined,
                     value: _ttsEngine,
                     options: const <SettingsChoiceOption<String>>[
-                      SettingsChoiceOption<String>(value: 'auto', label: 'Tự động (Google Neural TTS)'),
-                      SettingsChoiceOption<String>(value: 'edge_hoaimy', label: 'Nữ Hoài My (Ngọt ngào, tự nhiên)'),
-                      SettingsChoiceOption<String>(value: 'edge_namminh', label: 'Nam Minh (Trầm ấm, rõ ràng)'),
+                      SettingsChoiceOption<String>(value: 'auto', label: 'Tự động (Google Neural)'),
+                      SettingsChoiceOption<String>(value: 'edge_hoaimy', label: 'Nữ Hoài My (Ngọt ngào)'),
+                      SettingsChoiceOption<String>(value: 'edge_namminh', label: 'Nam Minh (Trầm ấm)'),
                     ],
                     valueLabelBuilder: (value) {
                       switch (value) {
@@ -416,6 +416,12 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     onChanged: (value) async {
                       setState(() => _ttsEngine = value);
                       await bridgeService.setTtsEngine(value);
+                      final sample = value == 'edge_namminh'
+                          ? 'Đã chọn giọng Nam Minh, âm sắc trầm ấm.'
+                          : (value == 'edge_hoaimy'
+                              ? 'Đã chọn giọng Nữ Hoài My, ngọt ngào tự nhiên.'
+                              : 'Đã chọn giọng đọc tự động.');
+                      await bridgeService.testTtsVoice(sample);
                     },
                   ),
                   const SizedBox(height: 12),
@@ -426,8 +432,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     maxColumns: 2,
                     children: [
                       actionCard(
-                        title: 'Cập nhật Model AI Free mới nhất',
-                        subtitle: 'Quét và kích hoạt Top Model AI miễn phí',
+                        title: 'Cập nhật Model AI',
+                        subtitle: 'Quét và làm mới danh sách AI',
                         icon: Icons.refresh_outlined,
                         onPressed: () async {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -437,16 +443,16 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                           if (!context.mounted) return;
                           final message = res['message']?.toString() ??
                               (res['success'] == true
-                                  ? 'Đã cập nhật danh sách Model AI Free thành công!'
-                                  : 'Không thể kết nối đến máy chủ AI');
+                                  ? 'Đã cập nhật danh sách Model AI thành công!'
+                                  : 'Không thể kết nối máy chủ AI');
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
                           );
                         },
                       ),
                       actionCard(
-                        title: 'Thử nghiệm tìm kiếm & Thu âm Mic',
-                        subtitle: 'Kiểm tra độ nhạy của micro',
+                        title: 'Thử nghiệm Micro',
+                        subtitle: 'Kiểm tra độ nhạy thu âm',
                         icon: Icons.mic_none_outlined,
                         onPressed: () async {
                           final result = await searchService.startSpeechRecognizer();
@@ -461,14 +467,14 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                         },
                       ),
                       actionCard(
-                        title: 'Thử phát giọng đọc TV',
-                        subtitle: 'Phát thử giọng nói qua loa TV',
+                        title: 'Thử giọng đọc TV',
+                        subtitle: 'Phát âm thanh mẫu qua loa',
                         icon: Icons.volume_up_outlined,
                         onPressed: () async {
                           await bridgeService.testTtsVoice('Xin chào! Trợ lý FLauncher TV đã sẵn sàng phục vụ bạn.');
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đang phát giọng đọc mẫu qua loa TV...')),
+                            const SnackBar(content: Text('Đang phát giọng đọc mẫu...')),
                           );
                         },
                       ),
@@ -480,9 +486,9 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 3: GIAO DIỆN & PHỤ ĐỀ AI
+            // SECTION 3: GIAO DIỆN & PHỤ ĐỀ
             // ==========================================
-            sectionHeader('GIAO DIỆN & PHỤ ĐỀ AI TRÊN MÀN HÌNH', Icons.palette_outlined),
+            sectionHeader('GIAO DIỆN & PHỤ ĐỀ', Icons.palette_outlined),
             SettingsSurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,8 +496,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   SettingsChoiceCard<int>(
                     selectorKey: const Key('voice_subtitle_size_selector'),
                     optionKeyPrefix: 'voice_subtitle_size_option',
-                    title: 'Cỡ chữ phụ đề AI (Voice Subtitle Size)',
-                    subtitle: 'Tùy chỉnh độ lớn chữ phản hồi của Trợ lý trên màn hình TV',
+                    title: 'Cỡ chữ phụ đề',
+                    subtitle: 'Độ lớn văn bản phản hồi',
                     icon: Icons.format_size,
                     value: _subtitleSize,
                     options: const <SettingsChoiceOption<int>>[
@@ -510,29 +516,29 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   SettingsChoiceCard<int>(
                     selectorKey: const Key('voice_subtitle_color_selector'),
                     optionKeyPrefix: 'voice_subtitle_color_option',
-                    title: 'Màu sắc phụ đề AI (Subtitle Color)',
-                    subtitle: 'Màu chữ hiển thị khi trợ lý trả lời trên màn hình TV',
+                    title: 'Màu sắc phụ đề',
+                    subtitle: 'Màu chữ hiển thị',
                     icon: Icons.palette_outlined,
                     value: _subtitleColor,
                     options: const <SettingsChoiceOption<int>>[
-                      SettingsChoiceOption<int>(value: 0xFF00E5FF, label: 'Xanh Cyan Gemini (Mặc định)'),
-                      SettingsChoiceOption<int>(value: 0xFFFFFFFF, label: 'Trắng tinh khôi'),
-                      SettingsChoiceOption<int>(value: 0xFF00E676, label: 'Xanh Lục Ngọc'),
-                      SettingsChoiceOption<int>(value: 0xFFFFD700, label: 'Vàng Hổ Phách'),
-                      SettingsChoiceOption<int>(value: 0xFFF472B6, label: 'Hồng Pastel'),
+                      SettingsChoiceOption<int>(value: 0xFF00E5FF, label: 'Xanh Cyan (Mặc định)'),
+                      SettingsChoiceOption<int>(value: 0xFFFFFFFF, label: 'Trắng'),
+                      SettingsChoiceOption<int>(value: 0xFF00E676, label: 'Xanh Lục'),
+                      SettingsChoiceOption<int>(value: 0xFFFFD700, label: 'Vàng'),
+                      SettingsChoiceOption<int>(value: 0xFFF472B6, label: 'Hồng'),
                     ],
                     valueLabelBuilder: (value) {
                       switch (value) {
                         case 0xFF00E5FF:
-                          return 'Xanh Cyan Gemini';
+                          return 'Xanh Cyan';
                         case 0xFF00E676:
-                          return 'Xanh Lục Ngọc';
+                          return 'Xanh Lục';
                         case 0xFFFFD700:
-                          return 'Vàng Hổ Phách';
+                          return 'Vàng';
                         case 0xFFF472B6:
-                          return 'Hồng Pastel';
+                          return 'Hồng';
                         default:
-                          return 'Trắng tinh khôi';
+                          return 'Trắng';
                       }
                     },
                     onChanged: (value) async {
@@ -566,7 +572,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                         const SizedBox(width: 14),
                         Expanded(
                           child: Text(
-                            'Xem trước: Hôm nay trời nắng ráo, nhiệt độ khoảng 28 độ C.',
+                            'Xem trước: Hôm nay trời nắng ráo, nhiệt độ 28 độ C.',
                             style: TextStyle(
                               color: Color(_subtitleColor),
                               fontSize: _subtitleSize.toDouble(),
@@ -586,9 +592,9 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
             const SizedBox(height: 16),
 
             // ==========================================
-            // SECTION 4: CHẨN ĐOÁN & QUẢN TRỊ HỆ THỐNG
+            // SECTION 4: CHẨN ĐOÁN & CÔNG CỤ
             // ==========================================
-            sectionHeader('CHẨN ĐOÁN & QUẢN TRỊ HỆ THỐNG', Icons.build_circle_outlined),
+            sectionHeader('CHẨN ĐOÁN & CÔNG CỤ', Icons.build_circle_outlined),
             SettingsSurfaceCard(
               child: SettingsAdaptiveGrid(
                 spacing: 12,
@@ -597,8 +603,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 maxColumns: 3,
                 children: [
                   actionCard(
-                    title: 'Thử mở Voice AI Overlay',
-                    subtitle: 'Kiểm tra giao diện sóng cực quang',
+                    title: 'Mở thử Voice Overlay',
+                    subtitle: 'Kiểm tra sóng âm',
                     icon: Icons.play_circle_outline,
                     onPressed: () async => _showResult(
                       context,
@@ -606,8 +612,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     ),
                   ),
                   actionCard(
-                    title: localizations.repairAccessibility,
-                    subtitle: 'Tự động sửa lỗi mất quyền Trợ năng',
+                    title: 'Sửa quyền Trợ năng',
+                    subtitle: 'Khôi phục dịch vụ nền',
                     icon: Icons.build_circle_outlined,
                     onPressed: () async => _showResult(
                       context,
@@ -615,8 +621,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     ),
                   ),
                   actionCard(
-                    title: localizations.openAccessibilitySettings,
-                    subtitle: 'Mở màn hình cài đặt của Android',
+                    title: 'Cài đặt Trợ năng Android',
+                    subtitle: 'Mở thiết lập hệ thống',
                     icon: Icons.settings_accessibility,
                     onPressed: () async {
                       bridgeService.openAccessibilitySettings();

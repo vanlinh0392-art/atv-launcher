@@ -5,6 +5,24 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.008 — Instant TTS Overlay Dismiss (0.5s), Dynamic TTS Voice Sync & Performance Profile Optimization
+
+### 1. Tối Ưu Phản Hồi Voice AI: Tắt Mic & Đóng Overlay Ngay Sau TTS (0.5s)
+- **Loại Bỏ Hoàn Toàn 4s Thu Âm Thừa Sau TTS**: Đóng ngay Floating Overlay và giải phóng Audio Ducking sau 500ms (0.5s) kể từ khi TTS đọc xong, không mở lại micro lắng nghe vô ích.
+- **Tiết Kiệm CPU & Socket**: Xả sạch stream lỗi `conn.getErrorStream()` để thu hồi TCP socket kết nối tức thì.
+
+### 2. Sửa Lỗi Đồng Bộ Giọng Đọc TTS & Phát Mẫu Demo Tức Thì
+- **Cập Nhật Ngay Lập Tức**: Sửa lỗi Android `MediaPlayer.setPlaybackParams` trên Android TV khi đổi giọng Nam Minh (trầm ấm) / Nữ Hoài My (ngọt ngào) / Tự động Google.
+- **Xem Trước Giọng Ngay Trong Cài Đặt**: Tự động phát âm thanh mẫu ngay khi người dùng chọn giọng mới trong Launcher Settings.
+
+### 3. Tối Giản Hóa Giao Diện & Bỏ Menu Chẩn Đoán (Bloat Reduction)
+- **Gọt Giũa Mô Tả Cài Đặt**: Rút gọn toàn bộ tiêu đề, phụ đề và mô tả trong menu Voice/Settings theo tư duy Ponytail/TV-first UI, ngắn gọn, súc tích và trực quan.
+- **Loại Bỏ Menu "Chẩn Đoán" Không Cần Thiết**: Tối ưu hóa thanh điều hướng Cài đặt, loại bỏ các mục debug thừa.
+
+### 4. Tối Ưu Hóa Toàn Diện 3 Chế Độ Hiệu Năng & Tự Động Play Video Nền
+- **Luôn Giữ Play Video Nền**: Cả 3 chế độ (Chất lượng, Cân bằng, Mượt mà) đều tự động phát lại video nền ngay lập tức khi từ app quay về Home hoặc khi khởi động TV.
+- **Tiết Kiệm CPU/RAM Tuyệt Đối**: Chế độ Cân bằng (mặc định) tắt Backdrop Blur thời gian thực và tắt Audio Decoder khi Video Mute; Chế độ Tắt hiệu ứng (yếu nhất) tắt hẳn Video nền cho TV siêu yếu.
+
 ## 2026-08-19 - Official release 2026.08.007 — Reliable Standby Wake Video Auto-Resume, Gemini Final Fallback & Multi-Layer Key Defense
 
 ### 1. Khắc Phục Triệt Để Lỗi Không Tự Play Video Nền Khi Bật TV Từ Chế Độ Ngủ (Standby Wake Fix)
