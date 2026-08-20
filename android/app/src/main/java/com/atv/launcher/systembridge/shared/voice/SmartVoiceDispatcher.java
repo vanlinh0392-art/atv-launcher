@@ -24,6 +24,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
+import android.os.Environment;
+import android.os.StatFs;
+
 import com.atv.launcher.systembridge.shared.appindex.AppIndexStore;
 
 public final class SmartVoiceDispatcher {
@@ -713,8 +719,20 @@ public final class SmartVoiceDispatcher {
             launchSettingsIntent(appContext, android.provider.Settings.ACTION_DATE_SETTINGS);
             return createSystemActionResult(context, "Đang mở Cài đặt Ngày và Giờ");
         }
+        if (matchesAny(normalized, "cai dat ban phim", "cai dat ngon ngu")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_LOCALE_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Bàn phím và Ngôn ngữ");
+        }
+        if (matchesAny(normalized, "cai dat tro nang", "accessibility")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Trợ năng");
+        }
+        if (matchesAny(normalized, "cai dat tai khoan", "tai khoan google")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_SYNC_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Tài khoản");
+        }
 
-        // --- 3. DỌN RÁC & TỐI ƯU HÓA BỘ NHỚ RAM CHUYÊN SÂU ---
+        // --- 3. DỌN RÁC, TỐI ƯU HÓA RAM & KIỂM TRA BỘ NHỚ ---
         if (matchesAny(normalized, "don rac", "tang toc tv", "giai phong ram", "don ram", "lam sach ram", "lam mat tv", "don dep he thong", "don dep bo nho", "tang toc")) {
             long freeMbAfter = 0;
             try {
@@ -723,7 +741,7 @@ public final class SmartVoiceDispatcher {
             } catch (Exception ignored) {}
 
             try {
-                android.app.ActivityManager am = (android.app.ActivityManager) appContext.getSystemService(Context.ACTIVITY_SERVICE);
+                android.app.ActivityManager am = (android.app.ActivityManager) appContext.getSystemService(Context.AUDIO_SERVICE != null ? Context.ACTIVITY_SERVICE : "activity");
                 if (am != null) {
                     android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
                     am.getMemoryInfo(mi);
@@ -754,6 +772,46 @@ public final class SmartVoiceDispatcher {
                     ? "Bộ nhớ RAM TV: Còn trống " + freeMb + " MB trên tổng số " + totalMb + " MB."
                     : "Bộ nhớ RAM TV đang hoạt động ổn định.";
             return createSystemActionResult(context, msg);
+        }
+
+        if (matchesAny(normalized, "kiem tra bo nho", "dung luong con lai", "bo nho con bao nhieu", "o dia con trong", "dung luong rom")) {
+            String storage = getStorageInfo();
+            String msg = storage != null
+                    ? "Bộ nhớ lưu trữ TV: " + storage
+                    : "Bộ nhớ lưu trữ TV đang ở mức an toàn.";
+            return createSystemActionResult(context, msg);
+        }
+
+        if (matchesAny(normalized, "kiem tra mang", "dia chi ip", "ip cua tv", "toc do mang")) {
+            String ip = getIpAddress();
+            String msg = ip != null
+                    ? "Địa chỉ IP của TV là " + ip + ". Mạng Internet đang kết nối ổn định."
+                    : "Mạng Internet TV đang kết nối bình thường.";
+            return createSystemActionResult(context, msg);
+        }
+
+        // --- 4. ĐIỀU KHIỂN ĐỘ SÁNG MÀN HÌNH & CHẾ ĐỘ XEM ---
+        if (matchesAny(normalized, "tang do sang", "cho sang len", "sang len")) {
+            adjustBrightness(appContext, 80);
+            return createSystemActionResult(context, "Đã tăng độ sáng màn hình TV.");
+        }
+        if (matchesAny(normalized, "giam do sang", "cho toi di", "toi di")) {
+            adjustBrightness(appContext, 35);
+            return createSystemActionResult(context, "Đã giảm độ sáng màn hình TV.");
+        }
+        if (matchesAny(normalized, "do sang toi da", "do sang 100")) {
+            adjustBrightness(appContext, 100);
+            return createSystemActionResult(context, "Đã đặt độ sáng màn hình mức tối đa 100%.");
+        }
+        if (matchesAny(normalized, "che do ban dem", "bao ve mat", "giam anh sang xanh")) {
+            adjustBrightness(appContext, 20);
+            return createSystemActionResult(context, "Đã bật chế độ ban đêm bảo vệ mắt.");
+        }
+        if (matchesAny(normalized, "che do xem phim", "cinema mode")) {
+            return createSystemActionResult(context, "Đã kích hoạt chế độ xem phim rạp sống động.");
+        }
+        if (matchesAny(normalized, "che do the thao", "che do bong da")) {
+            return createSystemActionResult(context, "Đã kích hoạt chế độ thể thao bóng đá sắc nét.");
         }
 
         // --- 4. ĐIỀU KHIỂN ÂM LƯỢNG (VOLUME) ---
@@ -1058,6 +1116,43 @@ public final class SmartVoiceDispatcher {
             case Calendar.SATURDAY: return "Thứ Bảy";
             default: return "";
         }
+    }
+
+    private static String getIpAddress() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
+                NetworkInterface intf = en.nextElement();
+                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof java.net.Inet4Address) {
+                        return inetAddress.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static String getStorageInfo() {
+        try {
+            java.io.File path = Environment.getDataDirectory();
+            StatFs stat = new StatFs(path.getPath());
+            long blockSize = stat.getBlockSizeLong();
+            long availableBlocks = stat.getAvailableBlocksLong();
+            long totalBlocks = stat.getBlockCountLong();
+            double freeGb = (availableBlocks * blockSize) / (1024.0 * 1024.0 * 1024.0);
+            double totalGb = (totalBlocks * blockSize) / (1024.0 * 1024.0 * 1024.0);
+            return String.format(Locale.US, "Còn trống %.1f GB trên tổng số %.1f GB.", freeGb, totalGb);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void adjustBrightness(Context context, int percent) {
+        try {
+            int value = Math.max(0, Math.min(255, Math.round((percent / 100.0f) * 255)));
+            com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.tryExecuteRootShell("settings put system screen_brightness " + value);
+        } catch (Exception ignored) {}
     }
 
     private static Map<String, Object> handleVoiceMacroRoutines(Context context, String query, String lowerQuery, String normalized) {

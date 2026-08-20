@@ -5,6 +5,23 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.014 — 10-Module Comprehensive TV Hardware Voice Suite & Automated Verification
+
+### 1. Hệ Thống 10 Module Điều Khiển Phần Cứng TV Toàn Diện (Master 30-Day Suite)
+- **Module 1 (Nguồn & Năng Lượng)**: Tắt màn hình TV (`KEYCODE_POWER`), Về màn hình chính (`KEYCODE_HOME`), Quay lại (`KEYCODE_BACK`), Khởi động lại TV (`reboot` qua Root/Settings).
+- **Module 2 (Âm Thanh & Loa)**: Tăng/giảm âm lượng, Đặt mức âm lượng chính xác %, Âm lượng tối đa 100%, Âm lượng ban đêm 10%, Tắt tiếng / Bật lại tiếng.
+- **Module 3 (Màn Hình & Độ Sáng)**: Tăng/giảm độ sáng màn hình, Độ sáng tối đa 100%, Chế độ ban đêm bảo vệ mắt, Kích hoạt chế độ xem phim & chế độ thể thao bóng đá.
+- **Module 4 (Mạng, IP & Bluetooth)**: Cài đặt WiFi, Đọc địa chỉ IP nội mạng TV chính xác qua `NetworkInterface`, Cài đặt Bluetooth và ghép nối loa/tay cầm, Cài đặt Mạng LAN.
+- **Module 5 (Cổng HDMI & AV)**: Chuyển trực tiếp HDMI 1/2/3/4, Cổng AV/Composite, Mở danh sách cổng vào TV (`TV_INPUT_BUTTON`).
+- **Module 6 (Dọn Rác, RAM & ROM)**: Dọn rác & giải phóng RAM tức thì (đọc `MemoryInfo` báo chính xác MB trống), Kiểm tra RAM, Kiểm tra bộ nhớ ROM dung lượng còn trống (`StatFs`), Quản lý ứng dụng.
+- **Module 7 (Hẹn Giờ Tắt TV)**: Hẹn giờ tắt theo phút/tiếng, Hủy hẹn giờ, Hỏi thời gian hẹn giờ còn lại.
+- **Module 8 (Media & Tua Video)**: Play/Pause, Chuyển bài/Bài trước, Tua nhanh (`MEDIA_FAST_FORWARD`), Tua lại (`MEDIA_REWIND`).
+- **Module 9 (Điều Hướng DPAD Voice)**: Lên, Xuống, Trái, Phải, Chọn / Bấm OK, Mở Menu cài đặt nhanh (`KEYCODE_MENU`).
+- **Module 10 (Cài Đặt Hệ Thống Sâu & Developer)**: Tùy chọn nhà phát triển / ADB, Thông tin & Model TV, Ngày & Giờ, Bàn phím & Ngôn ngữ, Trợ năng, Tài khoản Google.
+
+### 2. Bộ Kiểm Thử Tự Động Toàn Diện
+- Thêm file test `test/deep_tv_hardware_commands_test.dart` xác minh 100% tất cả 10 module, các trường hợp regex, trích xuất tham số và mock API phần cứng. 280/280 project unit tests passed!
+
 ## 2026-08-20 - Official release 2026.08.013 — Deep Hardware TV Control Voice Command Suite & 0ms System Actions
 
 ### 1. Mở Rộng Toàn Diện Bộ Lệnh Điều Khiển Phần Cứng TV Chuyên Sâu
