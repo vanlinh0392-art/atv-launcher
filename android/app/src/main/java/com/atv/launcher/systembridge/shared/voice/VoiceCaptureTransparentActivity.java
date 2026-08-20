@@ -184,22 +184,29 @@ public class VoiceCaptureTransparentActivity extends Activity {
         stopSpeechRecognition();
 
         try {
-            if (isFallback) {
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
-            } else {
-                android.content.ComponentName serviceComponent = new android.content.ComponentName(
+            if (!isFallback) {
+                android.content.pm.PackageManager pm = getPackageManager();
+                android.content.ComponentName katnissComp = new android.content.ComponentName(
                         "com.google.android.katniss",
                         "com.google.android.katniss.search.serviceapi.KatnissRecognitionService"
                 );
-                try {
-                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this, serviceComponent);
-                } catch (Exception e) {
-                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                Intent serviceIntent = new Intent("android.speech.RecognitionService").setComponent(katnissComp);
+                if (pm != null && !pm.queryIntentServices(serviceIntent, 0).isEmpty()) {
+                    try {
+                        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this, katnissComp);
+                        Log.i(TAG, "Using Katniss Recognition Service");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Cannot create Katniss speech recognizer", e);
+                    }
                 }
             }
-        } catch (Exception ex) {
+        } catch (Exception ignored) {
+        }
+
+        if (speechRecognizer == null) {
             try {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                Log.i(TAG, "Using default System SpeechRecognizer");
             } catch (Exception e) {
                 Log.e(TAG, "Cannot create SpeechRecognizer", e);
             }
@@ -256,15 +263,18 @@ public class VoiceCaptureTransparentActivity extends Activity {
                         error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT ||
                         error == SpeechRecognizer.ERROR_SERVER ||
                         error == SpeechRecognizer.ERROR_CLIENT ||
+                        error == SpeechRecognizer.ERROR_AUDIO ||
                         error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
                     hasRetriedRecognition = true;
-                    Log.i(TAG, "SpeechRecognizer network glitch, retrying with fallback...");
+                    Log.i(TAG, "SpeechRecognizer signal recovery (error=" + error + "), auto-reconnecting audio stream...");
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         if (!isFinishing()) {
                             updateSubtitle("Đang kết nối lại...", 0xFF00E5FF);
+                            abandonAudioDucking();
+                            requestAudioDucking();
                             startSpeechRecognitionInternal(true);
                         }
-                    }, 250);
+                    }, 200);
                     return;
                 }
 
@@ -337,12 +347,12 @@ public class VoiceCaptureTransparentActivity extends Activity {
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN");
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "vi-VN");
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
-        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3500L);
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2200L);
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L);
+        intent.putExtra("android.speech.extra.DICTATION_MODE", true);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3000L);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L);
 
         try {
             speechRecognizer.startListening(intent);
@@ -391,23 +401,50 @@ public class VoiceCaptureTransparentActivity extends Activity {
         });
     }
 
+    private Object audioFocusRequestObj;
+
     private void requestAudioDucking() {
         if (audioManager != null) {
             try {
-                audioManager.requestAudioFocus(
-                        audioFocusListener,
-                        AudioManager.STREAM_MUSIC,
-                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-                );
-            } catch (Exception ignored) {}
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    android.media.AudioAttributes playbackAttributes = new android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ASSISTANT)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build();
+                    android.media.AudioFocusRequest focusRequest = new android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                            .setAudioAttributes(playbackAttributes)
+                            .setAcceptsDelayedFocusGain(true)
+                            .setOnAudioFocusChangeListener(audioFocusListener, mainHandler)
+                            .build();
+                    audioFocusRequestObj = focusRequest;
+                    audioManager.requestAudioFocus(focusRequest);
+                } else {
+                    audioManager.requestAudioFocus(
+                            audioFocusListener,
+                            AudioManager.STREAM_MUSIC,
+                            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+                    );
+                }
+                Log.i(TAG, "Audio focus exclusive activated (background audio paused/muted)");
+            } catch (Exception e) {
+                Log.w(TAG, "Cannot request exclusive audio focus", e);
+            }
         }
     }
 
     private void abandonAudioDucking() {
         if (audioManager != null) {
             try {
-                audioManager.abandonAudioFocus(audioFocusListener);
-            } catch (Exception ignored) {}
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && audioFocusRequestObj instanceof android.media.AudioFocusRequest) {
+                    audioManager.abandonAudioFocusRequest((android.media.AudioFocusRequest) audioFocusRequestObj);
+                    audioFocusRequestObj = null;
+                } else {
+                    audioManager.abandonAudioFocus(audioFocusListener);
+                }
+                Log.i(TAG, "Audio focus abandoned, volume restored");
+            } catch (Exception e) {
+                Log.w(TAG, "Cannot abandon audio focus", e);
+            }
         }
     }
 

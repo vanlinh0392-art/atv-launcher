@@ -5,6 +5,28 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.020 — Auto APK Installer, Daily Update Toast, Voice Audio Focus Hardening & Default Art Wallpaper
+
+### 1. Tự Động Kích Hoạt Trình Cài Đặt Khi Tải Xong APK & Fallback Đa Tầng Cho Mọi Dòng TV
+- **Auto Install Upon Download**: Khi người dùng tải APK qua menu Cập nhật, tải xong sẽ tự động kích hoạt bộ cài đặt ngay lập tức mà không cần bấm thêm nút.
+- **Bộ Cài Đặt Fallback Đa Lớp**:
+  + Ưu tiên 1: Cài đặt trực tiếp ngầm không cần tương tác qua Local ADB (`pm install -r -d`).
+  + Ưu tiên 2: Tự động cấp quyền `REQUEST_INSTALL_PACKAGES` qua ADB nếu thiếu.
+  + Ưu tiên 3: Tương thích toàn diện với trình cài đặt gốc của mọi dòng Android TV (Google TV, Xiaomi MIUI TV, TCL, Sony DTV, AOSP).
+  + Ưu tiên 4: Fallback chuẩn qua `FileProvider` an toàn.
+
+### 2. Thông Báo Cập Nhật Nhẹ Nhàng 1 Lần / 24 Giờ (Anti-Spam)
+- Tự động kiểm tra phiên bản mới từ GitHub Release ngầm sau khi màn hình Home ổn định.
+- Hiển thị Toast thông báo TV nhẹ nhàng và lưu timestamp kiểm tra, cam kết **tối đa 1 lần/ngày**, không gây phiền toái.
+
+### 3. Nâng Cấp Voice AI Kháng Nhiễu Âm Thanh Ngoài (Audio Focus Hardening & Zero Signal Loss)
+- **Audio Focus Độc Quyền (`AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE`)**: Thay thế `MAY_DUCK` bằng Audio Focus độc quyền + `AudioAttributes.USAGE_ASSISTANT` (API 26+) để ép 100% ứng dụng ngoài (SmartTube, YouTube, Netflix, Zing MP3) lập tức ngắt tiếng khi bấm Voice, giúp micro TV thu âm rõ ràng 100% không bị dội âm.
+- **Tối Ưu Nhận Diện**: Bỏ cờ `EXTRA_PREFER_OFFLINE`, bật `DICTATION_MODE`, tăng silence threshold và bổ sung Auto-Recovery khi gặp `ERROR_AUDIO` hoặc `ERROR_RECOGNIZER_BUSY`.
+
+### 4. Tích Hợp Hình Nền Nghệ Thuật Mặc Định Cho TV & Fallback Khi Lỗi Video
+- Bổ sung hình nền nghệ thuật cảnh sắc Aurora huyền ảo 1080p (`assets/default_tv_wallpaper.jpg`, dung lượng nén nhẹ chỉ 223KB).
+- Tự động hiển thị làm hình nền mặc định khi vừa cài Launcher lần đầu hoặc làm lớp nền dự phòng khi video gặp sự cố.
+
 ## 2026-08-20 - Official release 2026.08.019 — Stable Single Surface Binding & Zero-Flapping ExoPlayer Pipeline
 
 ### 1. Tối Ưu Hóa Gắn Kết Surface & Ổn Định Tuyệt Đối Tuyến Giải Mã ExoPlayer

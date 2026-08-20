@@ -345,8 +345,12 @@ Widget _buildWallpaperLayer(
   required HomePerformanceProfile performanceProfile,
 }) {
   final physicalSize = MediaQuery.sizeOf(context);
-  final baseWallpaper =
-      wallpaper.wallpaperMode != 'gradient' && wallpaper.wallpaper != null
+  final baseWallpaper = wallpaper.wallpaperMode == 'gradient'
+      ? Container(
+          key: const Key('background'),
+          decoration: BoxDecoration(gradient: wallpaper.gradient),
+        )
+      : wallpaper.wallpaper != null
           ? Image(
               image: wallpaper.wallpaper!,
               key: const Key('background'),
@@ -356,9 +360,18 @@ Widget _buildWallpaperLayer(
               filterQuality: performanceProfile.wallpaperFilterQuality,
               gaplessPlayback: wallpaper.isVideoMode,
             )
-          : Container(
+          : Image.asset(
+              'assets/default_tv_wallpaper.jpg',
               key: const Key('background'),
-              decoration: BoxDecoration(gradient: wallpaper.gradient),
+              fit: BoxFit.cover,
+              height: physicalSize.height,
+              width: physicalSize.width,
+              filterQuality: performanceProfile.wallpaperFilterQuality,
+              gaplessPlayback: wallpaper.isVideoMode,
+              errorBuilder: (_, __, ___) => Container(
+                key: const Key('background'),
+                decoration: BoxDecoration(gradient: wallpaper.gradient),
+              ),
             );
 
   if (!wallpaper.isVideoMode || wallpaper.videoTextureId == null) {

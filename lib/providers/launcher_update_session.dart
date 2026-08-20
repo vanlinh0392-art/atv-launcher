@@ -4,7 +4,9 @@ import 'package:flauncher/flauncher_channel.dart';
 import 'package:flauncher/launcher_update_client.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum LauncherUpdateAbiResolutionState {
   unresolved,
@@ -369,6 +371,55 @@ class LauncherUpdateSession extends ChangeNotifier {
     }
     final sanitized = trimmed.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
     return sanitized.isEmpty ? fallback : sanitized;
+  }
+
+  static const String prefKeyLastUpdateToastAt =
+      'launcher_update_last_toast_at_ms';
+  static const String prefKeyLastNotifiedVersion =
+      'launcher_update_last_notified_tag';
+  static const int updateToastIntervalMs = 24 * 60 * 60 * 1000; // 24 hours
+
+  Future<void> checkDailyUpdateToastNotificationIfNeeded({
+    required FLauncherChannel launcherChannel,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final lastToastAt = prefs.getInt(prefKeyLastUpdateToastAt) ?? 0;
+      if (now - lastToastAt < updateToastIntervalMs && lastToastAt > 0) {
+        return;
+      }
+
+      final release = await _updateClient.fetchLatestOfficialRelease();
+      if (release == null) {
+        return;
+      }
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      final installedVersion = packageInfo.buildNumber.trim().isEmpty
+          ? packageInfo.version
+          : '${packageInfo.version}+${packageInfo.buildNumber}';
+
+      if (release.matchesInstalledVersion(installedVersion)) {
+        return;
+      }
+
+      final lastNotifiedTag = prefs.getString(prefKeyLastNotifiedVersion) ?? '';
+      if (lastNotifiedTag == release.tagName &&
+          (now - lastToastAt < updateToastIntervalMs)) {
+        return;
+      }
+
+      await prefs.setInt(prefKeyLastUpdateToastAt, now);
+      await prefs.setString(prefKeyLastNotifiedVersion, release.tagName);
+
+      final displayName = release.displayName.isNotEmpty
+          ? release.displayName
+          : release.tagName;
+      await launcherChannel.showToast(
+        '🎉 Có bản cập nhật mới: $displayName. Vào Cài đặt > Cập nhật để nâng cấp!',
+      );
+    } catch (_) {}
   }
 
   void _handleDownloadProgress(LauncherUpdateDownloadProgress progress) {

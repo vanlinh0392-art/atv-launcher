@@ -307,12 +307,19 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
 
   Future<void> _downloadLatestApk(LauncherUpdateAsset asset) async {
     final localizations = AppLocalizations.of(context)!;
+    final bridge = context.read<SystemBridgeService>();
     _requestSectionFocus(_statusFocusNode);
     await _updateSession.downloadLatestApk(asset, localizations);
     if (!mounted) {
       return;
     }
     _requestSectionFocus(_statusFocusNode);
+    if (_updateSession.downloadedApkPath != null) {
+      await _installDownloadedApk(
+        bridge: bridge,
+        openPermissionIfNeeded: true,
+      );
+    }
   }
 
   Future<void> _grantInstallerPermissionViaLocalAdb({

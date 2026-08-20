@@ -384,6 +384,15 @@ class FLauncherChannel {
         listener(eventMap);
       });
 
+  Future<void> showToast(String message) async {
+    if (message.trim().isEmpty) return;
+    try {
+      await _methodChannel.invokeMethod<bool>('showToast', <String, dynamic>{
+        'message': message,
+      });
+    } catch (_) {}
+  }
+
   Future<Map<String, dynamic>> _invokeMapMethod(String method,
       [Object? arguments]) async {
     final map = await _methodChannel.invokeMapMethod<dynamic, dynamic>(

@@ -29,6 +29,8 @@ import 'package:flauncher/providers/launcher_state.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/flauncher_channel.dart';
+import 'package:flauncher/providers/launcher_update_session.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
@@ -76,6 +78,7 @@ class _FLauncherAppState extends State<FLauncherApp>
   bool _adbOnboardingCheckScheduled = false;
   bool _adbOnboardingVisible = false;
   bool _adbOnboardingHandledThisSession = false;
+  Timer? _updateToastTimer;
 
   @override
   void initState() {
@@ -83,6 +86,16 @@ class _FLauncherAppState extends State<FLauncherApp>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshDefaultLauncherState(force: true);
+      _updateToastTimer?.cancel();
+      _updateToastTimer = Timer(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        unawaited(
+          LauncherUpdateSession.shared
+              .checkDailyUpdateToastNotificationIfNeeded(
+            launcherChannel: FLauncherChannel(),
+          ),
+        );
+      });
     });
   }
 
@@ -136,6 +149,7 @@ class _FLauncherAppState extends State<FLauncherApp>
 
   @override
   void dispose() {
+    _updateToastTimer?.cancel();
     _appInstalledSubscription?.cancel();
     _systemBridgeService?.removeListener(_handleSystemBridgeChanged);
     WidgetsBinding.instance.removeObserver(this);

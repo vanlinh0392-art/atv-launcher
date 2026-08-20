@@ -772,6 +772,13 @@ public class MainActivity extends FlutterActivity {
                             ? -1L
                             : sharedVideoWallpaperController.ensureTextureId());
             case "getDiagnosticsReport" -> result.success(SystemBridgeCoordinator.buildStatusReport(this));
+            case "showToast" -> {
+                String message = call.argument("message");
+                if (!TextUtils.isEmpty(message)) {
+                    com.atv.launcher.systembridge.shared.ui.BridgeToast.showState(this, message);
+                }
+                result.success(true);
+            }
             case "repairSharedPreferences" -> result.success(repairSharedPreferences());
             case "clearLauncherSharedPreferences" -> result.success(clearLauncherSharedPreferences());
             default -> throw new IllegalArgumentException("Unsupported method: " + call.method);
@@ -3592,26 +3599,44 @@ public class MainActivity extends FlutterActivity {
     }
 
     private boolean tryStartApkInstaller(Uri apkUri) {
-        Intent explicitInstallIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
-                .setClassName("com.android.packageinstaller", "com.android.packageinstaller.InstallStart")
-                .setDataAndType(apkUri, "application/vnd.android.package-archive")
-                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
-                .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        if (tryStartActivity(explicitInstallIntent)) {
-            return true;
-        }
+        String[][] installerComponents = new String[][]{
+                {"com.google.android.packageinstaller", "com.android.packageinstaller.PackageInstallerActivity"},
+                {"com.google.android.packageinstaller", "com.android.packageinstaller.InstallStart"},
+                {"com.android.packageinstaller", "com.android.packageinstaller.PackageInstallerActivity"},
+                {"com.android.packageinstaller", "com.android.packageinstaller.InstallStart"},
+                {"com.xiaomi.mitv.packageinstaller", "com.xiaomi.mitv.packageinstaller.PackageInstallerActivity"},
+                {"com.xiaomi.packageinstaller", "com.xiaomi.packageinstaller.PackageInstallerActivity"},
+                {"com.tcl.tv.packageinstaller", "com.tcl.tv.packageinstaller.PackageInstallerActivity"},
+                {"com.sony.dtv.packageinstaller", "com.sony.dtv.packageinstaller.PackageInstallerActivity"}
+        };
 
-        Intent explicitViewIntent = new Intent(Intent.ACTION_VIEW)
-                .setClassName("com.android.packageinstaller", "com.android.packageinstaller.InstallStart")
-                .setDataAndType(apkUri, "application/vnd.android.package-archive")
-                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
-                .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        if (tryStartActivity(explicitViewIntent)) {
-            return true;
+        for (String[] component : installerComponents) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW)
+                        .setClassName(component[0], component[1])
+                        .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                        .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                        .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                if (tryStartActivity(intent)) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+            try {
+                Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
+                        .setClassName(component[0], component[1])
+                        .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                        .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                        .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                if (tryStartActivity(intent)) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
         }
 
         Intent implicitInstallIntent = new Intent(Intent.ACTION_INSTALL_PACKAGE)
