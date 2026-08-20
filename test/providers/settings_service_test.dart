@@ -113,7 +113,7 @@ void main() async {
       );
       expect(
         settingsService.homeDockPerformanceMode,
-        SettingsService.homeDockPerformanceModeSmooth,
+        SettingsService.homeDockPerformanceModeOff,
       );
       expect(
         settingsService.homeDockRowSpacing,
@@ -270,7 +270,7 @@ void main() async {
       );
       expect(
         settingsService.homeDockPerformanceMode,
-        SettingsService.homeDockPerformanceModeSmooth,
+        SettingsService.homeDockPerformanceModeOff,
       );
       expect(
         settingsService.homeDockRowSpacing,

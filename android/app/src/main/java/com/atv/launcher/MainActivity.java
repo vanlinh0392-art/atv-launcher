@@ -214,6 +214,11 @@ public class MainActivity extends FlutterActivity {
     private static String lastBenchmarkSessionId = "";
     private static boolean lastBenchmarkAutoFocusDetail;
     private static boolean lastBenchmarkBypassSettingsSecurity;
+    private static final long SILENT_AUTO_GRANT_COOLDOWN_MS = 120_000L;
+    private static final int MAX_SILENT_AUTO_GRANT_ATTEMPTS = 3;
+    private static long lastSilentAutoGrantAtElapsedMs;
+    private static int silentAutoGrantAttemptCount;
+    private static boolean silentAutoGrantCompleted;
     private static boolean firstBridgeSnapshotLogged;
     private static boolean firstLiteBridgeStatusLogged;
     private static boolean firstFullBridgeStatusLogged;
@@ -366,24 +371,7 @@ public class MainActivity extends FlutterActivity {
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_start");
         handleForegroundWakeFallback("activity_start", returningToForeground);
         scheduleSystemEventPollingIfActive();
-
-        if (!hasPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)) {
-            boolean adbEnabled = false;
-            try {
-                adbEnabled = android.provider.Settings.Global.getInt(getContentResolver(), android.provider.Settings.Global.ADB_ENABLED, 0) == 1;
-            } catch (Exception ignored) {}
-            if (adbEnabled) {
-                android.util.Log.i("MainActivity", "WRITE_SECURE_SETTINGS is missing but ADB is enabled, running auto-grant in background...");
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(1500);
-                        grantWriteSecureSettingsWithLocalAdb();
-                    } catch (Exception e) {
-                        android.util.Log.w("MainActivity", "Auto-grant failed", e);
-                    }
-                }).start();
-            }
-        }
+        maybeTriggerSilentAutoGrant("activity_start");
     }
 
     @Override
@@ -400,6 +388,7 @@ public class MainActivity extends FlutterActivity {
         recordHomeNavigation("activity_resume");
         handleForegroundWakeFallback("activity_resume", true);
         scheduleSystemEventPollingIfActive();
+        maybeTriggerSilentAutoGrant("activity_resume");
     }
 
     @Override
@@ -506,6 +495,7 @@ public class MainActivity extends FlutterActivity {
                     if (recordWakeHomeNavigation()) {
                         emitSystemSnapshot();
                     }
+                    maybeTriggerSilentAutoGrant(action);
                 }
                 if (controller != null) {
                     if (allowWakeRearm) {
@@ -3324,6 +3314,7 @@ public class MainActivity extends FlutterActivity {
     private List<String> buildProvisioningGrantCommands() {
         List<String> commands = new ArrayList<>();
         commands.add("pm grant " + getPackageName() + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
+        commands.add("pm grant " + getPackageName() + " " + Manifest.permission.RECORD_AUDIO);
         commands.add("pm grant " + getPackageName() + " " + mediaReadPermissionName());
         if (requiresNotificationRuntimePermission()) {
             commands.add("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
@@ -3331,7 +3322,61 @@ public class MainActivity extends FlutterActivity {
         commands.add("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow");
         commands.add("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
         commands.add("appops set " + getPackageName() + " WRITE_SETTINGS allow");
+        commands.add("appops set " + getPackageName() + " GET_USAGE_STATS allow");
         return commands;
+    }
+
+    private void maybeTriggerSilentAutoGrant(String reason) {
+        if (silentAutoGrantCompleted) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (lastSilentAutoGrantAtElapsedMs > 0L && now - lastSilentAutoGrantAtElapsedMs < SILENT_AUTO_GRANT_COOLDOWN_MS) {
+            return;
+        }
+        if (silentAutoGrantAttemptCount >= MAX_SILENT_AUTO_GRANT_ATTEMPTS) {
+            return;
+        }
+
+        BACKGROUND_METHOD_EXECUTOR.execute(() -> {
+            try {
+                ProvisioningEvaluation eval = evaluateProvisioning();
+                if (!hasActionableProvisioningGaps(eval)) {
+                    silentAutoGrantCompleted = true;
+                    return;
+                }
+
+                boolean adbEnabled = readGlobalInt(Settings.Global.ADB_ENABLED, 0) == 1;
+                boolean rootAvailable = LocalAdbBridge.isRootAvailable();
+                if (!adbEnabled && !rootAvailable) {
+                    return;
+                }
+
+                lastSilentAutoGrantAtElapsedMs = SystemClock.elapsedRealtime();
+                silentAutoGrantAttemptCount++;
+                Log.i(TAG, "Attempting silent auto-grant (reason=" + reason + ", attempt=" + silentAutoGrantAttemptCount + ", root=" + rootAvailable + ", adb=" + adbEnabled + ")");
+
+                LocalAdbBridge.Result grantResult = runLocalAdbGrantBatch(buildProvisioningGrantCommands());
+                if (grantResult != null && grantResult.success) {
+                    List<String> log = new ArrayList<>();
+                    boolean writeSecureGranted = checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED;
+                    if (writeSecureGranted) {
+                        repairLauncherAccessibilityAfterProvisioning(log, "silent_auto_grant");
+                    }
+                    ProvisioningEvaluation afterEval = evaluateProvisioning();
+                    if (!hasActionableProvisioningGaps(afterEval)) {
+                        silentAutoGrantCompleted = true;
+                        silentAutoGrantAttemptCount = 0;
+                        Log.i(TAG, "Silent auto-grant succeeded and full permissions verified.");
+                        runOnUiThread(this::emitSystemSnapshot);
+                    }
+                } else {
+                    Log.w(TAG, "Silent auto-grant attempt failed: " + (grantResult == null ? "null" : grantResult.detail));
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Silent auto-grant error", e);
+            }
+        });
     }
 
     private LocalAdbBridge.Result runLocalAdbGrantBatch(List<String> shellCommands) {

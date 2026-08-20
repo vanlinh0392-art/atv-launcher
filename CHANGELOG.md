@@ -5,6 +5,22 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.009 — Multi-Layer Auto-Grant Pipeline (Root/ADB Fallback), Anti-Spam Protection & Default Off Mode
+
+### 1. Hệ Thống Tự Cấp Quyền Đa Tầng (Multi-Layer Auto-Grant Pipeline)
+- **Tầng Root Shell Fallback (`su`)**: Tự động phát hiện và thực thi qua `su -c` cho hàng triệu TV Box AOSP Trung Quốc đã root (Tanix, X96, Mecool...) mà không cần mở cổng mạng 5555.
+- **Tầng Local ADB Loopback Client (`127.0.0.1:5555`)**: Tự sinh cặp khóa RSA chuẩn, thực thi batch lệnh trong 1 round-trip socket duy nhất.
+- **Mở Rộng Quyền Đầy Đủ**: Tự động cấp thêm `RECORD_AUDIO`, `PACKAGE_USAGE_STATS` (đọc RAM Status Bar), `REQUEST_INSTALL_PACKAGES` (tự động cập nhật không cần hỏi), `SYSTEM_ALERT_WINDOW` (Floating Voice Overlay).
+
+### 2. Cơ Chế Chống Spam Tuyệt Đối (Anti-Spam & Zero-Waste Doctrine)
+- **Khóa Vĩnh Viễn Khi Đủ Quyền**: Khi hệ thống đã có đủ các quyền bắt buộc, toàn bộ tiến trình Auto-Grant ngắt hoàn toàn 100% (0% CPU/RAM).
+- **Giới Hạn Thử Tối Đa (Max 3 Retries)**: Tối đa 3 lần thử ngầm; nếu TV hiện hỏi RSA mà người dùng chưa bấm, launcher tự dừng để không spam.
+- **Giãn Cách 120s (Cooldown)**: Tối thiểu 120s giữa các lần thử ngầm khi bật TV hoặc quay lại Home.
+
+### 3. Khởi Chạy Lần Đầu & Hướng Dẫn Bật ADB
+- **Chế Độ Mặc Định "Tắt Hiệu Ứng"**: Khi cài mới lần đầu, launcher mặc định ở chế độ nhẹ nhất để chạy mượt mà ngay trên mọi thiết bị TV yếu.
+- **Onboarding Nhắc Bật ADB**: Tự động hiển thị hộp thoại hướng dẫn và dẫn thẳng vào Cài đặt nhà phát triển nếu phát hiện ADB đang tắt.
+
 ## 2026-08-20 - Official release 2026.08.008 — Instant TTS Overlay Dismiss (0.5s), Dynamic TTS Voice Sync & Performance Profile Optimization
 
 ### 1. Tối Ưu Phản Hồi Voice AI: Tắt Mic & Đóng Overlay Ngay Sau TTS (0.5s)

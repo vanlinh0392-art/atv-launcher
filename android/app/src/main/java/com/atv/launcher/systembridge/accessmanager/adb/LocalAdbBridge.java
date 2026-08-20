@@ -51,7 +51,49 @@ public final class LocalAdbBridge {
     private LocalAdbBridge() {
     }
 
+    public static boolean isRootAvailable() {
+        String[] paths = {"/system/bin/su", "/system/xbin/su", "/sbin/su", "/vendor/bin/su"};
+        for (String path : paths) {
+            try {
+                if (new File(path).exists()) return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    public static Result tryExecuteRootShell(String shellCommand) {
+        Process process = null;
+        try {
+            process = Runtime.getRuntime().exec(new String[]{"su", "-c", shellCommand});
+            StringBuilder output = new StringBuilder();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append('\n');
+                }
+            }
+            int exitCode = process.waitFor();
+            String rawOutput = output.toString().trim();
+            if (exitCode == 0) {
+                return Result.success(rawOutput.isEmpty() ? "root_ok" : rawOutput);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+        }
+        return null;
+    }
+
     public static Result executeShell(Context context, String shellCommand) {
+        if (isRootAvailable()) {
+            Result rootResult = tryExecuteRootShell(shellCommand);
+            if (rootResult != null && rootResult.success) {
+                return rootResult;
+            }
+        }
+
         File keyDir = new File(context.getFilesDir(), KEY_DIRECTORY_NAME);
         File privateKey = new File(keyDir, PRIVATE_KEY_FILE_NAME);
         File publicKey = new File(keyDir, PUBLIC_KEY_FILE_NAME);

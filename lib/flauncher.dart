@@ -898,12 +898,15 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     FocusNode current,
     List<FocusNode> nodes,
   ) {
-    if (nodes.isEmpty || !nodes.contains(current)) {
+    final activeNodes = nodes
+        .where((node) => node.context != null && node.context!.mounted)
+        .toList();
+    if (activeNodes.isEmpty || !activeNodes.contains(current)) {
       return false;
     }
 
     final searcher = NodeSearcher(direction);
-    final candidates = searcher.findCandidates(nodes, current);
+    final candidates = searcher.findCandidates(activeNodes, current);
     if (candidates.isEmpty) {
       return false;
     }
