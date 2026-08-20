@@ -225,22 +225,38 @@ public final class VideoWallpaperController {
         scheduleMultiStageWakeRecovery(reason);
     }
 
+    private final List<Runnable> pendingMultiStageRunnables = new ArrayList<>();
+
+    private void cancelPendingMultiStageWakeRecovery() {
+        for (Runnable r : pendingMultiStageRunnables) {
+            mainHandler.removeCallbacks(r);
+        }
+        pendingMultiStageRunnables.clear();
+    }
+
     private void scheduleMultiStageWakeRecovery(String reason) {
+        cancelPendingMultiStageWakeRecovery();
         long[] delays = new long[]{250L, 650L, 1200L};
         for (long delay : delays) {
-            mainHandler.postDelayed(() -> {
-                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
-                    if (player == null || !player.isPlaying()) {
-                        logWakeInfo("wallpaper_multi_stage_wake_retry delay=" + delay + "ms reason=" + reason);
-                        ensureSurface();
-                        if (player != null) {
-                            resumeExistingPlayerIfNeeded();
-                        } else {
-                            maybeStartPlayback(true, true);
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    pendingMultiStageRunnables.remove(this);
+                    if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                        if (player == null || !player.isPlaying()) {
+                            logWakeInfo("wallpaper_multi_stage_wake_retry delay=" + delay + "ms reason=" + reason);
+                            ensureSurface();
+                            if (player != null) {
+                                resumeExistingPlayerIfNeeded();
+                            } else {
+                                maybeStartPlayback(true, true);
+                            }
                         }
                     }
                 }
-            }, delay);
+            };
+            pendingMultiStageRunnables.add(r);
+            mainHandler.postDelayed(r, delay);
         }
     }
 
@@ -248,6 +264,7 @@ public final class VideoWallpaperController {
         foregroundActive = false;
         stopIntervalAdvance();
         cancelWakePlaylistRetry();
+        cancelPendingMultiStageWakeRecovery();
         if (player != null) {
             try {
                 player.pause();
@@ -485,6 +502,7 @@ public final class VideoWallpaperController {
             public void onPlaybackStateChanged(int playbackState) {
                 boolean statusChanged = setVideoReady(playbackState == Player.STATE_READY);
                 if (videoReady) {
+                    cancelPendingMultiStageWakeRecovery();
                     logPerf("time_to_video_ready", videoWarmupStartedAtNanos);
                     videoWarmupStartedAtNanos = 0L;
                     scheduleIntervalAdvance();

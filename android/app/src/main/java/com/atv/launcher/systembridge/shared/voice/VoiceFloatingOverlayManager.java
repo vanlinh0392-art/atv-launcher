@@ -453,6 +453,11 @@ public final class VoiceFloatingOverlayManager {
         if ("ai_qa".equals(type)) {
             updateSubtitle("Đang hỏi Trợ lý AI...", 0xFF7C4DFF);
             scheduleDismiss(15000L);
+        } else if (SmartVoiceDispatcher.TYPE_OPEN_APP.equals(type)
+                || SmartVoiceDispatcher.TYPE_TV_CHANNEL.equals(type)
+                || SmartVoiceDispatcher.TYPE_MEDIA_SEARCH.equals(type)) {
+            // Dismiss immediately so Xiaomi ROM does not kill launcher process with 'has system window, so kill it'
+            dismissImmediate();
         } else {
             if (!TextUtils.isEmpty(message)) {
                 updateSubtitle(message, 0xFF00E676);
@@ -506,30 +511,42 @@ public final class VoiceFloatingOverlayManager {
         }
     }
 
-    public void dismiss() {
-        mainHandler.post(() -> {
+    public void dismissImmediate() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::dismissImmediate);
+            return;
+        }
+        try {
+            VietnameseTtsEngine.getInstance(context).stop();
+        } catch (Exception ignored) {}
+        stopSpeechRecognition();
+        cancelDismissTimer();
+        if (overlayView != null) {
             try {
-                VietnameseTtsEngine.getInstance(context).stop();
-            } catch (Exception ignored) {}
-            stopSpeechRecognition();
-            cancelDismissTimer();
-            if (overlayView != null) {
+                WindowManager wm = accessibilityServiceInstance != null
+                        ? (WindowManager) accessibilityServiceInstance.getSystemService(Context.WINDOW_SERVICE)
+                        : (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+                if (wm != null) {
+                    wm.removeViewImmediate(overlayView);
+                }
+            } catch (Exception e) {
                 try {
-                    WindowManager wm = accessibilityServiceInstance != null
-                            ? (WindowManager) accessibilityServiceInstance.getSystemService(Context.WINDOW_SERVICE)
-                            : (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+                    WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
                     if (wm != null) {
                         wm.removeView(overlayView);
                     }
-                } catch (Exception ignored) {
-                }
-                overlayView = null;
-                subtitleTextView = null;
-                waveformView = null;
+                } catch (Exception ignored) {}
             }
-            abandonAudioDucking();
-            Log.i(TAG, "Floating overlay dismissed");
-        });
+            overlayView = null;
+            subtitleTextView = null;
+            waveformView = null;
+        }
+        abandonAudioDucking();
+        Log.i(TAG, "Floating overlay dismissed immediately");
+    }
+
+    public void dismiss() {
+        dismissImmediate();
     }
 
     private int dpToPx(int dp) {

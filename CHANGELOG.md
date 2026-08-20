@@ -5,6 +5,19 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.015 — Instant Overlay Dismissal & Anti-Kill Protection on App Switching
+
+### 1. Khắc Phục Triệt Để Lỗi Launcher Bị Khởi Động Lại Khi Từ App Khác Về Home
+- **Phát Hiện Nguyên Nhân Gốc (Root Cause)**: Khi mở ứng dụng khác (SmartTube, Movie, Game), Xiaomi TV Window Manager (`MitvWindowManager`) quét danh sách cửa sổ. Nếu phát hiện Launcher còn treo floating overlay (`TYPE_APPLICATION_OVERLAY`), hệ thống OEM sẽ ép buộc dừng tiến trình với thông báo `MitvWindowManager: com.atv.launcher has system window, so kill it.`. Khi người dùng bấm Home/Back quay lại Launcher, Launcher bị ép buộc cold restart từ đầu.
+- **Triển Khai `dismissImmediate()` Đồng Bộ**:
+  + Tự động gọi `dismissImmediate()` ngay lập tức khi người dùng mở ứng dụng, kênh truyền hình, hoặc kết quả tìm kiếm qua giọng nói.
+  + Thêm hook `onPause()` và `onStop()` trong `MainActivity.java` để tháo gỡ toàn bộ cửa sổ overlay tức thì trước khi nhường quyền cho ứng dụng khác.
+  + Đảm bảo Launcher ở trạng thái nền thuần túy (không có system window), không bao giờ bị Xiaomi ROM kill khi chuyển app.
+
+### 2. Tối Ưu Hóa Multi-Stage Wake & Quản Lý Alarm Trợ Năng
+- Tự động hủy bỏ các đợt `multi_stage_wake_retry` ngay khi ExoPlayer video wallpaper đạt trạng thái `STATE_READY` và đang phát, triệt tiêu hoàn toàn các lệnh MethodChannel lặp lại.
+- Chỉ kích hoạt các báo thức kiểm tra trợ năng (`WAKE_FAST`, `WAKE_MEDIUM`, `WAKE_SLOW`) khi thực sự có dịch vụ bị thiếu, chống đánh thức CPU không cần thiết.
+
 ## 2026-08-20 - Official release 2026.08.014 — 10-Module Comprehensive TV Hardware Voice Suite & Automated Verification
 
 ### 1. Hệ Thống 10 Module Điều Khiển Phần Cứng TV Toàn Diện (Master 30-Day Suite)

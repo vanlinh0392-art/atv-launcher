@@ -404,7 +404,18 @@ public class MainActivity extends FlutterActivity {
     }
 
     @Override
+    protected void onPause() {
+        try {
+            com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.getInstance(this).dismissImmediate();
+        } catch (Exception ignored) {}
+        super.onPause();
+    }
+
+    @Override
     protected void onStop() {
+        try {
+            com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.getInstance(this).dismissImmediate();
+        } catch (Exception ignored) {}
         foregroundVoiceKeyHandler.clearPendingActions();
         activityStarted = false;
         wakeRearmAllowedAfterStop = wakeRearmAllowedAfterStop

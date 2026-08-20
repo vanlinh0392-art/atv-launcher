@@ -98,6 +98,11 @@ public final class SystemBridgeCoordinator {
         if (!shouldScheduleWakeBackstop(context, reason)) {
             return;
         }
+        AccessibilityState accessibilityState = readAccessibilityState(context);
+        AccessibilityRepairPlan repairPlan = buildTargetAccessibilityState(context, accessibilityState);
+        if (repairPlan.missingBeforeIds.isEmpty()) {
+            return;
+        }
         scheduleExactHealInternal(context, WAKE_FAST_DELAY_MS, reason + "_wake_fast", ALARM_REQUEST_WAKE_FAST);
         scheduleExactHealInternal(context, WAKE_MEDIUM_DELAY_MS, reason + "_wake_medium", ALARM_REQUEST_WAKE_MEDIUM);
         scheduleExactHealInternal(context, WAKE_SLOW_DELAY_MS, reason + "_wake_slow", ALARM_REQUEST_WAKE_SLOW);

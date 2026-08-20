@@ -1,0 +1,257 @@
+﻿--------- beginning of main
+08-20 09:15:20.752 12628 12628 E om.atv.launche: Not starting debugger since process cannot load the jdwp agent.
+08-20 09:15:20.944 12628 12681 D skia    : [SkFontMgr Android Parser] /system/etc/fonts.xml:64:4: warning: 'serif-monospace' alias target not found
+08-20 09:15:20.944 12628 12681 D skia    : [SkFontMgr Android Parser] /system/etc/fonts.xml:65:4: warning: 'serif-monospace' alias target not found
+08-20 09:15:20.960 12628 12628 W om.atv.launcher: type=1400 audit(0.0:560): avc: denied { read } for name="max_map_count" dev="proc" ino=97383 scontext=u:r:untrusted_app:s0:c4,c257,c512,c768 tcontext=u:object_r:proc_max_map_count:s0 tclass=file permissive=0
+08-20 09:15:20.979 12628 12628 E gralloc : Arm Module v1.0
+08-20 09:15:20.984 12628 12628 I ConfigStore: android::hardware::configstore::V1_0::ISurfaceFlingerConfigs::hasWideColorDisplay retrieved: 0
+08-20 09:15:20.984 12628 12628 I ConfigStore: android::hardware::configstore::V1_0::ISurfaceFlingerConfigs::hasHDRDisplay retrieved: 0
+08-20 09:15:21.057 12628 12628 W FlutterEngineCxnRegstry: Attempted to register plugin (io.flutter.plugins.flutter_plugin_android_lifecycle.FlutterAndroidLifecyclePlugin@396ad31) but it was already registered with this FlutterEngine (io.flutter.embedding.engine.FlutterEngine@4d2dc16).
+08-20 09:15:21.058 12628 12628 W FlutterEngineCxnRegstry: Attempted to register plugin (io.flutter.plugins.imagepicker.ImagePickerPlugin@bda9997) but it was already registered with this FlutterEngine (io.flutter.embedding.engine.FlutterEngine@4d2dc16).
+08-20 09:15:21.058 12628 12628 W FlutterEngineCxnRegstry: Attempted to register plugin (h4.c@8a99784) but it was already registered with this FlutterEngine (io.flutter.embedding.engine.FlutterEngine@4d2dc16).
+08-20 09:15:21.058 12628 12628 W FlutterEngineCxnRegstry: Attempted to register plugin (io.flutter.plugins.pathprovider.PathProviderPlugin@77eb6d) but it was already registered with this FlutterEngine (io.flutter.embedding.engine.FlutterEngine@4d2dc16).
+08-20 09:15:21.058 12628 12628 W FlutterEngineCxnRegstry: Attempted to register plugin (io.flutter.plugins.sharedpreferences.SharedPreferencesPlugin@18a3a2) but it was already registered with this FlutterEngine (io.flutter.embedding.engine.FlutterEngine@4d2dc16).
+08-20 09:15:21.058 12628 12628 W FlutterEngineCxnRegstry: Attempted to register plugin (i4.a@da53833) but it was already registered with this FlutterEngine (io.flutter.embedding.engine.FlutterEngine@4d2dc16).
+08-20 09:15:21.091 12628 12628 D OpenGLRenderer: Skia GL Pipeline
+08-20 09:15:21.150 12628 12628 I AppIndexStore: Loaded 54 indexed apps from persistent cache
+08-20 09:15:21.152 12628 12715 I AppIndexStore: Starting full app indexing from PackageManager...
+08-20 09:15:21.221 12628 12628 I ExoPlayerImpl: Init 786e4f8 [AndroidXMedia3/1.5.1] [alita, MiTV-MFTP0, xiaomi, 28]
+08-20 09:15:21.345 12628 12628 I FLauncherPerf: wallpaper_focus_resume reason=activity_resume
+08-20 09:15:21.371 12628 12760 I FLauncherPerf: Attempting silent auto-grant (reason=activity_start, attempt=1, root=false, adb=true)
+08-20 09:15:21.388 12628 12628 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+08-20 09:15:21.412 12628 12628 I om.atv.launche: Rejecting re-init on previously-failed class java.lang.Class<androidx.window.layout.adapter.sidecar.DistinctElementSidecarCallback>: java.lang.NoClassDefFoundError: Failed resolution of: Landroidx/window/sidecar/SidecarInterface$SidecarCallback;
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.a androidx.window.layout.adapter.sidecar.b$a.b(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.b androidx.window.layout.adapter.sidecar.b$a.a(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at d3.f d3.f$a.d(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at io.flutter.embedding.android.WindowInfoRepositoryCallbackAdapterWrapper io.flutter.embedding.android.FlutterView.createWindowInfoRepo() (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void io.flutter.embedding.android.FlutterView.onAttachedToWindow() (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.View.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (View.java:18347)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3397)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.413 12628 12628 I chatty  : uid=10260(com.atv.launcher) identical 4 lines
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.performTraversals() (ViewRootImpl.java:1775)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.doTraversal() (ViewRootImpl.java:1469)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl$TraversalRunnable.run() (ViewRootImpl.java:7234)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer$CallbackRecord.run(long) (Choreographer.java:949)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doCallbacks(int, long) (Choreographer.java:761)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doFrame(long, int) (Choreographer.java:696)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer$FrameDisplayEventReceiver.run() (Choreographer.java:935)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.os.Handler.handleCallback(android.os.Message) (Handler.java:873)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.os.Handler.dispatchMessage(android.os.Message) (Handler.java:99)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.os.Looper.loop() (Looper.java:193)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.app.ActivityThread.main(java.lang.String[]) (ActivityThread.java:6677)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[]) (Method.java:-2)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run() (RuntimeInit.java:493)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void com.android.internal.os.ZygoteInit.main(java.lang.String[]) (ZygoteInit.java:881)
+08-20 09:15:21.413 12628 12628 I om.atv.launche: Caused by: java.lang.ClassNotFoundException: Didn't find class "androidx.window.sidecar.SidecarInterface$SidecarCallback" on path: DexPathList[[zip file "/data/app/com.atv.launcher-Kd60KbsoA0qIRQHQKvg6mw==/base.apk"],nativeLibraryDirectories=[/data/app/com.atv.launcher-Kd60KbsoA0qIRQHQKvg6mw==/lib/arm, /data/app/com.atv.launcher-Kd60KbsoA0qIRQHQKvg6mw==/base.apk!/lib/armeabi-v7a, /system/lib, /system/product/lib]]
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:134)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:379)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.a androidx.window.layout.adapter.sidecar.b$a.b(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.b androidx.window.layout.adapter.sidecar.b$a.a(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at d3.f d3.f$a.d(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at io.flutter.embedding.android.WindowInfoRepositoryCallbackAdapterWrapper io.flutter.embedding.android.FlutterView.createWindowInfoRepo() (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void io.flutter.embedding.android.FlutterView.onAttachedToWindow() (SourceFile:-1)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.View.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (View.java:18347)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3397)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.performTraversals() (ViewRootImpl.java:1775)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.doTraversal() (ViewRootImpl.java:1469)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl$TraversalRunnable.run() (ViewRootImpl.java:7234)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer$CallbackRecord.run(long) (Choreographer.java:949)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doCallbacks(int, long) (Choreographer.java:761)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doFrame(long, int) (Choreographer.java:696)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.view.Choreographer$FrameDisplayEventReceiver.run() (Choreographer.java:935)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.os.Handler.handleCallback(android.os.Message) (Handler.java:873)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.os.Handler.dispatchMessage(android.os.Message) (Handler.java:99)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.os.Looper.loop() (Looper.java:193)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void android.app.ActivityThread.main(java.lang.String[]) (ActivityThread.java:6677)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[]) (Method.java:-2)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run() (RuntimeInit.java:493)
+08-20 09:15:21.413 12628 12628 I om.atv.launche:   at void com.android.internal.os.ZygoteInit.main(java.lang.String[]) (ZygoteInit.java:881)
+08-20 09:15:21.413 12628 12628 I om.atv.launche: 
+08-20 09:15:21.414 12628 12628 I om.atv.launche: Rejecting re-init on previously-failed class java.lang.Class<androidx.window.layout.adapter.sidecar.DistinctElementSidecarCallback>: java.lang.NoClassDefFoundError: Failed resolution of: Landroidx/window/sidecar/SidecarInterface$SidecarCallback;
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.a androidx.window.layout.adapter.sidecar.b$a.b(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.b androidx.window.layout.adapter.sidecar.b$a.a(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at d3.f d3.f$a.d(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at io.flutter.embedding.android.WindowInfoRepositoryCallbackAdapterWrapper io.flutter.embedding.android.FlutterView.createWindowInfoRepo() (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void io.flutter.embedding.android.FlutterView.onAttachedToWindow() (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.View.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (View.java:18347)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3397)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.performTraversals() (ViewRootImpl.java:1775)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.doTraversal() (ViewRootImpl.java:1469)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl$TraversalRunnable.run() (ViewRootImpl.java:7234)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer$CallbackRecord.run(long) (Choreographer.java:949)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doCallbacks(int, long) (Choreographer.java:761)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doFrame(long, int) (Choreographer.java:696)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer$FrameDisplayEventReceiver.run() (Choreographer.java:935)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.os.Handler.handleCallback(android.os.Message) (Handler.java:873)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.os.Handler.dispatchMessage(android.os.Message) (Handler.java:99)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.os.Looper.loop() (Looper.java:193)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.app.ActivityThread.main(java.lang.String[]) (ActivityThread.java:6677)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[]) (Method.java:-2)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run() (RuntimeInit.java:493)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void com.android.internal.os.ZygoteInit.main(java.lang.String[]) (ZygoteInit.java:881)
+08-20 09:15:21.415 12628 12628 I om.atv.launche: Caused by: java.lang.ClassNotFoundException: Didn't find class "androidx.window.sidecar.SidecarInterface$SidecarCallback" on path: DexPathList[[zip file "/data/app/com.atv.launcher-Kd60KbsoA0qIRQHQKvg6mw==/base.apk"],nativeLibraryDirectories=[/data/app/com.atv.launcher-Kd60KbsoA0qIRQHQKvg6mw==/lib/arm, /data/app/com.atv.launcher-Kd60KbsoA0qIRQHQKvg6mw==/base.apk!/lib/armeabi-v7a, /system/lib, /system/product/lib]]
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:134)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:379)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.a androidx.window.layout.adapter.sidecar.b$a.b(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at androidx.window.layout.adapter.sidecar.b androidx.window.layout.adapter.sidecar.b$a.a(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at d3.f d3.f$a.d(android.content.Context) (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at io.flutter.embedding.android.WindowInfoRepositoryCallbackAdapterWrapper io.flutter.embedding.android.FlutterView.createWindowInfoRepo() (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void io.flutter.embedding.android.FlutterView.onAttachedToWindow() (SourceFile:-1)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.View.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (View.java:18347)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3397)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewGroup.dispatchAttachedToWindow(android.view.View$AttachInfo, int) (ViewGroup.java:3404)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.performTraversals() (ViewRootImpl.java:1775)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl.doTraversal() (ViewRootImpl.java:1469)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.ViewRootImpl$TraversalRunnable.run() (ViewRootImpl.java:7234)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer$CallbackRecord.run(long) (Choreographer.java:949)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doCallbacks(int, long) (Choreographer.java:761)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer.doFrame(long, int) (Choreographer.java:696)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.view.Choreographer$FrameDisplayEventReceiver.run() (Choreographer.java:935)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.os.Handler.handleCallback(android.os.Message) (Handler.java:873)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.os.Handler.dispatchMessage(android.os.Message) (Handler.java:99)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.os.Looper.loop() (Looper.java:193)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void android.app.ActivityThread.main(java.lang.String[]) (ActivityThread.java:6677)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at java.lang.Object java.lang.reflect.Method.invoke(java.lang.Object, java.lang.Object[]) (Method.java:-2)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run() (RuntimeInit.java:493)
+08-20 09:15:21.415 12628 12628 I om.atv.launche:   at void com.android.internal.os.ZygoteInit.main(java.lang.String[]) (ZygoteInit.java:881)
+08-20 09:15:21.415 12628 12628 I om.atv.launche: 
+08-20 09:15:21.479 12628 12646 I om.atv.launche: Background concurrent copying GC freed 6474(427KB) AllocSpace objects, 0(0B) LOS objects, 24% free, 2MB/3MB, paused 69us total 113.454ms
+08-20 09:15:21.487 12628 12769 I OpenGLRenderer: Initialized EGL, version 1.4
+08-20 09:15:21.488 12628 12769 D OpenGLRenderer: Swap behavior 2
+08-20 09:15:21.499 12628 12688 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+08-20 09:15:21.502 12628 12769 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+08-20 09:15:21.574 12628 12628 I SystemBridgeCore: ResidentCoreService onStartCommand: activity_start
+08-20 09:15:21.585 12628 12628 I SystemBridgeCore: ResidentCoreService onStartCommand: activity_resume
+08-20 09:15:21.712 12628 12646 I om.atv.launche: Background concurrent copying GC freed 12022(1008KB) AllocSpace objects, 4(92KB) LOS objects, 24% free, 2MB/3MB, paused 325us total 114.792ms
+08-20 09:15:21.716 12628 12746 W AudioCapabilities: Unsupported mime audio/ac3p
+08-20 09:15:21.719 12628 12746 W AudioCapabilities: Unsupported mime audio/ac4
+08-20 09:15:21.720 12628 12746 W AudioCapabilities: Unsupported mime audio/x-adpcm-ima
+08-20 09:15:21.721 12628 12746 W AudioCapabilities: Unsupported mime audio/x-adpcm-ms
+08-20 09:15:21.726 12628 12746 W AudioCapabilities: Unsupported mime audio/vnd.dra
+08-20 09:15:21.727 12628 12746 W AudioCapabilities: Unsupported mime audio/vnd.dts
+08-20 09:15:21.728 12628 12746 W AudioCapabilities: Unsupported mime audio/vnd.dts.hd
+08-20 09:15:21.728 12628 12746 W AudioCapabilities: Unsupported mime audio/vnd.dts.hd;profile=lbr
+08-20 09:15:21.734 12628 12746 W AudioCapabilities: Unsupported mime audio/mp4a-latm-hw
+08-20 09:15:21.735 12628 12746 W AudioCapabilities: Unsupported mime audio/mpeg-L1
+08-20 09:15:21.736 12628 12746 W AudioCapabilities: Unsupported mime audio/mpeg-L2
+08-20 09:15:21.741 12628 12746 W AudioCapabilities: Unsupported mime audio/passthrough
+08-20 09:15:21.754 12628 12746 W VideoCapabilities: Unsupported mime video/av01
+08-20 09:15:21.760 12628 12746 W VideoCapabilities: Unsupported mime video/av01
+08-20 09:15:21.772 12628 12746 W VideoCapabilities: Unsupported mime video/avs
+08-20 09:15:21.774 12628 12746 W VideoCapabilities: Unsupported mime video/avs2
+08-20 09:15:21.779 12628 12746 W VideoCapabilities: Unsupported mime video/dolby-vision
+08-20 09:15:21.781 12628 12746 W VideoCapabilities: Unsupported mime video/dolby-vision
+08-20 09:15:21.786 12628 12746 W VideoCapabilities: Unsupported mime video/dolby-vision
+08-20 09:15:21.790 12628 12746 W VideoCapabilities: Unsupported mime video/dolby-vision
+08-20 09:15:21.797 12628 12746 W VideoCapabilities: Unsupported mime video/dolby-vision
+08-20 09:15:21.838 12628 12746 I chatty  : uid=10260(com.atv.launcher) ExoPlayer:Playb identical 28 lines
+08-20 09:15:21.843 12628 12746 W VideoCapabilities: Unsupported mime video/dolby-vision
+08-20 09:15:21.853 12628 12746 W VideoCapabilities: Unsupported mime video/flv
+08-20 09:15:21.865 12628 12746 W VideoCapabilities: Unsupported mime video/mjpeg
+08-20 09:15:21.869 12628 12746 W VideoCapabilities: Unrecognized profile/level 0/0 for video/mpeg2
+08-20 09:15:21.869 12628 12746 W VideoCapabilities: Unrecognized profile/level 0/2 for video/mpeg2
+08-20 09:15:21.869 12628 12746 W VideoCapabilities: Unrecognized profile/level 0/3 for video/mpeg2
+08-20 09:15:21.871 12628 12746 W VideoCapabilities: Unrecognized profile/level 1/32 for video/mp4v-es
+08-20 09:15:21.871 12628 12746 I VideoCapabilities: Unsupported profile 4 for video/mp4v-es
+08-20 09:15:21.871 12628 12746 I VideoCapabilities: Unsupported profile 4 for video/mp4v-es
+08-20 09:15:21.871 12628 12746 I VideoCapabilities: Unsupported profile 8 for video/mp4v-es
+08-20 09:15:21.871 12628 12746 I VideoCapabilities: Unsupported profile 8 for video/mp4v-es
+08-20 09:15:21.871 12628 12746 I VideoCapabilities: Unsupported profile 1024 for video/mp4v-es
+08-20 09:15:21.871 12628 12746 I VideoCapabilities: Unsupported profile 1024 for video/mp4v-es
+08-20 09:15:21.877 12628 12746 W VideoCapabilities: Unsupported mime video/VC1
+08-20 09:15:21.894 12628 12746 W VideoCapabilities: Unsupported mime video/x-ms-wmv
+08-20 09:15:21.905 12628 12746 I VideoCapabilities: Unsupported profile 4 for video/mp4v-es
+08-20 09:15:21.911 12628 12628 I FLauncherPerf: wallpaper_focus_resume reason=window_focus_gained
+08-20 09:15:21.968 12628 12889 I OMXClient: IOmx service obtained
+08-20 09:15:21.975 12628 12888 D SurfaceUtils: connecting to surface 0xc8cef808, reason connectToSurface
+08-20 09:15:21.975 12628 12888 I MediaCodec: [OMX.MS.AVC.Decoder] setting surface generation to 12931073
+08-20 09:15:21.975 12628 12888 D SurfaceUtils: disconnecting from surface 0xc8cef808, reason connectToSurface(reconnect)
+08-20 09:15:21.975 12628 12888 D SurfaceUtils: connecting to surface 0xc8cef808, reason connectToSurface(reconnect)
+08-20 09:15:21.981 12628 12889 E ACodec  : [OMX.MS.AVC.Decoder] setPortMode on output to DynamicANWBuffer failed w/ err -1010
+08-20 09:15:21.989 12628 12889 I ACodec  : codec does not support config priority (err -2147483648)
+08-20 09:15:21.989 12628 12889 I ACodec  : codec does not support config operating rate (err -2147483648)
+08-20 09:15:21.997 12628 12628 I FLauncherPerf: wallpaper_multi_stage_wake_retry delay=250ms reason=activity_resume
+08-20 09:15:22.027 12628 12889 D ACodec  : set uasge Now is SW Render
+08-20 09:15:22.027 12628 12889 D ACodec  : OMX set planer, change to SW Render
+08-20 09:15:22.027 12628 12889 D SurfaceUtils: disconnecting from surface 0xc8cef808, reason setNativeWindowSizeFormatAndUsage
+08-20 09:15:22.027 12628 12889 D SurfaceUtils: connecting to surface 0xc8cef808, reason setNativeWindowSizeFormatAndUsage
+08-20 09:15:22.027 12628 12889 D SurfaceUtils: set up nativeWindow 0xc8cef808 for 1920x1080, color 0x13, rotation 0, usage 0x2930
+08-20 09:15:22.028 12628 12889 W ACodec  : [OMX.MS.AVC.Decoder] setting nBufferCountActual to 12 failed: -22
+08-20 09:15:22.028 12628 12889 W ACodec  : [OMX.MS.AVC.Decoder] setting nBufferCountActual to 11 failed: -22
+08-20 09:15:22.028 12628 12889 W ACodec  : [OMX.MS.AVC.Decoder] setting nBufferCountActual to 10 failed: -22
+08-20 09:15:22.053 12628 12628 W om.atv.launche: Unknown chunk type '200'.
+08-20 09:15:22.053 12628 12628 W om.atv.launche: Unknown chunk type '200'.
+08-20 09:15:22.054 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.068 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.072 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.100 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.111 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.138 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.143 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.146 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.159 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.161 12628 12628 I FLauncherPerf: wallpaper_multi_stage_wake_retry delay=650ms reason=activity_resume
+08-20 09:15:22.169 12628 12628 I FLauncherPerf: wallpaper_multi_stage_wake_retry delay=250ms reason=window_focus_gained
+08-20 09:15:22.184 12628 12889 D ACodec  : set uasge Now is SW Render
+08-20 09:15:22.185 12628 12889 D ACodec  : OMX set planer, change to SW Render
+08-20 09:15:22.185 12628 12889 D SurfaceUtils: disconnecting from surface 0xc8cef808, reason setNativeWindowSizeFormatAndUsage
+08-20 09:15:22.190 12628 12889 D SurfaceUtils: connecting to surface 0xc8cef808, reason setNativeWindowSizeFormatAndUsage
+08-20 09:15:22.190 12628 12889 D SurfaceUtils: set up nativeWindow 0xc8cef808 for 1920x1088, color 0x13, rotation 0, usage 0x2930
+08-20 09:15:22.191 12628 12889 W ACodec  : [OMX.MS.AVC.Decoder] setting nBufferCountActual to 12 failed: -22
+08-20 09:15:22.192 12628 12889 W ACodec  : [OMX.MS.AVC.Decoder] setting nBufferCountActual to 11 failed: -22
+08-20 09:15:22.192 12628 12889 W ACodec  : [OMX.MS.AVC.Decoder] setting nBufferCountActual to 10 failed: -22
+08-20 09:15:22.192 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.197 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.201 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.205 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.218 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.222 12628 12687 I flutter : FLauncherRuntime wallpaper_home_recovery reason=activity_resume mode=smooth
+08-20 09:15:22.239 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.245 12628 12715 I AppIndexStore: Synced and persisted 54 apps into AppIndexStore in 1093ms
+08-20 09:15:22.246 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.253 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.280 12628 12889 W         : buffer descriptor with invalid usage bits 0x2000
+08-20 09:15:22.296 12628 12646 I om.atv.launche: Background concurrent copying GC freed 8959(644KB) AllocSpace objects, 3(124KB) LOS objects, 24% free, 4MB/5MB, paused 82us total 149.059ms
+08-20 09:15:22.477 12628 12628 I VoiceBridge: connected process=com.atv.launcher key=0 mode=2
+08-20 09:15:22.477 12628 12628 I VoiceFloatingOverlay: setAccessibilityService: true
+08-20 09:15:22.887 12628 12628 I SystemBridgeCore: ResidentCoreService onStartCommand: accessibility_connected
+08-20 09:15:22.895 12628 12646 I om.atv.launche: Background concurrent copying GC freed 13064(881KB) AllocSpace objects, 7(204KB) LOS objects, 25% free, 5MB/7MB, paused 558us total 422.040ms
+08-20 09:15:23.013 12628 12760 I FLauncherPerf: Silent auto-grant succeeded and full permissions verified.
+08-20 09:15:23.142 12628 12687 I flutter : FLauncherRuntime wallpaper_home_recovery reason=activity_resume mode=smooth
+08-20 09:15:23.314 12628 12646 I om.atv.launche: Background concurrent copying GC freed 23963(1569KB) AllocSpace objects, 20(744KB) LOS objects, 24% free, 5MB/7MB, paused 208us total 261.049ms
+08-20 09:15:23.574 12628 12646 I om.atv.launche: Background concurrent copying GC freed 5816(590KB) AllocSpace objects, 4(80KB) LOS objects, 25% free, 7MB/10MB, paused 773us total 112.421ms
+08-20 09:15:23.812 12628 12687 I flutter : FLauncherRuntime wallpaper_home_recovery reason=activity_resume mode=smooth
+08-20 09:15:23.961 12628 12646 I om.atv.launche: Background concurrent copying GC freed 7672(610KB) AllocSpace objects, 3(52KB) LOS objects, 25% free, 10MB/14MB, paused 416us total 221.766ms
+08-20 09:15:24.145 12628 12628 I SystemBridgeCore: ResidentCoreService onStartCommand: accessibility_connected_wake_fast
+08-20 09:15:24.399 12628 12646 I om.atv.launche: Background concurrent copying GC freed 19268(1593KB) AllocSpace objects, 20(524KB) LOS objects, 25% free, 13MB/18MB, paused 94us total 129.606ms
+08-20 09:15:26.819 12628 14102 D ProfileInstaller: Skipping profile installation for com.atv.launcher
+08-20 09:15:31.641 12628 12646 I om.atv.launche: Background concurrent copying GC freed 11492(4MB) AllocSpace objects, 3(72KB) LOS objects, 25% free, 17MB/23MB, paused 80us total 159.966ms
+08-20 09:15:37.045 12628 12628 I VoiceBridge: accessibility ignored_key code=21 target=0
+08-20 09:15:37.056 12628 12628 I LauncherVoiceKey: foreground ignored_key code=21 target=0
+08-20 09:15:37.505 12628 12628 I SystemBridgeCore: ResidentCoreService onStartCommand: accessibility_connected_wake_medium
+08-20 09:15:37.657 12628 12628 I VoiceBridge: accessibility ignored_key code=22 target=0
+08-20 09:15:37.661 12628 12628 I LauncherVoiceKey: foreground ignored_key code=22 target=0
+08-20 09:15:37.714 12628 12628 W om.atv.launche: Unknown chunk type '200'.
+08-20 09:15:37.714 12628 12628 W om.atv.launche: Unknown chunk type '200'.
+08-20 09:15:40.038 12628 12628 I VoiceBridge: accessibility ignored_key code=19 target=0
+08-20 09:15:40.046 12628 12628 I LauncherVoiceKey: foreground ignored_key code=19 target=0
+08-20 09:15:40.877 12628 12628 I VoiceBridge: accessibility ignored_key code=22 target=0
+08-20 09:15:40.882 12628 12628 I LauncherVoiceKey: foreground ignored_key code=22 target=0
+08-20 09:15:41.099 12628 12628 I VoiceBridge: accessibility ignored_key code=22 target=0
+08-20 09:15:41.103 12628 12628 I LauncherVoiceKey: foreground ignored_key code=22 target=0
+08-20 09:15:41.318 12628 12628 I VoiceBridge: accessibility ignored_key code=22 target=0
+08-20 09:15:41.322 12628 12628 I LauncherVoiceKey: foreground ignored_key code=22 target=0
+08-20 09:15:41.615 12628 12628 I VoiceBridge: accessibility ignored_key code=22 target=0
+08-20 09:15:41.630 12628 12628 I LauncherVoiceKey: foreground ignored_key code=22 target=0
+08-20 09:15:41.958 12628 12628 I VoiceBridge: accessibility ignored_key code=23 target=0
+08-20 09:15:41.966 12628 12628 I LauncherVoiceKey: foreground ignored_key code=23 target=0
+
