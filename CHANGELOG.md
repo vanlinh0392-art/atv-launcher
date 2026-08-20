@@ -5,6 +5,13 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.019 — Stable Single Surface Binding & Zero-Flapping ExoPlayer Pipeline
+
+### 1. Tối Ưu Hóa Gắn Kết Surface & Ổn Định Tuyệt Đối Tuyến Giải Mã ExoPlayer
+- **Loại Bỏ Hiện Tượng Tranh Chấp & Chớp Surface (Surface Flapping)**:
+  + Trước đây `ensureSurface()` và `resumeExistingPlayerIfNeeded()` liên tục gọi `player.clearVideoSurface()` và `player.setVideoSurface(surface)` lặp lại mỗi khi Activity thay đổi trạng thái, làm MediaCodec phải hủy và khởi tạo lại pipeline 6 lần trong 30ms.
+  + **Giải pháp**: Chỉ gắn `player.setVideoSurface(surface)` duy nhất một lần khi Surface vừa được tạo/tái tạo, giữ nguyên kết nối ổn định khi video đang phát.
+
 ## 2026-08-20 - Official release 2026.08.018 — Instant Background Player Release & Codec Self-Recovery on Home Re-entry
 
 ### 1. Khắc Phục Lỗi Video Nền Không Phát Lại Khi Từ App Khác (SmartTube/Phim) Quay Về Home

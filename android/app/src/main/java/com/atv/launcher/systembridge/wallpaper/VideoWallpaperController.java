@@ -716,12 +716,11 @@ public final class VideoWallpaperController {
             }
             surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
             surface = new Surface(surfaceTextureEntry.surfaceTexture());
-        }
-        if (player != null) {
-            try {
-                player.clearVideoSurface();
-                player.setVideoSurface(surface);
-            } catch (Exception ignored) {
+            if (player != null) {
+                try {
+                    player.setVideoSurface(surface);
+                } catch (Exception ignored) {
+                }
             }
         }
     }
@@ -736,12 +735,6 @@ public final class VideoWallpaperController {
             return;
         }
         ensureSurface();
-        if (surface != null && surface.isValid()) {
-            try {
-                player.clearVideoSurface();
-                player.setVideoSurface(surface);
-            } catch (Exception ignored) {}
-        }
         int playbackState = player.getPlaybackState();
         if (playbackState == Player.STATE_IDLE) {
             player.prepare();
