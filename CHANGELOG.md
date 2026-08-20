@@ -5,6 +5,16 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.021 — Fix Toast Version Comparison & Eliminate Video Wallpaper Buffering Flickering
+
+### 1. Sửa Lỗi Toast Cập Nhật Tự Động & So Sánh Phiên Bản Chuẩn Xác
+- **Sửa Lỗi Logic So Sánh Phiên Bản**: Bổ sung hàm `isNewerThanInstalled(installedVersion)`. Toast chỉ hiển thị khi phiên bản trên GitHub **thực sự lớn hơn** phiên bản đang cài đặt trên TV (`compareVersion > 0`). Loại bỏ hoàn toàn trường hợp TV đang cài bản mới nhất (hoặc bản build cục bộ cao hơn) mà vẫn nhận được Toast.
+
+### 2. Loại Bỏ Hoàn Toàn Hiện Tượng Video Nền Nhấp Nháy Về Ảnh Nền Khi Đang Phát
+- **Khắc Phục Trạng Thái `STATE_BUFFERING`**: Trước đây `setVideoReady(playbackState == Player.STATE_READY)` làm `videoReady` bị rớt về `false` mỗi khi video nạp đệm (buffering) vài chục mili-giây hoặc khi lặp bài (looping/seeking), khiến màn hình bị giật về ảnh nền rồi nhảy lại video.
+- **Tối Ưu Hóa Render Frame**: Giữ `videoReady = true` xuyên suốt quá trình phát, kích hoạt ngay khi `onRenderedFirstFrame()` xuất hiện. Video phát mượt mà 100% không còn hiện tượng chớp tắt.
+- **Giải Phóng Bộ Giải Mã Trên `onPause()`**: Giải phóng `MediaCodec` ngay tại `onPause()` (khi vừa bấm mở app ngoài), triệt tiêu hoàn toàn xung đột phần cứng `omxError 0x80001013`.
+
 ## 2026-08-20 - Official release 2026.08.020 — Auto APK Installer, Daily Update Toast, Voice Audio Focus Hardening & Default Art Wallpaper
 
 ### 1. Tự Động Kích Hoạt Trình Cài Đặt Khi Tải Xong APK & Fallback Đa Tầng Cho Mọi Dòng TV

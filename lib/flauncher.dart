@@ -393,8 +393,8 @@ Widget _buildWallpaperLayer(
     child: FittedBox(
       fit: _videoBoxFit(wallpaper.videoFit),
       child: SizedBox(
-        width: wallpaperStatus.videoWidth,
-        height: wallpaperStatus.videoHeight,
+        width: wallpaperStatus.videoWidth > 0 ? wallpaperStatus.videoWidth : physicalSize.width,
+        height: wallpaperStatus.videoHeight > 0 ? wallpaperStatus.videoHeight : physicalSize.height,
         child: Texture(textureId: wallpaper.videoTextureId!),
       ),
     ),

@@ -271,6 +271,15 @@ public final class VideoWallpaperController {
         }
     }
 
+    public void onPause() {
+        foregroundActive = false;
+        stopIntervalAdvance();
+        cancelWakePlaylistRetry();
+        cancelPendingMultiStageWakeRecovery();
+        mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        releasePlayer();
+    }
+
     public void onStop() {
         foregroundActive = false;
         stopIntervalAdvance();
@@ -500,13 +509,21 @@ public final class VideoWallpaperController {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
-                boolean statusChanged = setVideoReady(playbackState == Player.STATE_READY);
-                if (videoReady) {
+                if (playbackState == Player.STATE_READY) {
+                    boolean statusChanged = setVideoReady(true);
                     cancelPendingMultiStageWakeRecovery();
                     logPerf("time_to_video_ready", videoWarmupStartedAtNanos);
                     videoWarmupStartedAtNanos = 0L;
                     scheduleIntervalAdvance();
+                    notifyStatusChangedIf(statusChanged);
+                } else if (playbackState == Player.STATE_ENDED) {
+                    scheduleIntervalAdvance();
                 }
+            }
+
+            @Override
+            public void onRenderedFirstFrame() {
+                boolean statusChanged = setVideoReady(true);
                 notifyStatusChangedIf(statusChanged);
             }
 

@@ -400,7 +400,7 @@ class LauncherUpdateSession extends ChangeNotifier {
           ? packageInfo.version
           : '${packageInfo.version}+${packageInfo.buildNumber}';
 
-      if (release.matchesInstalledVersion(installedVersion)) {
+      if (!release.isNewerThanInstalled(installedVersion)) {
         return;
       }
 

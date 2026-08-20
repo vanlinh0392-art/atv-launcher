@@ -408,6 +408,9 @@ public class MainActivity extends FlutterActivity {
         try {
             com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.getInstance(this).dismissImmediate();
         } catch (Exception ignored) {}
+        if (sharedVideoWallpaperController != null) {
+            sharedVideoWallpaperController.onPause();
+        }
         super.onPause();
     }
 

@@ -329,6 +329,30 @@ class LauncherUpdateRelease {
     return false;
   }
 
+  bool isNewerThanInstalled(String installedVersion) {
+    if (matchesInstalledVersion(installedVersion)) {
+      return false;
+    }
+    final releaseSortKey = _versionSortKey;
+    final installedSortKey = normalizeVersionToken(installedVersion);
+    if (releaseSortKey.isEmpty || installedSortKey.isEmpty) {
+      return false;
+    }
+    final releaseParts = _parseVersionParts(releaseSortKey);
+    final installedParts = _parseVersionParts(installedSortKey);
+    final maxLength = releaseParts.length > installedParts.length
+        ? releaseParts.length
+        : installedParts.length;
+    for (var index = 0; index < maxLength; index += 1) {
+      final rVal = index < releaseParts.length ? releaseParts[index] : 0;
+      final iVal = index < installedParts.length ? installedParts[index] : 0;
+      if (rVal != iVal) {
+        return rVal > iVal;
+      }
+    }
+    return false;
+  }
+
   static LauncherUpdateRelease? pickLatestOfficialRelease(
     Iterable<LauncherUpdateRelease> releases,
   ) {

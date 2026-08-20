@@ -355,6 +355,34 @@ void main() {
       expect(release.matchesInstalledVersion('2025.01.002+1'), isFalse);
     });
 
+    test('isNewerThanInstalled compares semantic release numbers accurately', () {
+      final release019 = LauncherUpdateRelease.fromGitHubJson({
+        'tag_name': 'v2026.08.019-release',
+        'name': 'ATV Launcher v2026.08.019',
+        'html_url': 'https://example.com',
+        'published_at': '2026-08-19T10:00:00Z',
+        'body': officialMarker,
+        'assets': [
+          {
+            'name': 'atv-launcher-armeabi-v7a-release.apk',
+            'browser_download_url': 'https://example.com/release.apk',
+            'size': 456,
+            'download_count': 10,
+            'content_type': 'application/vnd.android.package-archive',
+          },
+        ],
+      });
+
+      // Older installed version -> update available
+      expect(release019.isNewerThanInstalled('2026.08.018+55'), isTrue);
+
+      // Same installed version -> no update
+      expect(release019.isNewerThanInstalled('2026.08.019+56'), isFalse);
+
+      // Newer installed local build -> no update
+      expect(release019.isNewerThanInstalled('2026.08.020+57'), isFalse);
+    });
+
     test('does not treat legacy unmarked releases as official', () {
       final release = LauncherUpdateRelease.fromGitHubJson({
         'tag_name': 'v2026.04.30-release',
