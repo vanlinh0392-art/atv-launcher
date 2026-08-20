@@ -174,7 +174,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _fLauncherChannel.setWallpaperMode(wallpaperMode);
     if (_canActivateVideoWallpaper) {
       if (_shouldDelayVideoUntilHomeSettles) {
-        _markVideoNeedsWarmUp(clearTexture: true);
+        _markVideoNeedsWarmUp(clearTexture: false);
         await syncVideoOptionsToNative(notifyFlutter: false);
         return;
       }
@@ -444,7 +444,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _settingsService.setVideoWallpaperFolderName(folderName);
     await _fLauncherChannel.setWallpaperMode('video');
     await _reloadPreviewImage();
-    _markVideoNeedsWarmUp(clearTexture: _shouldDelayVideoUntilHomeSettles);
+    _markVideoNeedsWarmUp(clearTexture: false);
     await _warmUpVideoControllerForCurrentMode(allowDeferred: true);
   }
 
@@ -712,7 +712,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       _videoNeedsForegroundRearm = true;
     }
     if (_shouldReleasePlayerOnBackground && _canActivateVideoWallpaper) {
-      _markVideoNeedsWarmUp(clearTexture: true);
+      _markVideoNeedsWarmUp(clearTexture: false);
     }
   }
 
@@ -851,7 +851,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _fLauncherChannel.setWallpaperMode('video');
     await _reloadPreviewImage();
     _markVideoNeedsWarmUp(
-      clearTexture: _shouldDelayVideoUntilHomeSettles,
+      clearTexture: false,
       notify: false,
     );
     await _warmUpVideoControllerForCurrentMode(allowDeferred: true);

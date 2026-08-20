@@ -402,7 +402,7 @@ void main() {
 
     service.didChangeAppLifecycleState(AppLifecycleState.paused);
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(service.videoTextureId, isNull);
+    expect(service.videoTextureId, 47);
 
     service.didChangeAppLifecycleState(AppLifecycleState.resumed);
     await Future<void>.delayed(const Duration(milliseconds: 100));

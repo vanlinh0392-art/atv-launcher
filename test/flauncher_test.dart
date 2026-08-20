@@ -251,7 +251,7 @@ void main() {
       wallpaperMode: 'video',
       wallpaper: MemoryImage(Uint8List.fromList(kTransparentImage)),
       isVideoMode: true,
-      videoTextureId: 7,
+      videoTextureId: null,
     );
     when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{
       'videoReady': false,

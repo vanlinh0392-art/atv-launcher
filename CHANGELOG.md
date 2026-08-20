@@ -5,6 +5,13 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.023 — Fix Video Texture Invalidation On DPAD Movement & Status Bar Traversal
+
+### 1. Khắc Phục Triệt Để Hiện Tượng Chớp Ảnh Nền Khi Di Chuyển DPAD & Lên Status Bar
+- **Bảo Vệ Video Texture ID Cố Định**: Trước đây trong `WallpaperService`, các hàm `restoreFromSettings()`, `_handleAppBackgrounded()`, `_applyVideoSelection()` gọi `_markVideoNeedsWarmUp(clearTexture: true)`. Việc xóa `_videoTextureId = null` làm Flutter gỡ bỏ Texture và vẽ ảnh nền mặc định trong thời gian chờ nạp video, gây hiện tượng giật chớp ảnh nền khi điều hướng DPAD hoặc khi focus lên thanh trạng thái.
+- **Giữ Trọn Vẹn Texture Suốt Vòng Đời**: `_videoTextureId` luôn được duy trì cố định và liên tục trong suốt chế độ Video Mode.
+- **Trong Suốt 100% Cho FocusAwareAppBar**: Đặt tường minh `backgroundColor: Colors.transparent`, `surfaceTintColor: Colors.transparent`, `shadowColor: Colors.transparent` và `elevation: 0` trên `AppBar` để loại bỏ bất kỳ vùng vẽ đè nào khi focus lên thanh trạng thái.
+
 ## 2026-08-20 - Official release 2026.08.022 — Zero-Flash Video Wallpaper Transitions Across All Performance Modes
 
 ### 1. Triệt Tiêu 100% Hiện Tượng Chớp Ảnh Nền Khi Mở & Quay Về Từ App Khác

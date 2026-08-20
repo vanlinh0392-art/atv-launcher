@@ -113,6 +113,10 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
         },
         child: AppBar(
           automaticallyImplyLeading: false,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          elevation: 0,
           leadingWidth: showRam
               ? (isCompact
                   ? _statusBarRamChipLeadingWidthCompact
