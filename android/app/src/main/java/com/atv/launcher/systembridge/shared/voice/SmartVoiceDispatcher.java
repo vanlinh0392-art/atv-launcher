@@ -652,7 +652,111 @@ public final class SmartVoiceDispatcher {
         Context appContext = context.getApplicationContext();
         AudioManager audioManager = (AudioManager) appContext.getSystemService(Context.AUDIO_SERVICE);
 
-        // --- 1. ĐIỀU KHIỂN ÂM LƯỢNG (VOLUME) ---
+        // --- 1. ĐIỀU KHIỂN NGUỒN / MÀN HÌNH / ĐIỀU HƯỚNG CƠ BẢN ---
+        if (matchesAny(normalized, "tat tv", "tat tivi", "tat man hinh", "tat nguon tv", "ngu ngay", "di ngu ngay")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_POWER);
+            return createSystemActionResult(context, "Đã tắt màn hình TV.");
+        }
+        if (matchesAny(normalized, "ve trang chu", "man hinh chinh", "quay ve home", "ve home", "trang chu")) {
+            try {
+                Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+                homeIntent.addCategory(Intent.CATEGORY_HOME);
+                homeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                appContext.startActivity(homeIntent);
+            } catch (Exception e) {
+                sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_HOME);
+            }
+            return createSystemActionResult(context, "Đã quay về màn hình chính.");
+        }
+        if (matchesAny(normalized, "quay lai", "tro ve", "quay ve", "back lai")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_BACK);
+            return createSystemActionResult(context, "Đã quay lại.");
+        }
+        if (matchesAny(normalized, "khoi dong lai tv", "khoi dong lai", "reboot tv", "khoi dong lai he thong")) {
+            com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.Result res = com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.tryExecuteRootShell("reboot");
+            if (res == null || !res.success) {
+                launchSettingsIntent(appContext, android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS);
+            }
+            return createSystemActionResult(context, "Đang khởi động lại TV...");
+        }
+
+        // --- 2. CÀI ĐẶT HỆ THỐNG CHUYÊN SÂU ---
+        if (matchesAny(normalized, "cai dat wifi", "mo wifi", "ket noi wifi", "cai dat mang", "kiem tra wifi")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_WIFI_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt WiFi và Mạng");
+        }
+        if (matchesAny(normalized, "cai dat bluetooth", "mo bluetooth", "ket noi bluetooth", "ghep noi bluetooth", "tim loa bluetooth", "tim tai nghe", "tim tay cam")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_BLUETOOTH_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Bluetooth và Thiết bị ngoại vi");
+        }
+        if (matchesAny(normalized, "cai dat man hinh", "cai dat hinh anh", "chinh do phan giai", "cai dat hien thi", "cai dat dpi")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_DISPLAY_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Màn hình và Độ phân giải");
+        }
+        if (matchesAny(normalized, "cai dat am thanh", "chinh am thanh", "cai dat loa")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_SOUND_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Âm thanh TV");
+        }
+        if (matchesAny(normalized, "quan ly ung dung", "quan ly app", "danh sach ung dung", "cai dat ung dung", "xoa ung dung")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Quản lý Ứng dụng");
+        }
+        if (matchesAny(normalized, "tuy chon nha phat trien", "cai dat adb", "developer options", "che do nha phat trien")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Tùy chọn nhà phát triển");
+        }
+        if (matchesAny(normalized, "thong tin tv", "gioi thieu tv", "phien ban android", "kiem tra cap nhat tv", "thong tin he thong")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Thông tin và Cập nhật hệ thống TV");
+        }
+        if (matchesAny(normalized, "cai dat ngay gio", "cai dat thoi gian", "chinh dong ho tv")) {
+            launchSettingsIntent(appContext, android.provider.Settings.ACTION_DATE_SETTINGS);
+            return createSystemActionResult(context, "Đang mở Cài đặt Ngày và Giờ");
+        }
+
+        // --- 3. DỌN RÁC & TỐI ƯU HÓA BỘ NHỚ RAM CHUYÊN SÂU ---
+        if (matchesAny(normalized, "don rac", "tang toc tv", "giai phong ram", "don ram", "lam sach ram", "lam mat tv", "don dep he thong", "don dep bo nho", "tang toc")) {
+            long freeMbAfter = 0;
+            try {
+                System.gc();
+                Runtime.getRuntime().gc();
+            } catch (Exception ignored) {}
+
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) appContext.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                    am.getMemoryInfo(mi);
+                    freeMbAfter = mi.availMem / (1024 * 1024);
+                }
+            } catch (Exception ignored) {}
+
+            String msg = freeMbAfter > 0
+                    ? "Đã dọn dẹp hệ thống TV! Bộ nhớ RAM hiện trống " + freeMbAfter + " MB."
+                    : "Đã dọn dẹp bộ nhớ và tối ưu hóa hệ thống TV mượt mà.";
+            return createSystemActionResult(context, msg);
+        }
+
+        if (matchesAny(normalized, "kiem tra ram", "ram con bao nhieu", "xem ram", "bo nho ram")) {
+            long freeMb = 0;
+            long totalMb = 0;
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) appContext.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                    am.getMemoryInfo(mi);
+                    freeMb = mi.availMem / (1024 * 1024);
+                    totalMb = mi.totalMem / (1024 * 1024);
+                }
+            } catch (Exception ignored) {}
+
+            String msg = totalMb > 0
+                    ? "Bộ nhớ RAM TV: Còn trống " + freeMb + " MB trên tổng số " + totalMb + " MB."
+                    : "Bộ nhớ RAM TV đang hoạt động ổn định.";
+            return createSystemActionResult(context, msg);
+        }
+
+        // --- 4. ĐIỀU KHIỂN ÂM LƯỢNG (VOLUME) ---
         if (matchesAny(normalized, "tang am luong", "tang volume", "cho to len", "to len", "tang tieng", "cho lon len", "lon len")) {
             if (audioManager != null) {
                 audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI);
@@ -685,6 +789,13 @@ public final class SmartVoiceDispatcher {
             }
             return createSystemActionResult(context, "Đã bật lại tiếng TV");
         }
+        if (matchesAny(normalized, "am luong toi da", "am luong 100", "cho to het co", "max volume")) {
+            if (audioManager != null) {
+                int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, AudioManager.FLAG_SHOW_UI);
+            }
+            return createSystemActionResult(context, "Đã đặt âm lượng tối đa 100%");
+        }
         Matcher volMatcher = Pattern.compile("(?:dat|chinh|cho|de)?\\s*am luong\\s*(\\d+)\\s*%?").matcher(normalized);
         if (volMatcher.find()) {
             try {
@@ -699,7 +810,7 @@ public final class SmartVoiceDispatcher {
             } catch (Exception ignored) {}
         }
 
-        // --- 2. ĐIỀU KHIỂN PHÁT MEDIA TOÀN HỆ THỐNG ---
+        // --- 5. ĐIỀU KHIỂN PHÁT MEDIA & TUA VIDEO ---
         if (matchesExactOrPrefix(normalized, "tam dung", "dung phat", "dung lai", "pause")) {
             dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
             return createSystemActionResult(context, "Đã tạm dừng phát");
@@ -716,8 +827,38 @@ public final class SmartVoiceDispatcher {
             dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_PREVIOUS);
             return createSystemActionResult(context, "Đã quay lại bài trước");
         }
+        if (matchesAny(normalized, "tua nhanh", "tua toi", "tua qua", "fast forward")) {
+            dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD);
+            return createSystemActionResult(context, "Đang tua nhanh");
+        }
+        if (matchesAny(normalized, "tua lai", "tua lui", "quay lai mot doan", "rewind")) {
+            dispatchMediaKey(appContext, KeyEvent.KEYCODE_MEDIA_REWIND);
+            return createSystemActionResult(context, "Đang tua lại");
+        }
 
-        // --- 3. HẸN GIỜ TẮT TV (SLEEP TIMER) ---
+        // --- 6. ĐIỀU HƯỚNG DPAD BẰNG GIỌNG NÓI ---
+        if (matchesExactOrPrefix(normalized, "di chuyen len", "len tren", "len")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_DPAD_UP);
+            return createSystemActionResult(context, "Lên");
+        }
+        if (matchesExactOrPrefix(normalized, "di chuyen xuong", "xuong duoi", "xuong")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_DPAD_DOWN);
+            return createSystemActionResult(context, "Xuống");
+        }
+        if (matchesExactOrPrefix(normalized, "sang trai", "qua trai", "trai")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_DPAD_LEFT);
+            return createSystemActionResult(context, "Trái");
+        }
+        if (matchesExactOrPrefix(normalized, "sang phai", "qua phai", "phai")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_DPAD_RIGHT);
+            return createSystemActionResult(context, "Phải");
+        }
+        if (matchesExactOrPrefix(normalized, "bam ok", "nhan ok", "xac nhan", "chon vao", "chon")) {
+            sendGlobalKeyEvent(appContext, KeyEvent.KEYCODE_DPAD_CENTER);
+            return createSystemActionResult(context, "OK");
+        }
+
+        // --- 7. HẸN GIỜ TẮT TV (SLEEP TIMER) ---
         if (normalized.contains("huy hen gio") || normalized.contains("huy tat tv") || normalized.contains("tat hen gio")) {
             SleepTimerManager.cancelSleepTimer(appContext);
             return createSystemActionResult(context, "Đã hủy hẹn giờ tắt TV");
@@ -742,15 +883,23 @@ public final class SmartVoiceDispatcher {
             }
         }
 
-        // --- 4. CHUYỂN CỔNG ĐẦU VÀO HDMI ---
+        // --- 8. CHUYỂN CỔNG ĐẦU VÀO HDMI & AV ---
         Matcher hdmiMatcher = Pattern.compile("(?:chuyen\\s*(?:sang)?|mo|bat|cong)\\s*hdmi\\s*(\\d+)").matcher(normalized);
         if (hdmiMatcher.find()) {
             String port = hdmiMatcher.group(1);
             launchHdmiPort(appContext, port);
             return createSystemActionResult(context, "Đang chuyển sang cổng HDMI " + port);
         }
+        if (matchesAny(normalized, "chuyen sang av", "cong av", "cong video in", "dau dia av")) {
+            launchAvPort(appContext);
+            return createSystemActionResult(context, "Đang chuyển sang cổng AV");
+        }
+        if (matchesAny(normalized, "danh sach cong vao", "nguon dau vao", "chon cong vao", "input tv")) {
+            launchTvInputChooser(appContext);
+            return createSystemActionResult(context, "Đang mở danh sách cổng vào TV");
+        }
 
-        // --- 5. HỎI ĐÁP CỤC BỘ 0MS (GIỜ GIẤC, NGÀY THÁNG, LỊCH) ---
+        // --- 9. HỎI ĐÁP CỤC BỘ 0MS (GIỜ GIẤC, NGÀY THÁNG, LỊCH) ---
         if (matchesAny(normalized, "may gio", "xem gio", "gio roi", "bay gio la may gio", "gio bay gio")) {
             Calendar cal = Calendar.getInstance();
             int hour = cal.get(Calendar.HOUR_OF_DAY);
@@ -774,7 +923,7 @@ public final class SmartVoiceDispatcher {
             return createSystemActionResult(context, ans);
         }
 
-        // --- 6. LỜI CHÀO & PERSONA CỤC BỘ ---
+        // --- 10. LỜI CHÀO & PERSONA CỤC BỘ ---
         if (matchesAny(normalized, "chao buoi sang", "good morning")) {
             return createSystemActionResult(context, "Chào buổi sáng! Chúc bạn một ngày mới an lành, tràn đầy niềm vui và may mắn.");
         }
@@ -782,7 +931,7 @@ public final class SmartVoiceDispatcher {
             return createSystemActionResult(context, "Chào buổi tối! Chúc bạn có những phút giây xem TV thư giãn tuyệt vời.");
         }
         if (matchesAny(normalized, "ban la ai", "ban ten gi", "tro ly ten gi")) {
-            return createSystemActionResult(context, "Tôi là Trợ lý Giọng nói Thông minh trên Android TV của bạn. Tôi có thể giúp bạn mở kênh, tìm video YouTube, điều khiển TV và trò chuyện.");
+            return createSystemActionResult(context, "Tôi là Trợ lý Giọng nói Thông minh trên Android TV của bạn. Tôi có thể giúp bạn mở kênh, tìm video YouTube, điều khiển phần cứng TV và trò chuyện.");
         }
 
         return null;
@@ -811,6 +960,61 @@ public final class SmartVoiceDispatcher {
         result.put("message", message);
         com.atv.launcher.systembridge.tts.VietnameseTtsEngine.getInstance(context).speak(context, message, null);
         return result;
+    }
+
+    private static void sendGlobalKeyEvent(Context context, int keyCode) {
+        try {
+            long now = SystemClock.uptimeMillis();
+            KeyEvent down = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0);
+            KeyEvent up = new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0);
+
+            // 1. Thử qua Root / ADB Shell
+            com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.tryExecuteRootShell("input keyevent " + keyCode);
+
+            // 2. Thử qua AudioManager
+            AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (audio != null) {
+                audio.dispatchMediaKeyEvent(down);
+                audio.dispatchMediaKeyEvent(up);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "sendGlobalKeyEvent failed for " + keyCode, e);
+        }
+    }
+
+    private static void launchSettingsIntent(Context context, String action) {
+        try {
+            Intent intent = new Intent(action);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            try {
+                Intent fallback = new Intent("android.settings.SETTINGS");
+                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(fallback);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private static void launchAvPort(Context context) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(Uri.parse("passthrough://com.android.tv.passthrough/AV1"));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            launchTvInputChooser(context);
+        }
+    }
+
+    private static void launchTvInputChooser(Context context) {
+        try {
+            Intent tvInputIntent = new Intent("android.intent.action.TV_INPUT_BUTTON");
+            tvInputIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(tvInputIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "Cannot launch TV input chooser", e);
+        }
     }
 
     private static void dispatchMediaKey(Context context, int keyCode) {

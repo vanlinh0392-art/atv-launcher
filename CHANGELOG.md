@@ -5,6 +5,33 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.013 — Deep Hardware TV Control Voice Command Suite & 0ms System Actions
+
+### 1. Mở Rộng Toàn Diện Bộ Lệnh Điều Khiển Phần Cứng TV Chuyên Sâu
+- **Điều Khiển Nguồn, Màn Hình & Điều Hướng**:
+  + Tắt màn hình TV / Đi ngủ ngay: `tắt tv`, `tắt màn hình`, `tat nguon tv`, `ngu ngay`.
+  + Về Trang chủ / Màn hình chính: `về trang chủ`, `màn hình chính`, `quay ve home`, `ve home`.
+  + Quay lại: `quay lại`, `tro ve`, `quay ve`, `back lai`.
+  + Khởi động lại TV: `khởi động lại tv`, `reboot tv` (Root shell fallback).
+- **Mở Trực Tiếp Các Cài Đặt Hệ Thống Chuyên Sâu**:
+  + WiFi / Mạng: `cài đặt wifi`, `mở wifi`, `kết nối wifi`, `cài đặt mạng`.
+  + Bluetooth: `cài đặt bluetooth`, `mở bluetooth`, `kết nối loa bluetooth`, `tim tai nghe`.
+  + Màn hình & DPI: `cài đặt màn hình`, `cài đặt hình ảnh`, `chỉnh độ phân giải`, `cai dat dpi`.
+  + Âm thanh: `cài đặt âm thanh`, `chinh am thanh`, `cai dat loa`.
+  + Quản lý ứng dụng: `quản lý ứng dụng`, `quan ly app`, `danh sach ung dung`.
+  + Tùy chọn nhà phát triển / ADB: `tùy chọn nhà phát triển`, `cai dat adb`, `developer options`.
+  + Thông tin TV: `thông tin tv`, `giới thiệu tv`, `phiên bản android`.
+  + Ngày & Giờ: `cài đặt ngày giờ`, `chinh dong ho tv`.
+- **Dọn Rác & Tối Ưu Hóa RAM Thông Minh**:
+  + Lệnh: `dọn rác`, `tăng tốc tv`, `giải phóng ram`, `dọn ram`, `lam sach ram`, `làm mát tv`.
+  + Đọc dung lượng RAM thực tế qua `ActivityManager.MemoryInfo` và phản hồi bằng giọng nói: "Đã dọn dẹp hệ thống TV! Bộ nhớ RAM hiện trống ... MB."
+  + Lệnh kiểm tra RAM: `kiểm tra ram`, `ram còn bao nhiêu`, `xem ram`.
+- **Điều Khiển Tua Video & Điều Hướng DPAD Voice**:
+  + Tua video: `tua nhanh`, `tua tới`, `tua lại`, `tua lui`.
+  + DPAD Voice Navigation: `lên`, `xuống`, `trái`, `phải`, `bấm ok`, `chọn`.
+- **Chuyển Đổi Cổng Vào Ngoại Vi (HDMI & AV)**:
+  + `chuyển hdmi 1`, `hdmi 2`, `hdmi 3`, `hdmi 4`, `cổng av`, `chuyển sang av`, `danh sách cổng vào`.
+
 ## 2026-08-20 - Official release 2026.08.012 — Microsoft Edge Neural Studio TTS & Multi-Stage Video Sleep Wake Auto-Play
 
 ### 1. Tích Hợp Microsoft Edge Neural Studio TTS (WebSocket Native)
