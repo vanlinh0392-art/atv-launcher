@@ -5,6 +5,13 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.011 — Smart Memory Trimming (onTrimMemory / onLowMemory Hooks) & Anti-OOM Immunity
+
+### 1. Quản Lý Bộ Nhớ RAM & Phòng Chống OOM (Anti-LMK Protection)
+- **Hook Toàn Diện `onTrimMemory` & `onLowMemory`**: Triển khai `onTrimMemory(level)` và `onLowMemory()` trong cả `MainActivity` và `ResidentCoreService`.
+- **Tự Động Xả Cache Bộ Nhớ Đệm**: Khi hệ điều hành Android phát tín hiệu thiếu RAM hoặc app chuyển sang trạng thái Background (`TRIM_MEMORY_BACKGROUND`, `TRIM_MEMORY_RUNNING_CRITICAL`), launcher tự động giải phóng cache provisioning, dọn dẹp bitmap, thu hồi video decoder và gọi `System.gc()`.
+- **Ngăn Chặn Bị Tắt Ngầm Khi Mở App Nặng**: Đảm bảo launcher không bao giờ bị Android Low Memory Killer tắt khi người dùng xem phim 4K trên YouTube/Kodi hoặc chơi game nặng.
+
 ## 2026-08-20 - Official release 2026.08.010 — RepaintBoundary Tree Isolation (60 FPS Lock) & Zero-Jank DPAD Navigation
 
 ### 1. Tối Ưu Hóa Cây Render (Sliver Child RepaintBoundary Isolation)

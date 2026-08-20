@@ -450,6 +450,45 @@ public class MainActivity extends FlutterActivity {
     }
 
     @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        Log.i(TAG, "onTrimMemory level=" + level);
+        cachedLiteProvisioningSummary = null;
+        cachedLiteProvisioningSummaryAtElapsedMs = 0L;
+        cachedLiteMemoryStatus = null;
+        cachedLiteMemoryStatusAtElapsedMs = 0L;
+        appImageCacheBytes = 0;
+
+        if (level >= TRIM_MEMORY_BACKGROUND) {
+            if (sharedVideoWallpaperController != null && !activityStarted) {
+                try {
+                    sharedVideoWallpaperController.onStop();
+                } catch (Exception ignored) {}
+            }
+        }
+        if (level >= TRIM_MEMORY_RUNNING_CRITICAL || level >= TRIM_MEMORY_COMPLETE) {
+            System.gc();
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        Log.w(TAG, "onLowMemory received - purging all transient caches");
+        cachedLiteProvisioningSummary = null;
+        cachedLiteProvisioningSummaryAtElapsedMs = 0L;
+        cachedLiteMemoryStatus = null;
+        cachedLiteMemoryStatusAtElapsedMs = 0L;
+        appImageCacheBytes = 0;
+        if (sharedVideoWallpaperController != null && !activityStarted) {
+            try {
+                sharedVideoWallpaperController.onStop();
+            } catch (Exception ignored) {}
+        }
+        System.gc();
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event != null && event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
