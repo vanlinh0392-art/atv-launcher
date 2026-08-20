@@ -28,6 +28,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
+import okio.ByteString;
+
 public final class VietnameseTtsEngine {
     private static final String TAG = "VietnameseTtsEngine";
 
@@ -376,7 +383,143 @@ public final class VietnameseTtsEngine {
         return false;
     }
 
+    private static final OkHttpClient OK_HTTP_CLIENT = new OkHttpClient.Builder()
+            .connectTimeout(java.time.Duration.ofMillis(3500))
+            .readTimeout(java.time.Duration.ofMillis(5500))
+            .build();
+
+    private String resolveVoiceName(String eng) {
+        if ("edge_namminh".equals(eng) || "namminh".equals(eng) || "nam_minh".equals(eng)) {
+            return VOICE_NAM_MINH;
+        }
+        if ("edge_hoaimy".equals(eng) || "hoaimy".equals(eng) || "hoai_my".equals(eng)) {
+            return VOICE_HOAI_MY;
+        }
+        return VOICE_HOAI_MY;
+    }
+
     private File fetchOnlineTtsAudio(Context context, String text) {
+        String eng = getPreferredEngine();
+        String voice = resolveVoiceName(eng);
+
+        // 1. Cố gắng tải giọng Microsoft Edge Neural Studio TTS
+        File edgeFile = fetchEdgeNeuralTtsAudio(context, text, voice);
+        if (edgeFile != null && edgeFile.exists() && edgeFile.length() > 100) {
+            return edgeFile;
+        }
+
+        // 2. Fallback sang Google Translate Audio
+        return fetchGoogleTranslateTtsAudio(context, text);
+    }
+
+    private File fetchEdgeNeuralTtsAudio(Context context, String text, String voiceName) {
+        if (isStopped || TextUtils.isEmpty(text)) return null;
+
+        final String voice = !TextUtils.isEmpty(voiceName) ? voiceName : VOICE_HOAI_MY;
+        final String uri = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EA6542D3A6D31224126252A6";
+        final Request request = new Request.Builder()
+                .url(uri)
+                .addHeader("Origin", "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold")
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0")
+                .addHeader("Pragma", "no-cache")
+                .addHeader("Cache-Control", "no-cache")
+                .build();
+
+        final java.io.ByteArrayOutputStream audioBuffer = new java.io.ByteArrayOutputStream();
+        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicBoolean success = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        WebSocket ws = OK_HTTP_CLIENT.newWebSocket(request, new WebSocketListener() {
+            @Override
+            public void onOpen(WebSocket webSocket, Response response) {
+                try {
+                    String configMsg = "Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n" +
+                            "{\"context\":{\"synthesis\":{\"audio\":{\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"},\"outputFormat\":\"audio-24khz-48kbitrate-mono-mp3\"}}}}";
+                    webSocket.send(configMsg);
+
+                    String reqId = UUID.randomUUID().toString().replace("-", "");
+                    String timestamp = new java.text.SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss 'GMT+0000 (Coordinated Universal Time)'", Locale.US).format(new java.util.Date());
+                    String escapedText = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+                    String ssml = "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"vi-VN\"><voice name=\"" + voice + "\">" + escapedText + "</voice></speak>";
+                    String ssmlMsg = "X-RequestId:" + reqId + "\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:" + timestamp + "\r\nPath:ssml\r\n\r\n" + ssml;
+                    webSocket.send(ssmlMsg);
+                } catch (Exception e) {
+                    Log.w(TAG, "Edge TTS onOpen error", e);
+                    latch.countDown();
+                }
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, String text) {
+                if (text.contains("Path:turn.end")) {
+                    success.set(true);
+                    webSocket.close(1000, "Done");
+                    latch.countDown();
+                }
+            }
+
+            @Override
+            public void onMessage(WebSocket webSocket, ByteString bytes) {
+                try {
+                    if (bytes.size() > 2) {
+                        java.nio.ByteBuffer bb = bytes.asByteBuffer();
+                        int headerLen = bb.getShort() & 0xFFFF;
+                        if (bytes.size() >= 2 + headerLen) {
+                            String header = new String(bytes.toByteArray(), 2, headerLen, java.nio.charset.StandardCharsets.UTF_8);
+                            if (header.contains("Path:audio")) {
+                                byte[] raw = bytes.toByteArray();
+                                int audioOffset = 2 + headerLen;
+                                int audioLen = raw.length - audioOffset;
+                                if (audioLen > 0) {
+                                    audioBuffer.write(raw, audioOffset, audioLen);
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Edge TTS audio chunk error", e);
+                }
+            }
+
+            @Override
+            public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                Log.w(TAG, "Edge TTS WebSocket failure: " + t.getMessage());
+                latch.countDown();
+            }
+
+            @Override
+            public void onClosed(WebSocket webSocket, int code, String reason) {
+                latch.countDown();
+            }
+        });
+
+        try {
+            boolean completed = latch.await(4500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            if (!completed) {
+                ws.cancel();
+            }
+        } catch (InterruptedException ignored) {
+            ws.cancel();
+        }
+
+        if (success.get() && audioBuffer.size() > 100) {
+            try {
+                File cacheDir = context.getCacheDir();
+                File tempFile = new File(cacheDir, "tts_edge_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 5) + ".mp3");
+                try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                    audioBuffer.writeTo(fos);
+                    fos.flush();
+                }
+                Log.i(TAG, "Microsoft Edge Neural TTS downloaded for voice=" + voice + " (" + text.length() + " chars): " + tempFile.length() + " bytes");
+                return tempFile;
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to save Edge TTS file", e);
+            }
+        }
+        return null;
+    }
+
+    private File fetchGoogleTranslateTtsAudio(Context context, String text) {
         for (int attempt = 0; attempt < 2; attempt++) {
             if (isStopped) return null;
             HttpURLConnection conn = null;
@@ -388,13 +531,13 @@ public final class VietnameseTtsEngine {
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                conn.setConnectTimeout(4500);
-                conn.setReadTimeout(5500);
+                conn.setConnectTimeout(3500);
+                conn.setReadTimeout(4500);
 
                 int code = conn.getResponseCode();
                 if (code == 200) {
                     File cacheDir = context.getCacheDir();
-                    File tempFile = new File(cacheDir, "tts_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 5) + ".mp3");
+                    File tempFile = new File(cacheDir, "tts_google_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 5) + ".mp3");
                     try (InputStream is = conn.getInputStream();
                          OutputStream os = new FileOutputStream(tempFile)) {
                         byte[] buffer = new byte[4096];
@@ -404,7 +547,7 @@ public final class VietnameseTtsEngine {
                         }
                         os.flush();
                     }
-                    Log.i(TAG, "Online TTS downloaded chunk (" + text.length() + " chars): " + tempFile.length() + " bytes");
+                    Log.i(TAG, "Google TTS downloaded chunk (" + text.length() + " chars): " + tempFile.length() + " bytes");
                     return tempFile;
                 } else {
                     try (InputStream es = conn.getErrorStream()) {
@@ -413,10 +556,10 @@ public final class VietnameseTtsEngine {
                             while (es.read(buf) > 0) {}
                         }
                     } catch (Exception ignored) {}
-                    Log.w(TAG, "Online TTS HTTP " + code + " (attempt " + (attempt + 1) + ")");
+                    Log.w(TAG, "Google TTS HTTP " + code + " (attempt " + (attempt + 1) + ")");
                 }
             } catch (Exception e) {
-                Log.w(TAG, "fetchOnlineTtsAudio error (attempt " + (attempt + 1) + "): " + e.getMessage());
+                Log.w(TAG, "fetchGoogleTranslateTtsAudio error (attempt " + (attempt + 1) + "): " + e.getMessage());
             } finally {
                 if (conn != null) {
                     conn.disconnect();
@@ -424,7 +567,7 @@ public final class VietnameseTtsEngine {
             }
             if (attempt == 0 && !isStopped) {
                 try {
-                    Thread.sleep(180);
+                    Thread.sleep(150);
                 } catch (InterruptedException ignored) {}
             }
         }

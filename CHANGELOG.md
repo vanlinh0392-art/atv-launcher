@@ -5,6 +5,18 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.012 — Microsoft Edge Neural Studio TTS & Multi-Stage Video Sleep Wake Auto-Play
+
+### 1. Tích Hợp Microsoft Edge Neural Studio TTS (WebSocket Native)
+- **Chuẩn Giọng Studio Tự Nhiên 100%**: Sử dụng OkHttp WebSocket kết nối trực tiếp đến Microsoft Neural Speech engine, hỗ trợ chuẩn xác 2 giọng đọc cao cấp:
+  + **Nam Minh (`vi-VN-NamMinhNeural`)**: Giọng nam miền Bắc trầm ấm, tự nhiên, truyền cảm.
+  + **Hoài My (`vi-VN-HoaiMyNeural`)**: Giọng nữ miền Nam trong trẻo, ngọt ngào.
+- **Multi-Tier Fallback Tuyệt Đối An Toàn**: Khi mạng yếu hoặc offline, tự động chuyển tầng thông minh sang Google Translate Audio hoặc Android Native TextToSpeech.
+
+### 2. Sửa Lỗi Tự Phát Video Nền Khi Thức Dậy (Multi-Stage Wake Recovery)
+- **Bỏ Chặn Debounce Khi Foreground Resume**: Loại bỏ bộ lọc drop sự kiện khi Activity hoặc Window lấy lại Focus, giúp video wallpaper luôn nhận lệnh thức dậy kịp thời.
+- **Phục Hồi Đa Nhịp (250ms, 650ms, 1200ms)**: Bù đắp độ trễ khởi động của bộ giải mã phần cứng MediaCodec trên các dòng Android TV, đảm bảo video luôn phát lại mượt mà khi bật màn hình.
+
 ## 2026-08-20 - Official release 2026.08.011 — Smart Memory Trimming (onTrimMemory / onLowMemory Hooks) & Anti-OOM Immunity
 
 ### 1. Quản Lý Bộ Nhớ RAM & Phòng Chống OOM (Anti-LMK Protection)

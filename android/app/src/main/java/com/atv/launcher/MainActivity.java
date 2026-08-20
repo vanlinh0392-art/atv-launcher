@@ -381,7 +381,7 @@ public class MainActivity extends FlutterActivity {
         activeActivity = this;
         if (sharedVideoWallpaperController != null) {
             sharedVideoWallpaperController.onStart();
-            sharedVideoWallpaperController.onScreenWake("activity_resume", true);
+            sharedVideoWallpaperController.resumePlaybackOnFocus("activity_resume");
         }
         pruneBackgroundLauncherTasks("onResume");
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_resume");
@@ -398,7 +398,7 @@ public class MainActivity extends FlutterActivity {
             activityStarted = true;
             if (sharedVideoWallpaperController != null) {
                 sharedVideoWallpaperController.onStart();
-                sharedVideoWallpaperController.onScreenWake("window_focus_gained", true);
+                sharedVideoWallpaperController.resumePlaybackOnFocus("window_focus_gained");
             }
         }
     }

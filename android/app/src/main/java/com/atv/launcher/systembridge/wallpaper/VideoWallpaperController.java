@@ -183,7 +183,10 @@ public final class VideoWallpaperController {
         }
 
         long now = SystemClock.elapsedRealtime();
-        if (lastWakeRearmAtElapsedMs > 0L
+        boolean isForegroundDirectTrigger = "activity_resume".equals(resolvedReason)
+                || "window_focus_gained".equals(resolvedReason)
+                || "force_wake".equals(resolvedReason);
+        if (!isForegroundDirectTrigger && lastWakeRearmAtElapsedMs > 0L
                 && now - lastWakeRearmAtElapsedMs < 400L) {
             return;
         }
@@ -198,14 +201,47 @@ public final class VideoWallpaperController {
         ensureSurface();
         maybeStartPlayback(true, true);
 
-        // Hardware wake delay check: phục hồi video ngay khi bộ giải mã phần cứng TV sẵn sàng
-        mainHandler.postDelayed(() -> {
-            if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
-                if (player == null || !player.isPlaying()) {
-                    resumeExistingPlayerIfNeeded();
+        scheduleMultiStageWakeRecovery(resolvedReason);
+    }
+
+    public void resumePlaybackOnFocus(String reason) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(() -> resumePlaybackOnFocus(reason));
+            return;
+        }
+        if (!shouldAutoResumeFromWake()) {
+            return;
+        }
+        logWakeInfo("wallpaper_focus_resume reason=" + reason);
+        mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        foregroundActive = true;
+        startupWarmupReady = true;
+        ensureSurface();
+        if (player != null && !player.isPlaying()) {
+            resumeExistingPlayerIfNeeded();
+        } else if (player == null) {
+            maybeStartPlayback(true, true);
+        }
+        scheduleMultiStageWakeRecovery(reason);
+    }
+
+    private void scheduleMultiStageWakeRecovery(String reason) {
+        long[] delays = new long[]{250L, 650L, 1200L};
+        for (long delay : delays) {
+            mainHandler.postDelayed(() -> {
+                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                    if (player == null || !player.isPlaying()) {
+                        logWakeInfo("wallpaper_multi_stage_wake_retry delay=" + delay + "ms reason=" + reason);
+                        ensureSurface();
+                        if (player != null) {
+                            resumeExistingPlayerIfNeeded();
+                        } else {
+                            maybeStartPlayback(true, true);
+                        }
+                    }
                 }
-            }
-        }, 450L);
+            }, delay);
+        }
     }
 
     public void onStop() {
