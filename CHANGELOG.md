@@ -5,6 +5,17 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-20 - Official release 2026.08.018 — Instant Background Player Release & Codec Self-Recovery on Home Re-entry
+
+### 1. Khắc Phục Lỗi Video Nền Không Phát Lại Khi Từ App Khác (SmartTube/Phim) Quay Về Home
+- **Phát Hiện & Giải Quyết Tranh Chấp Phần Cứng MediaCodec**:
+  + Khi mở ứng dụng ngoài (SmartTube, Xem Phim), app ngoài chiếm dụng kênh giải mã phần cứng MediaTek AVC/HEVC.
+  + Launcher trước đây giữ ExoPlayer ngầm trong 10 giây làm xuất hiện lỗi xung đột `omxError 0x80001013` / `MediaCodecVideoRenderer IllegalStateException`.
+  + **Giải pháp**: Giải phóng bộ giải mã phần cứng ngay lập tức khi Launcher vào nền (`onStop()`), nhường 100% tài nguyên cho app ngoài.
+  + Khi quay lại Home (`onStart` / `onResume` / `onWindowFocusChanged`), Launcher tự động khởi tạo một instance ExoPlayer hoàn toàn mới, sạch sẽ và bắt đầu phát video ngay tức thì.
+- **Cơ Chế Tự Phục Hồi Thông Minh Trong `onPlayerError`**:
+  + Bổ sung cơ chế auto-recovery: Nếu ExoPlayer gặp lỗi codec hoặc Surface ngắt kết nối, hệ thống tự động giải phóng codec lỗi và khởi động lại sau 350ms, đảm bảo video nền không bao giờ bị dừng vĩnh viễn.
+
 ## 2026-08-20 - Official release 2026.08.017 — Xiaomi STR Sleep Wake Full Recovery & ExoPlayer Surface Re-bind
 
 ### 1. Khắc Phục Triệt Để Toàn Bộ Chu Kỳ Video Nền Khi Thức Dậy Trên TV Xiaomi / Android TV

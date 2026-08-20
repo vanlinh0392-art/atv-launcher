@@ -163,7 +163,14 @@ public final class VideoWallpaperController {
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
         foregroundActive = true;
         startupWarmupReady = true;
-        maybeStartPlayback(true);
+        if (shouldAutoResumeFromWake()) {
+            ensureSurface();
+            if (player != null && !player.isPlaying()) {
+                resumeExistingPlayerIfNeeded();
+            } else if (player == null) {
+                maybeStartPlayback(true, true);
+            }
+        }
     }
 
     public void onScreenWake(String reason) {
@@ -269,19 +276,8 @@ public final class VideoWallpaperController {
         stopIntervalAdvance();
         cancelWakePlaylistRetry();
         cancelPendingMultiStageWakeRecovery();
-        if (player != null) {
-            try {
-                player.pause();
-            } catch (Exception ignored) {
-            }
-        }
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
-        if (deferForegroundResume) {
-            startupWarmupReady = false;
-            releasePlayer();
-            return;
-        }
-        mainHandler.postDelayed(backgroundReleaseRunnable, BACKGROUND_PLAYER_RELEASE_DELAY_MS);
+        releasePlayer();
     }
 
     public void onDestroy() {
@@ -516,11 +512,19 @@ public final class VideoWallpaperController {
 
             @Override
             public void onPlayerError(PlaybackException error) {
+                Log.w(TAG, "ExoPlayer onPlayerError: " + (error.getMessage() == null ? error.toString() : error.getMessage()));
                 boolean statusChanged = setVideoReady(false)
                         | setLastError(error.getMessage() == null ? error.toString() : error.getMessage());
                 notifyStatusChangedIf(statusChanged);
-                if (!advancePlaylist()) {
-                    releasePlayer();
+                releasePlayer();
+                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                    mainHandler.postDelayed(() -> {
+                        if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                            logWakeInfo("wallpaper_auto_recover_after_error");
+                            ensureSurface();
+                            maybeStartPlayback(true, true);
+                        }
+                    }, 350L);
                 }
             }
 
@@ -700,23 +704,22 @@ public final class VideoWallpaperController {
     }
 
     private void ensureSurface() {
-        if (surfaceTextureEntry != null && surface != null && surface.isValid()) {
-            return;
-        }
-        if (surface != null) {
-            try {
-                surface.release();
-            } catch (Exception ignored) {
-            }
-            surface = null;
-        }
         if (surfaceTextureEntry == null) {
             surfaceTextureEntry = textureRegistry.createSurfaceTexture();
         }
-        surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
-        surface = new Surface(surfaceTextureEntry.surfaceTexture());
+        if (surface == null || !surface.isValid()) {
+            if (surface != null) {
+                try {
+                    surface.release();
+                } catch (Exception ignored) {
+                }
+            }
+            surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
+            surface = new Surface(surfaceTextureEntry.surfaceTexture());
+        }
         if (player != null) {
             try {
+                player.clearVideoSurface();
                 player.setVideoSurface(surface);
             } catch (Exception ignored) {
             }
