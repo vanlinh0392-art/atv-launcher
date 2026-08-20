@@ -95,33 +95,35 @@ class CategoryRow extends StatelessWidget {
                       _slotKeyForPackage(applications[index].packageName),
                     ),
                     alignment: Alignment.center,
-                    child: AppCard(
-                      key: Key(applications[index].packageName),
-                      focusId: _focusIdForPackage(
-                        applications[index].packageName,
+                    child: RepaintBoundary(
+                      child: AppCard(
+                        key: Key(applications[index].packageName),
+                        focusId: _focusIdForPackage(
+                          applications[index].packageName,
+                        ),
+                        category: category,
+                        application: applications[index],
+                        autofocus: autofocusFirstItem && index == 0,
+                        eagerImageLoad: eagerImagePackageNames
+                            .contains(applications[index].packageName),
+                        imageWarmupSequence: imageWarmupSequence,
+                        onFocused: (itemContext) {
+                          _prefetchAround(context, index);
+                          onApplicationFocused?.call(
+                            category.name,
+                            itemContext,
+                            index ~/ category.columnsCount,
+                          );
+                        },
+                        onMoveStart: (itemContext) =>
+                            _onMoveStart(context, itemContext),
+                        onMove: (itemContext, direction) =>
+                            _onMove(context, itemContext, direction, index),
+                        onMoveEnd: (itemContext, committed) =>
+                            _onMoveEnd(context, itemContext, committed),
+                        onNavigate: (direction) =>
+                            _onNavigate(context, direction, index),
                       ),
-                      category: category,
-                      application: applications[index],
-                      autofocus: autofocusFirstItem && index == 0,
-                      eagerImageLoad: eagerImagePackageNames
-                          .contains(applications[index].packageName),
-                      imageWarmupSequence: imageWarmupSequence,
-                      onFocused: (itemContext) {
-                        _prefetchAround(context, index);
-                        onApplicationFocused?.call(
-                          category.name,
-                          itemContext,
-                          index ~/ category.columnsCount,
-                        );
-                      },
-                      onMoveStart: (itemContext) =>
-                          _onMoveStart(context, itemContext),
-                      onMove: (itemContext, direction) =>
-                          _onMove(context, itemContext, direction, index),
-                      onMoveEnd: (itemContext, committed) =>
-                          _onMoveEnd(context, itemContext, committed),
-                      onNavigate: (direction) =>
-                          _onNavigate(context, direction, index),
                     ),
                   ),
                 ),
