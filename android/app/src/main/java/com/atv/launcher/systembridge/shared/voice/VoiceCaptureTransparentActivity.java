@@ -75,15 +75,29 @@ public class VoiceCaptureTransparentActivity extends Activity {
         requestAudioDucking();
 
         initLayout();
-        startSpeechRecognition();
+        String extraQuery = getIntent() != null ? getIntent().getStringExtra("query") : null;
+        if (!TextUtils.isEmpty(extraQuery)) {
+            updateSubtitle(extraQuery, 0xFFFFFFFF);
+            handleVoiceText(extraQuery);
+        } else {
+            startSpeechRecognition();
+        }
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        Log.i(TAG, "onNewIntent received -> restarting voice listening while open");
-        restartVoiceListening();
+        String extraQuery = intent != null ? intent.getStringExtra("query") : null;
+        if (!TextUtils.isEmpty(extraQuery)) {
+            Log.i(TAG, "onNewIntent received with query: " + extraQuery);
+            cancelDismissTimer();
+            updateSubtitle(extraQuery, 0xFFFFFFFF);
+            handleVoiceText(extraQuery);
+        } else {
+            Log.i(TAG, "onNewIntent received -> restarting voice listening while open");
+            restartVoiceListening();
+        }
     }
 
     public void restartVoiceListening() {
@@ -373,10 +387,10 @@ public class VoiceCaptureTransparentActivity extends Activity {
         String type = (String) result.get("type");
         String message = (String) result.get("message");
 
-        if ("ai_qa".equals(type)) {
-            updateSubtitle("Đang hỏi Trợ lý AI...", 0xFF7C4DFF);
-            // Hẹn giờ đóng dự phòng sau 15s nếu TTS gặp sự cố mạng
-            scheduleDismiss(15000L);
+        if ("ai_qa".equals(type) || "ai_news".equals(type)) {
+            updateSubtitle("ai_news".equals(type) ? "Đang cập nhật tin tức..." : "Đang hỏi Trợ lý AI...", 0xFF7C4DFF);
+            // Hẹn giờ đóng dự phòng sau 30s
+            scheduleDismiss(30000L);
         } else {
             if (!TextUtils.isEmpty(message)) {
                 updateSubtitle(message, 0xFF00E676);

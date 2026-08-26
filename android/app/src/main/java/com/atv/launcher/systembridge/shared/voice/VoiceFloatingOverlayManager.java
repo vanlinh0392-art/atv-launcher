@@ -481,9 +481,9 @@ public final class VoiceFloatingOverlayManager {
         String type = (String) result.get("type");
         String message = (String) result.get("message");
 
-        if ("ai_qa".equals(type)) {
-            updateSubtitle("Đang hỏi Trợ lý AI...", 0xFF7C4DFF);
-            scheduleDismiss(15000L);
+        if ("ai_qa".equals(type) || "ai_news".equals(type)) {
+            updateSubtitle("ai_news".equals(type) ? "Đang cập nhật tin tức..." : "Đang hỏi Trợ lý AI...", 0xFF7C4DFF);
+            scheduleDismiss(30000L);
         } else if (SmartVoiceDispatcher.TYPE_OPEN_APP.equals(type)
                 || SmartVoiceDispatcher.TYPE_TV_CHANNEL.equals(type)
                 || SmartVoiceDispatcher.TYPE_MEDIA_SEARCH.equals(type)) {
