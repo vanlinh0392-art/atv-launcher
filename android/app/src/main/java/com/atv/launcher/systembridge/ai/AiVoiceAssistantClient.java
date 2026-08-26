@@ -84,10 +84,37 @@ public final class AiVoiceAssistantClient {
             "Hãy trả lời người dùng bằng tiếng Việt tự nhiên, súc tích, ngắn gọn trong 1 đến 2 câu (tối đa 35 từ), " +
             "không dùng markdown ký hiệu hoa mỹ, thích hợp để đọc thành tiếng qua loa TV.";
 
+    public static final String TV_NEWS_BROADCASTER_PROMPT =
+            "Bạn là Biên tập viên Thời sự chuyên nghiệp trên truyền hình. " +
+            "Hãy tổng hợp và đọc 3 tin tức mới nhất của Việt Nam ngày hôm nay dựa trên dữ liệu tin tức được cung cấp. " +
+            "Bản tin gồm đúng 3 phần: Tin thứ nhất, Tin thứ hai, Tin thứ ba. " +
+            "Mỗi tin trình bày ngắn gọn, mạch lạc, súc tích trong khoảng 5 đến 10 câu văn rõ ràng, dùng lời văn phát thanh tự nhiên, " +
+            "ngắt câu bằng dấu chấm rõ ràng để phát thanh qua loa TV, tuyệt đối không dùng ký hiệu markdown hoa mỹ (không dùng **, ##, bullet point, dấu sao).";
+
+    public static boolean isNewsQuery(String query) {
+        if (TextUtils.isEmpty(query)) return false;
+        String q = query.trim().toLowerCase(Locale.ROOT);
+        String[] newsKeywords = {
+                "tin tức", "tin tuc", "tin mới", "tin moi", "tin mới nhất", "tin moi nhat",
+                "tin hôm nay", "tin hom nay", "tin tức hôm nay", "tin tuc hom nay",
+                "tin tức mới nhất", "tin tuc moi nhat", "tin tức việt nam", "tin tuc viet nam",
+                "điểm tin", "diem tin", "thời sự", "thoi su", "bản tin", "ban tin",
+                "bản tin hôm nay", "ban tin hom nay", "tin vắn", "tin van",
+                "có tin gì mới", "co tin gi moi", "đọc tin tức", "doc tin tuc",
+                "tin tức ngày hôm nay", "tin tuc ngay hom nay", "tin tức trong ngày", "tin tuc trong ngay"
+        };
+        for (String kw : newsKeywords) {
+            if (q.contains(kw)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean isStoryOrLongContent(String query) {
         if (TextUtils.isEmpty(query)) return false;
         String q = query.trim().toLowerCase(Locale.ROOT);
-        return q.contains("kể chuyện") || q.contains("ke chuyen") || q.contains("câu chuyện")
+        return isNewsQuery(q) || q.contains("kể chuyện") || q.contains("ke chuyen") || q.contains("câu chuyện")
                 || q.contains("cau chuyen") || q.contains("truyện") || q.contains("truyen")
                 || q.contains("thơ") || q.contains("tho") || q.contains("giải thích")
                 || q.contains("giai thich") || q.contains("tại sao") || q.contains("vi sao");
@@ -410,6 +437,83 @@ public final class AiVoiceAssistantClient {
             // 4. Tầng 4: Dự phòng ngoại tuyến an toàn
             String defaultAnswer = "Dạ, tôi đã nhận được câu hỏi '" + userQuery + "', vui lòng thử lại sau giây lát.";
             speakAndDisplay(context, defaultAnswer, "fallback_offline", callback);
+        });
+    }
+
+    public static void fetchAndReadNews(Context context, String userQuery, AiResponseCallback callback) {
+        executor.execute(() -> {
+            Log.i(TAG, "fetchAndReadNews query: '" + userQuery + "' -> fetching top 3 VN news & summarizing");
+
+            List<VietnamNewsProvider.NewsItem> newsItems = VietnamNewsProvider.getLatestTop3News();
+            if (newsItems == null || newsItems.isEmpty()) {
+                Log.w(TAG, "No RSS news items fetched -> fallback direct script");
+                String fallbackMsg = VietnamNewsProvider.buildDirectBroadcastScript(null);
+                speakAndDisplay(context, fallbackMsg, "offline_news", callback);
+                return;
+            }
+
+            String newsContext = VietnamNewsProvider.buildNewsContextForAi(newsItems);
+            String userPrompt = "Dưới đây là 3 tin tức mới nhất của Việt Nam ngày hôm nay:\n\n" + newsContext +
+                    "\nHãy đọc bản tin thời sự tóm tắt 3 tin tức này (mỗi tin từ 5 đến 10 câu văn rõ ràng, súc tích).";
+
+            // 1. Tầng 1: NVIDIA NIM
+            for (int i = 0; i < 4 && i < FALLBACK_MODELS.size(); i++) {
+                ModelTarget target = FALLBACK_MODELS.get(i);
+                if (!"NVIDIA NIM".equalsIgnoreCase(target.provider)) continue;
+                try {
+                    Log.i(TAG, "News Tier 1 NVIDIA NIM [" + (i + 1) + "]: " + target.modelId);
+                    String nvAnswer = queryOpenAiCompatible(target.endpoint, target.modelId, nvidiaKey, userPrompt, TV_NEWS_BROADCASTER_PROMPT);
+                    if (!TextUtils.isEmpty(nvAnswer)) {
+                        String clean = cleanResponse(nvAnswer);
+                        addMessageToHistory("user", userQuery);
+                        addMessageToHistory("assistant", clean);
+                        speakAndDisplay(context, clean, target.modelId, callback);
+                        return;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "News Tier 1 NVIDIA " + target.modelId + " failed: " + e.getMessage());
+                }
+            }
+
+            // 2. Tầng 2: OpenRouter Free
+            for (int i = 4; i < FALLBACK_MODELS.size(); i++) {
+                ModelTarget target = FALLBACK_MODELS.get(i);
+                try {
+                    Log.i(TAG, "News Tier 2 OpenRouter Free [" + (i - 3) + "]: " + target.modelId);
+                    String answer = queryOpenAiCompatible(target.endpoint, target.modelId, openRouterKey, userPrompt, TV_NEWS_BROADCASTER_PROMPT);
+                    if (!TextUtils.isEmpty(answer)) {
+                        String clean = cleanResponse(answer);
+                        addMessageToHistory("user", userQuery);
+                        addMessageToHistory("assistant", clean);
+                        speakAndDisplay(context, clean, target.modelId, callback);
+                        return;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "News Tier 2 Model " + target.modelId + " failed: " + e.getMessage());
+                }
+            }
+
+            // 3. Tầng 3: Google Gemini
+            try {
+                Log.i(TAG, "News Tier 3 Gemini 2.5 Flash Lite...");
+                String geminiAnswer = queryGeminiOfficial(geminiApiKey, userPrompt, TV_NEWS_BROADCASTER_PROMPT);
+                if (!TextUtils.isEmpty(geminiAnswer)) {
+                    String clean = cleanResponse(geminiAnswer);
+                    addMessageToHistory("user", userQuery);
+                    addMessageToHistory("assistant", clean);
+                    speakAndDisplay(context, clean, "Google Gemini 2.5 Flash Lite", callback);
+                    return;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "News Tier 3 Gemini failed: " + e.getMessage());
+            }
+
+            // 4. Tầng 4: Direct RSS Script Fallback
+            Log.i(TAG, "News Fallback: Generating direct broadcast script from RSS items");
+            String directScript = VietnamNewsProvider.buildDirectBroadcastScript(newsItems);
+            addMessageToHistory("user", userQuery);
+            addMessageToHistory("assistant", directScript);
+            speakAndDisplay(context, directScript, "rss_direct", callback);
         });
     }
 

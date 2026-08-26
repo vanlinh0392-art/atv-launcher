@@ -143,6 +143,16 @@ public final class SmartVoiceDispatcher {
             return result;
         }
 
+        // 1.5 Kiểm tra câu hỏi về tin tức mới nhất Việt Nam (Tin tức, Tin mới, Thời sự, Bản tin...)
+        if (com.atv.launcher.systembridge.ai.AiVoiceAssistantClient.isNewsQuery(query)) {
+            com.atv.launcher.systembridge.ai.AiVoiceAssistantClient.fetchAndReadNews(context, query, null);
+            result.put("success", true);
+            result.put("type", "ai_news");
+            result.put("query", query);
+            result.put("message", "Đang cập nhật 3 tin tức mới nhất Việt Nam...");
+            return result;
+        }
+
         // 2. Nhận diện các lệnh liên quan Bài Hát, Ca Khúc, Nhạc, YouTube, Karaoke, Video
         if (isMediaOrSongOrYoutubeQuery(lowerQuery, normalized)) {
             String cleanSearchQuery = extractCleanMediaSearchQuery(query);

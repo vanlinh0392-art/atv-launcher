@@ -89,5 +89,35 @@ void main() {
     expect(storeContent, contains('computeLevenshteinDistance'));
     expect(storeContent, contains('stripAccents'));
   });
+
+  test('VietnamNewsProvider and News Dispatching are properly configured for Real-Time Vietnam News', () {
+    final newsProviderFile = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/ai/VietnamNewsProvider.java',
+    );
+    expect(newsProviderFile.existsSync(), isTrue);
+    final newsContent = newsProviderFile.readAsStringSync();
+    expect(newsContent, contains('class VietnamNewsProvider'));
+    expect(newsContent, contains('getLatestTop3News'));
+    expect(newsContent, contains('fetchRssFeed'));
+    expect(newsContent, contains('buildNewsContextForAi'));
+    expect(newsContent, contains('buildDirectBroadcastScript'));
+    expect(newsContent, contains('vnexpress.net'));
+    expect(newsContent, contains('tuoitre.vn'));
+
+    final aiClientFile = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/ai/AiVoiceAssistantClient.java',
+    );
+    final aiContent = aiClientFile.readAsStringSync();
+    expect(aiContent, contains('isNewsQuery'));
+    expect(aiContent, contains('TV_NEWS_BROADCASTER_PROMPT'));
+    expect(aiContent, contains('fetchAndReadNews'));
+
+    final dispatcherFile = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/shared/voice/SmartVoiceDispatcher.java',
+    );
+    final dispatcherContent = dispatcherFile.readAsStringSync();
+    expect(dispatcherContent, contains('isNewsQuery'));
+    expect(dispatcherContent, contains('fetchAndReadNews'));
+  });
 }
 
