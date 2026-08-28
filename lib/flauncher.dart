@@ -345,36 +345,52 @@ Widget _buildWallpaperLayer(
   required HomePerformanceProfile performanceProfile,
 }) {
   final physicalSize = MediaQuery.sizeOf(context);
-  final baseWallpaper = wallpaper.wallpaperMode == 'gradient'
-      ? Container(
-          key: const Key('background'),
-          decoration: BoxDecoration(gradient: wallpaper.gradient),
-        )
-      : wallpaper.wallpaper != null
-          ? Image(
-              image: wallpaper.wallpaper!,
-              key: const Key('background'),
-              fit: BoxFit.cover,
-              height: physicalSize.height,
-              width: physicalSize.width,
-              filterQuality: performanceProfile.wallpaperFilterQuality,
-              gaplessPlayback: wallpaper.isVideoMode,
-            )
-          : Image.asset(
-              'assets/default_tv_wallpaper.jpg',
-              key: const Key('background'),
-              fit: BoxFit.cover,
-              height: physicalSize.height,
-              width: physicalSize.width,
-              filterQuality: performanceProfile.wallpaperFilterQuality,
-              gaplessPlayback: wallpaper.isVideoMode,
-              errorBuilder: (_, __, ___) => Container(
-                key: const Key('background'),
-                decoration: BoxDecoration(gradient: wallpaper.gradient),
-              ),
-            );
+  final isVideo = wallpaper.isVideoMode;
 
-  if (!wallpaper.isVideoMode ||
+  final Widget baseWallpaper;
+  if (wallpaper.wallpaperMode == 'gradient') {
+    baseWallpaper = Container(
+      key: const Key('background'),
+      decoration: BoxDecoration(gradient: wallpaper.gradient),
+    );
+  } else if (wallpaper.wallpaper != null) {
+    baseWallpaper = Image(
+      image: wallpaper.wallpaper!,
+      key: const Key('background'),
+      fit: BoxFit.cover,
+      height: physicalSize.height,
+      width: physicalSize.width,
+      filterQuality: performanceProfile.wallpaperFilterQuality,
+      gaplessPlayback: isVideo,
+    );
+  } else if (isVideo) {
+    baseWallpaper = Container(
+      key: const Key('background'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF020617)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+    );
+  } else {
+    baseWallpaper = Image.asset(
+      'assets/default_tv_wallpaper.jpg',
+      key: const Key('background'),
+      fit: BoxFit.cover,
+      height: physicalSize.height,
+      width: physicalSize.width,
+      filterQuality: performanceProfile.wallpaperFilterQuality,
+      gaplessPlayback: false,
+      errorBuilder: (_, __, ___) => Container(
+        key: const Key('background'),
+        decoration: BoxDecoration(gradient: wallpaper.gradient),
+      ),
+    );
+  }
+
+  if (!isVideo ||
       wallpaper.videoTextureId == null ||
       wallpaperStatus.lastError.isNotEmpty) {
     return RepaintBoundary(child: baseWallpaper);

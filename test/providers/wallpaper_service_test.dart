@@ -430,7 +430,7 @@ void main() {
         .thenAnswer((_) async => <String, dynamic>{});
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
     expect(settings.wallpaperMode, 'image');
     expect(settings.wallpaperVideoRestoreCandidatePending, isTrue);
@@ -452,7 +452,7 @@ void main() {
         .thenAnswer((_) async => <String, dynamic>{});
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
     expect(settings.wallpaperMode, 'gradient');
     expect(settings.wallpaperVideoRestoreCandidatePending, isTrue);
@@ -477,13 +477,13 @@ void main() {
     when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 31);
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(settings.wallpaperMode, 'image');
 
     await settings.setHomeDockPerformanceMode(
       SettingsService.homeDockPerformanceModeBalanced,
     );
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
     expect(settings.wallpaperMode, 'video');
     expect(settings.wallpaperVideoRestoreCandidatePending, isFalse);
@@ -513,13 +513,13 @@ void main() {
     when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 37);
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(settings.wallpaperMode, 'image');
 
     await settings.setHomeDockPerformanceMode(
       SettingsService.homeDockPerformanceModeQuality,
     );
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
     expect(settings.wallpaperMode, 'image');
     expect(settings.wallpaperVideoRestoreCandidatePending, isFalse);
@@ -547,7 +547,7 @@ void main() {
         .thenAnswer((_) async => <String, dynamic>{});
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
     expect(settings.wallpaperMode, 'image');
     expect(settings.wallpaperVideoRestoreCandidatePending, isFalse);

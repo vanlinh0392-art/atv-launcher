@@ -119,7 +119,7 @@ public final class VideoWallpaperController {
         }
         ensureSurface();
         maybeStartPlayback(true);
-        return surfaceTextureEntry.id();
+        return surfaceTextureEntry != null ? surfaceTextureEntry.id() : -1L;
     }
 
     public Map<String, Object> getStatus() {
@@ -306,6 +306,7 @@ public final class VideoWallpaperController {
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
             boolean changed = setVideoReady(false) | setLastError("");
             releasePlayer();
+            releaseSurface();
             notifyStatusChangedIf(changed);
             return;
         }
@@ -385,6 +386,7 @@ public final class VideoWallpaperController {
         if (!allowed) {
             startupWarmupReady = false;
             releasePlayer();
+            releaseSurface();
         }
         return true;
     }
@@ -534,11 +536,19 @@ public final class VideoWallpaperController {
 
             @Override
             public void onPlayerError(PlaybackException error) {
-                Log.w(TAG, "ExoPlayer onPlayerError: " + (error.getMessage() == null ? error.toString() : error.getMessage()));
+                String errorMsg = error.getMessage() == null ? error.toString() : error.getMessage();
+                Log.w(TAG, "ExoPlayer onPlayerError: " + errorMsg);
                 boolean statusChanged = setVideoReady(false)
-                        | setLastError(error.getMessage() == null ? error.toString() : error.getMessage());
+                        | setLastError(errorMsg);
                 notifyStatusChangedIf(statusChanged);
                 releasePlayer();
+                if (errorMsg.contains("0x80001013")
+                        || errorMsg.contains("MediaCodec")
+                        || errorMsg.contains("Surface")
+                        || errorMsg.contains("DecoderInitException")
+                        || errorMsg.contains("ExoPlaybackException")) {
+                    releaseSurface();
+                }
                 if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
                     mainHandler.postDelayed(() -> {
                         if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
@@ -726,8 +736,20 @@ public final class VideoWallpaperController {
     }
 
     private void ensureSurface() {
+        if (surfaceTextureEntry != null) {
+            try {
+                surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
+            } catch (Exception e) {
+                releaseSurface();
+            }
+        }
         if (surfaceTextureEntry == null) {
-            surfaceTextureEntry = textureRegistry.createSurfaceTexture();
+            try {
+                surfaceTextureEntry = textureRegistry.createSurfaceTexture();
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to create SurfaceTexture: " + e.getMessage());
+                return;
+            }
         }
         if (surface == null || !surface.isValid()) {
             if (surface != null) {
@@ -736,8 +758,27 @@ public final class VideoWallpaperController {
                 } catch (Exception ignored) {
                 }
             }
-            surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
-            surface = new Surface(surfaceTextureEntry.surfaceTexture());
+            if (surfaceTextureEntry == null) {
+                return;
+            }
+            try {
+                surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
+                surface = new Surface(surfaceTextureEntry.surfaceTexture());
+            } catch (Exception e) {
+                Log.w(TAG, "Surface creation failed, recreating texture entry: " + e.getMessage());
+                releaseSurface();
+                try {
+                    surfaceTextureEntry = textureRegistry.createSurfaceTexture();
+                    if (surfaceTextureEntry == null) {
+                        return;
+                    }
+                    surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
+                    surface = new Surface(surfaceTextureEntry.surfaceTexture());
+                } catch (Exception fatal) {
+                    Log.e(TAG, "Fatal Surface initialization failure: " + fatal.getMessage());
+                    return;
+                }
+            }
             if (player != null) {
                 try {
                     player.setVideoSurface(surface);
