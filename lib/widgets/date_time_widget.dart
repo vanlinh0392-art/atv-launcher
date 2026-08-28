@@ -35,7 +35,8 @@ class DateTimeWidget extends StatefulWidget {
   State<DateTimeWidget> createState() => _DateTimeWidgetState();
 }
 
-class _DateTimeWidgetState extends State<DateTimeWidget> {
+class _DateTimeWidgetState extends State<DateTimeWidget>
+    with WidgetsBindingObserver {
   late DateFormat _dateFormat;
   late DateTime _now;
   Timer? _timer;
@@ -46,6 +47,7 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _now = DateTime.now();
     _localeName = Platform.localeName;
@@ -69,9 +71,27 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
       _syncDateFormat(forceReschedule: true);
     }
   }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final now = DateTime.now();
+      final formattedNow = _dateFormat.format(now);
+      if (mounted) {
+        setState(() {
+          _now = now;
+          _formattedNow = formattedNow;
+        });
+      }
+      _scheduleNextRefresh();
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
