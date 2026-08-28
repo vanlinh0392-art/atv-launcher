@@ -5,6 +5,20 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-08-28 - Official release 2026.08.025 — Instant Video Wallpaper On Home & Sleep Wake With Self-Healing Surface Architecture
+
+### 1. Phát Video Nền Tức Thì 0-Delay Khi Về Home & Thức Dậy Từ Chế Độ Ngủ
+- **Triệt Tiêu 100% Hiện Tượng Chớp Ảnh Default**: Khi `wallpaperMode == 'video'`, nếu texture đang chuẩn bị hoặc re-arm, hệ thống sử dụng gradient chuyển tiếp tối mượt mà (`[#0F172A, #020617]`), loại bỏ vĩnh viễn việc render đè ảnh mặc định (`default_tv_wallpaper.jpg`).
+- **Phát Nền Ngay Lập Tức Trên Mọi Performance Mode**: Tối ưu Fast-Path `player.play()` trực tiếp tại luồng Native ngay khi nhận sự kiện `resumed` / `screen_wake` trên cả 3 chế độ `Balanced`, `Quality`, `Smooth`.
+
+### 2. Kiến Trúc Surface Texture Tự Phục Hồi (Self-Healing Surface Engine)
+- **Tự Động Khôi Phục Codec & Texture**: Tự phát hiện và tái tạo `SurfaceTextureEntry` sạch sẽ khi gặp lỗi giải mã `OMX 0x80001013`, `MediaCodec` hoặc khi TV tắt mở nguồn sâu liên tục.
+- **Triệt Tiêu Rò Rỉ Tài Nguyên**: Giải phóng Surface an toàn, chống leak bộ nhớ và giữ ổn định GPU decode.
+
+### 3. Tối Ưu Hóa AI Voice Broadcaster & Bộ Nhớ Đệm Tin Tức
+- **Dual-Cache RSS 15 Phút**: Lưu đệm tin tức thông minh, phản hồi phát thanh thời sự siêu tốc ngay cả khi mạng TV chập chờn.
+- **Thuật Toán Lọc Trùng Tin Tức Chuẩn Xác**: Ngăn chặn tin trùng lặp và bảo đảm văn phong báo chí súc tích cho bộ đọc giọng nói Tiếng Việt.
+
 ## 2026-08-26 - Official release 2026.08.024 — Real-Time Vietnam News Broadcaster For AI Voice Assistant
 
 ### 1. Tính Năng Điểm Tin Thời Sự & Đọc 3 Tin Tức Mới Nhất Việt Nam
