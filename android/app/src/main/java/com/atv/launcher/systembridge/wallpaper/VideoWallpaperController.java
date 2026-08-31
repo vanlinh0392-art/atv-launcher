@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 
@@ -34,6 +35,7 @@ public final class VideoWallpaperController {
     private static final long WAKE_REARM_DEBOUNCE_MS = 1500L;
     private static final long WAKE_PLAYLIST_RETRY_DELAY_MS = 750L;
     private static final int MAX_WAKE_PLAYLIST_RETRIES = 4;
+    private static final int MAX_CONSECUTIVE_PLAYER_ERRORS = 3;
 
     private final Context appContext;
     private final TextureRegistry textureRegistry;
@@ -63,6 +65,7 @@ public final class VideoWallpaperController {
     private String activePlaybackConfigSignature = "";
     private long lastWakeRearmAtElapsedMs = 0L;
     private int pendingWakePlaylistRetryCount = 0;
+    private int consecutivePlayerErrorCount = 0;
     private String pendingWakeReason = "";
 
     private final Runnable advanceRunnable = new Runnable() {
@@ -298,7 +301,7 @@ public final class VideoWallpaperController {
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
         cancelWakePlaylistRetry();
         releasePlayer();
-        releaseSurface();
+        releaseSurfaceAndTextureEntry();
     }
 
     public void onWallpaperModeChanged() {
@@ -306,7 +309,7 @@ public final class VideoWallpaperController {
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
             boolean changed = setVideoReady(false) | setLastError("");
             releasePlayer();
-            releaseSurface();
+            releaseSurfaceAndTextureEntry();
             notifyStatusChangedIf(changed);
             return;
         }
@@ -386,7 +389,7 @@ public final class VideoWallpaperController {
         if (!allowed) {
             startupWarmupReady = false;
             releasePlayer();
-            releaseSurface();
+            releaseSurfaceAndTextureEntry();
         }
         return true;
     }
@@ -508,8 +511,10 @@ public final class VideoWallpaperController {
         videoWarmupStartedAtNanos = System.nanoTime();
         notifyStatusChangedIf(resetStatusChanged);
 
+        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(appContext)
+                .setEnableDecoderFallback(true);
         trackSelector = new DefaultTrackSelector(appContext);
-        player = new ExoPlayer.Builder(appContext)
+        player = new ExoPlayer.Builder(appContext, renderersFactory)
                 .setTrackSelector(trackSelector)
                 .build();
         player.setVideoSurface(surface);
@@ -517,6 +522,7 @@ public final class VideoWallpaperController {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_READY) {
+                    consecutivePlayerErrorCount = 0;
                     boolean statusChanged = setVideoReady(true);
                     cancelPendingMultiStageWakeRecovery();
                     logPerf("time_to_video_ready", videoWarmupStartedAtNanos);
@@ -530,33 +536,35 @@ public final class VideoWallpaperController {
 
             @Override
             public void onRenderedFirstFrame() {
+                consecutivePlayerErrorCount = 0;
                 boolean statusChanged = setVideoReady(true);
                 notifyStatusChangedIf(statusChanged);
             }
 
             @Override
             public void onPlayerError(PlaybackException error) {
+                consecutivePlayerErrorCount++;
                 String errorMsg = error.getMessage() == null ? error.toString() : error.getMessage();
-                Log.w(TAG, "ExoPlayer onPlayerError: " + errorMsg);
+                Log.w(TAG, "ExoPlayer onPlayerError (attempt " + consecutivePlayerErrorCount + "): " + errorMsg);
                 boolean statusChanged = setVideoReady(false)
                         | setLastError(errorMsg);
                 notifyStatusChangedIf(statusChanged);
                 releasePlayer();
-                if (errorMsg.contains("0x80001013")
-                        || errorMsg.contains("MediaCodec")
-                        || errorMsg.contains("Surface")
-                        || errorMsg.contains("DecoderInitException")
-                        || errorMsg.contains("ExoPlaybackException")) {
-                    releaseSurface();
-                }
-                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
-                    mainHandler.postDelayed(() -> {
-                        if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
-                            logWakeInfo("wallpaper_auto_recover_after_error");
-                            ensureSurface();
-                            maybeStartPlayback(true, true);
-                        }
-                    }, 350L);
+                releaseSurface();
+
+                if (consecutivePlayerErrorCount < MAX_CONSECUTIVE_PLAYER_ERRORS) {
+                    long delayMs = 600L * consecutivePlayerErrorCount;
+                    if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                        mainHandler.postDelayed(() -> {
+                            if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                                logWakeInfo("wallpaper_auto_recover_after_error attempt=" + consecutivePlayerErrorCount);
+                                ensureSurface();
+                                maybeStartPlayback(true, true);
+                            }
+                        }, delayMs);
+                    }
+                } else {
+                    Log.e(TAG, "ExoPlayer onPlayerError: Max consecutive error count reached. Stopping recovery loop to conserve CPU.");
                 }
             }
 
@@ -726,6 +734,10 @@ public final class VideoWallpaperController {
             }
             surface = null;
         }
+    }
+
+    private void releaseSurfaceAndTextureEntry() {
+        releaseSurface();
         if (surfaceTextureEntry != null) {
             try {
                 surfaceTextureEntry.release();
@@ -736,13 +748,6 @@ public final class VideoWallpaperController {
     }
 
     private void ensureSurface() {
-        if (surfaceTextureEntry != null) {
-            try {
-                surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
-            } catch (Exception e) {
-                releaseSurface();
-            }
-        }
         if (surfaceTextureEntry == null) {
             try {
                 surfaceTextureEntry = textureRegistry.createSurfaceTexture();
@@ -751,6 +756,14 @@ public final class VideoWallpaperController {
                 return;
             }
         }
+        if (surfaceTextureEntry == null) {
+            return;
+        }
+        try {
+            surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to set default buffer size on SurfaceTexture: " + e.getMessage());
+        }
         if (surface == null || !surface.isValid()) {
             if (surface != null) {
                 try {
@@ -758,32 +771,17 @@ public final class VideoWallpaperController {
                 } catch (Exception ignored) {
                 }
             }
-            if (surfaceTextureEntry == null) {
-                return;
-            }
             try {
-                surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
                 surface = new Surface(surfaceTextureEntry.surfaceTexture());
             } catch (Exception e) {
-                Log.w(TAG, "Surface creation failed, recreating texture entry: " + e.getMessage());
-                releaseSurface();
-                try {
-                    surfaceTextureEntry = textureRegistry.createSurfaceTexture();
-                    if (surfaceTextureEntry == null) {
-                        return;
-                    }
-                    surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(videoWidth, videoHeight);
-                    surface = new Surface(surfaceTextureEntry.surfaceTexture());
-                } catch (Exception fatal) {
-                    Log.e(TAG, "Fatal Surface initialization failure: " + fatal.getMessage());
-                    return;
-                }
+                Log.w(TAG, "Surface creation failed: " + e.getMessage());
+                return;
             }
-            if (player != null) {
-                try {
-                    player.setVideoSurface(surface);
-                } catch (Exception ignored) {
-                }
+        }
+        if (player != null && surface != null && surface.isValid()) {
+            try {
+                player.setVideoSurface(surface);
+            } catch (Exception ignored) {
             }
         }
     }
