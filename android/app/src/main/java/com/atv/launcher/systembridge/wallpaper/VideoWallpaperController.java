@@ -22,9 +22,11 @@ import com.atv.launcher.systembridge.shared.state.BridgeStateStore;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import io.flutter.view.TextureRegistry;
 
@@ -41,6 +43,7 @@ public final class VideoWallpaperController {
     private final TextureRegistry textureRegistry;
     private final Runnable statusChangedCallback;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Set<String> quarantinedVideoUris = new HashSet<>();
 
     private TextureRegistry.SurfaceTextureEntry surfaceTextureEntry;
     private Surface surface;
@@ -306,6 +309,7 @@ public final class VideoWallpaperController {
 
     public void onWallpaperModeChanged() {
         cancelWakePlaylistRetry();
+        quarantinedVideoUris.clear();
         if (!TextUtils.equals("video", BridgeStateStore.getWallpaperMode(appContext))) {
             boolean changed = setVideoReady(false) | setLastError("");
             releasePlayer();
@@ -318,6 +322,7 @@ public final class VideoWallpaperController {
 
     public void onVideoConfigChanged() {
         cancelWakePlaylistRetry();
+        quarantinedVideoUris.clear();
         startupWarmupReady = true;
         onVideoPlaylistTopologyChanged();
         onVideoPlayerPolicyChanged();
@@ -546,6 +551,14 @@ public final class VideoWallpaperController {
                 consecutivePlayerErrorCount++;
                 String errorMsg = error.getMessage() == null ? error.toString() : error.getMessage();
                 Log.w(TAG, "ExoPlayer onPlayerError (attempt " + consecutivePlayerErrorCount + "): " + errorMsg);
+
+                int currentItemIndex = player != null ? player.getCurrentMediaItemIndex() : -1;
+                if (currentItemIndex >= 0 && currentItemIndex < resolvedPlaylistUris.size()) {
+                    String failedUri = resolvedPlaylistUris.get(currentItemIndex);
+                    quarantinedVideoUris.add(failedUri);
+                    Log.w(TAG, "Quarantined faulty video wallpaper URI: " + failedUri);
+                }
+
                 boolean statusChanged = setVideoReady(false)
                         | setLastError(errorMsg);
                 notifyStatusChangedIf(statusChanged);
@@ -553,7 +566,7 @@ public final class VideoWallpaperController {
                 releaseSurface();
 
                 if (consecutivePlayerErrorCount < MAX_CONSECUTIVE_PLAYER_ERRORS) {
-                    long delayMs = 600L * consecutivePlayerErrorCount;
+                    long delayMs = 800L * consecutivePlayerErrorCount;
                     if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
                         mainHandler.postDelayed(() -> {
                             if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
@@ -648,7 +661,17 @@ public final class VideoWallpaperController {
     }
 
     private List<String> resolvePlaylistUris() {
-        List<String> uris = new ArrayList<>(VideoLibraryController.resolveConfiguredPlaylistUris(appContext));
+        List<String> rawUris = new ArrayList<>(VideoLibraryController.resolveConfiguredPlaylistUris(appContext));
+        List<String> uris = new ArrayList<>();
+        for (String uri : rawUris) {
+            if (!quarantinedVideoUris.contains(uri)) {
+                uris.add(uri);
+            }
+        }
+        if (uris.isEmpty() && !rawUris.isEmpty() && quarantinedVideoUris.size() >= rawUris.size()) {
+            Log.e(TAG, "All " + rawUris.size() + " video wallpaper URIs are quarantined due to decoder errors.");
+            return Collections.emptyList();
+        }
         String advanceMode = BridgeStateStore.getWallpaperVideoAdvanceMode(appContext);
         if (BridgeStateStore.WALLPAPER_ORDER_SHUFFLE.equals(
                 BridgeStateStore.getWallpaperVideoOrderMode(appContext)

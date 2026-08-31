@@ -390,9 +390,16 @@ Widget _buildWallpaperLayer(
     );
   }
 
+  final isFatalVideoError = wallpaperStatus.lastError.isNotEmpty &&
+      !wallpaperStatus.videoReady &&
+      (wallpaperStatus.lastError.contains('No playable') ||
+          wallpaperStatus.lastError.contains('All wallpaper videos') ||
+          wallpaperStatus.lastError.contains('quarantined'));
+
   if (!isVideo ||
       wallpaper.videoTextureId == null ||
-      wallpaperStatus.lastError.isNotEmpty) {
+      isFatalVideoError ||
+      !wallpaperStatus.videoReady) {
     return RepaintBoundary(child: baseWallpaper);
   }
 
