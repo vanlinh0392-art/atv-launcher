@@ -231,6 +231,8 @@ public final class VideoWallpaperController {
         }
         logWakeInfo("wallpaper_focus_resume reason=" + reason);
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        consecutivePlayerErrorCount = 0;
+        quarantinedVideoUris.clear();
         foregroundActive = true;
         startupWarmupReady = true;
         ensureSurface();
@@ -253,7 +255,7 @@ public final class VideoWallpaperController {
 
     private void scheduleMultiStageWakeRecovery(String reason) {
         cancelPendingMultiStageWakeRecovery();
-        long[] delays = new long[]{250L, 650L, 1200L};
+        long[] delays = new long[]{300L, 750L, 1500L, 2500L};
         for (long delay : delays) {
             Runnable r = new Runnable() {
                 @Override
@@ -283,12 +285,8 @@ public final class VideoWallpaperController {
         cancelWakePlaylistRetry();
         cancelPendingMultiStageWakeRecovery();
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
-        if (player != null) {
-            try {
-                player.pause();
-            } catch (Exception ignored) {
-            }
-        }
+        releasePlayer();
+        releaseSurface();
     }
 
     public void onStop() {
@@ -552,32 +550,35 @@ public final class VideoWallpaperController {
                 String errorMsg = error.getMessage() == null ? error.toString() : error.getMessage();
                 Log.w(TAG, "ExoPlayer onPlayerError (attempt " + consecutivePlayerErrorCount + "): " + errorMsg);
 
+                boolean isTransient = isCodecContentionOrTransientError(errorMsg);
+
                 int currentItemIndex = player != null ? player.getCurrentMediaItemIndex() : -1;
-                if (currentItemIndex >= 0 && currentItemIndex < resolvedPlaylistUris.size()) {
+                if (!isTransient && currentItemIndex >= 0 && currentItemIndex < resolvedPlaylistUris.size()) {
                     String failedUri = resolvedPlaylistUris.get(currentItemIndex);
                     quarantinedVideoUris.add(failedUri);
-                    Log.w(TAG, "Quarantined faulty video wallpaper URI: " + failedUri);
+                    Log.w(TAG, "Quarantined permanent faulty video wallpaper URI: " + failedUri);
                 }
 
                 boolean statusChanged = setVideoReady(false)
-                        | setLastError(errorMsg);
+                        | setLastError(isTransient ? "" : errorMsg);
                 notifyStatusChangedIf(statusChanged);
                 releasePlayer();
                 releaseSurface();
 
-                if (consecutivePlayerErrorCount < MAX_CONSECUTIVE_PLAYER_ERRORS) {
-                    long delayMs = 800L * consecutivePlayerErrorCount;
+                int maxRetries = isTransient ? 5 : MAX_CONSECUTIVE_PLAYER_ERRORS;
+                if (consecutivePlayerErrorCount < maxRetries) {
+                    long delayMs = isTransient ? (350L * consecutivePlayerErrorCount) : (800L * consecutivePlayerErrorCount);
                     if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
                         mainHandler.postDelayed(() -> {
                             if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
-                                logWakeInfo("wallpaper_auto_recover_after_error attempt=" + consecutivePlayerErrorCount);
+                                logWakeInfo("wallpaper_auto_recover_after_error isTransient=" + isTransient + " attempt=" + consecutivePlayerErrorCount);
                                 ensureSurface();
                                 maybeStartPlayback(true, true);
                             }
                         }, delayMs);
                     }
                 } else {
-                    Log.e(TAG, "ExoPlayer onPlayerError: Max consecutive error count reached. Stopping recovery loop to conserve CPU.");
+                    Log.e(TAG, "ExoPlayer onPlayerError: Max error recovery attempts reached (isTransient=" + isTransient + "). Pausing recovery loop.");
                 }
             }
 
@@ -912,6 +913,20 @@ public final class VideoWallpaperController {
                         .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, !enabled)
                         .build()
         );
+    }
+
+    private boolean isCodecContentionOrTransientError(String errorMsg) {
+        if (TextUtils.isEmpty(errorMsg)) {
+            return true;
+        }
+        return errorMsg.contains("0x80001013")
+                || errorMsg.contains("NO_RESOURCES")
+                || errorMsg.contains("DecoderInitException")
+                || errorMsg.contains("MediaCodec")
+                || errorMsg.contains("Surface")
+                || errorMsg.contains("ExoPlaybackException")
+                || errorMsg.contains("resource")
+                || errorMsg.contains("busy");
     }
 
     private void notifyStatusChangedIf(boolean changed) {
