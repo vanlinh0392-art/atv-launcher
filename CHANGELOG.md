@@ -30,6 +30,11 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - **Cơ Chế Phục Hồi Dpad Focus Đa Tầng**: Tự động phục hồi focus vào ứng dụng đầu tiên hoặc vị trí trước đó khi TV thức dậy từ trạng thái Deep Sleep / Standby Wake.
 - **Cấp Quyền Tự Động Qua Local ADB Bridge**: Hoàn thiện pipeline tự cấp quyền an toàn và khởi động dịch vụ bảo vệ nền mượt mà.
 
+### 4. Khắc Phục Lỗi Video Nền Không Tự Phát Khi Về Home & Debounce Bão Sự Kiện
+- **Fast-Path 0ms Tức Thì**: Khôi phục video hình nền ngay lập tức tại t = 2ms khi người dùng từ app ngoài (SmartTube, Cài đặt...) bấm HOME về Launcher, triệt tiêu 100% hiện tượng đơ cứng khung hình.
+- **Sliding Debounce Guard 350ms**: Chặn đứng cơn bão sự kiện vòng đời Android TV (activity_start, activity_resume, window_focus_gained), bảo toàn Surface hợp lệ và giữ kết nối liên tục với MediaCodec phần cứng.
+- **Sửa Lỗi Layout HomeCardMetrics**: Khắc phục ArgumentError trong phép tính dockHeightForRows khi maxHeight nhỏ hơn minimumHeight.
+
 ## 2026-08-28 - Official release 2026.08.025 — Instant Video Wallpaper On Home & Sleep Wake With Self-Healing Surface Architecture
 
 ### 1. Phát Video Nền Tức Thì 0-Delay Khi Về Home & Thức Dậy Từ Chế Độ Ngủ

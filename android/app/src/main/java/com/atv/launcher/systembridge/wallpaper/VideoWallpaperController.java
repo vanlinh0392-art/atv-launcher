@@ -53,6 +53,7 @@ public final class VideoWallpaperController {
     private static final long ADVANCE_THROTTLE_MS = 2500L;
     private static final long MIN_LEGITIMATE_PLAYBACK_DURATION_MS = 1200L;
     private static final int MAX_GLITCH_RETRIES = 3;
+    private static final long RESUME_DEBOUNCE_MS = 350L;
 
     private final Context appContext;
     private final TextureRegistry textureRegistry;
@@ -97,6 +98,7 @@ public final class VideoWallpaperController {
     private long wakeRearmStartedAtNanos = 0L;
     private long lifecycleEpoch = 0L;
     private long lastWakeElapsedRealtimeMs = 0L;
+    private long lastResumeElapsedRealtimeMs = 0L;
     private long lastAdvanceElapsedRealtimeMs = 0L;
     private long targetAdvanceUptimeMs = 0L;
     private boolean isAdvanceScheduled = false;
@@ -238,8 +240,21 @@ public final class VideoWallpaperController {
             return;
         }
 
+        long now = SystemClock.elapsedRealtime();
+
+        // 1. DEBOUNCE GUARD: Chặn bão sự kiện (home_reentry, start, resume, focus...)
+        if (player != null && player.getMediaItemCount() > 0 && surface != null && surface.isValid()) {
+            boolean isAlreadyActiveOrStarting = player.isPlaying() || player.getPlayWhenReady();
+            if (isAlreadyActiveOrStarting && (now - lastResumeElapsedRealtimeMs < RESUME_DEBOUNCE_MS)) {
+                Log.d(TAG, "wallpaper_resume debounced: already active (reason=" + resolvedReason
+                        + ", elapsed=" + (now - lastResumeElapsedRealtimeMs) + "ms)");
+                return;
+            }
+        }
+
+        lastResumeElapsedRealtimeMs = now;
         wakeRearmStartedAtNanos = System.nanoTime();
-        lastWakeElapsedRealtimeMs = SystemClock.elapsedRealtime();
+        lastWakeElapsedRealtimeMs = now;
         consecutiveGlitchRetryCount = 0;
         logWakeInfo("wallpaper_resume reason=" + resolvedReason);
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
@@ -253,18 +268,13 @@ public final class VideoWallpaperController {
             return;
         }
 
-        // Làm sạch Surface cũ đã bị ngắt kết nối bởi GPU/VDEC sau chu kỳ ngủ TV (STR),
-        // tạo Surface mới sạch từ surfaceTextureEntry và rebind vào player.
-        // Giữ nguyên surfaceTextureEntry để Flutter giữ nguyên textureId.
-        releaseSurface();
-        ensureSurface();
-        currentItemStartedAtMs = SystemClock.elapsedRealtime();
-
-        if (player != null && surface != null && surface.isValid()) {
+        // 2. FAST-PATH (0ms DELAY): Surface & Player còn nguyên vẹn trong RAM và đã có playlist!
+        // TUYỆT ĐỐI KHÔNG releaseSurface() hay ensureSurface() ở đây!
+        if (player != null && player.getMediaItemCount() > 0 && surface != null && surface.isValid()) {
             int state = player.getPlaybackState();
             if (state == Player.STATE_IDLE) {
                 player.prepare();
-            } else if (state == Player.STATE_ENDED && player.getMediaItemCount() > 0) {
+            } else if (state == Player.STATE_ENDED) {
                 player.seekToDefaultPosition(Math.max(0, player.getCurrentMediaItemIndex()));
             }
             player.setPlayWhenReady(true);
@@ -273,14 +283,36 @@ public final class VideoWallpaperController {
             if (state == Player.STATE_READY) {
                 notifyStatusChangedIf(setVideoReady(true));
             }
+            Log.i(TAG, "wallpaper_resume fast-path 0ms success (reason=" + resolvedReason + ", state=" + state + ")");
             return;
         }
 
-        if (player != null && rebindFreshSurfaceToPlayer()) {
-            return;
-        }
-
+        // 3. SLOW-PATH: Chỉ chạy khi Surface bị mất/invalid (sau TV STR wake) hoặc player == null (sau 60s background)
         ensureSurface();
+        currentItemStartedAtMs = SystemClock.elapsedRealtime();
+
+        if (player != null && player.getMediaItemCount() > 0 && surface != null && surface.isValid()) {
+            try {
+                player.setVideoSurface(surface);
+                int state = player.getPlaybackState();
+                if (state == Player.STATE_IDLE) {
+                    player.prepare();
+                } else if (state == Player.STATE_ENDED) {
+                    player.seekToDefaultPosition(Math.max(0, player.getCurrentMediaItemIndex()));
+                }
+                player.setPlayWhenReady(true);
+                player.play();
+                scheduleIntervalAdvance();
+                if (state == Player.STATE_READY) {
+                    notifyStatusChangedIf(setVideoReady(true));
+                }
+                Log.i(TAG, "wallpaper_resume slow-path rebind success (reason=" + resolvedReason + ")");
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "wallpaper_resume rebind surface failed: " + e.getMessage());
+            }
+        }
+
         maybeStartPlayback(true, true, true);
     }
 
@@ -1105,36 +1137,6 @@ public final class VideoWallpaperController {
         }
     }
 
-    private boolean rebindFreshSurfaceToPlayer() {
-        if (player == null) {
-            return false;
-        }
-        long startNanos = System.nanoTime();
-        ensureSurface();
-        if (surface != null && surface.isValid()) {
-            try {
-                player.setVideoSurface(surface);
-                int playbackState = player.getPlaybackState();
-                if (playbackState == Player.STATE_IDLE) {
-                    player.prepare();
-                } else if (playbackState == Player.STATE_ENDED && player.getMediaItemCount() > 0) {
-                    int currentMediaItemIndex = Math.max(0, player.getCurrentMediaItemIndex());
-                    player.seekToDefaultPosition(currentMediaItemIndex);
-                }
-                if (BridgeStateStore.isWallpaperVideoAutoResumeEnabled(appContext) && !playbackSuppressed) {
-                    player.setPlayWhenReady(true);
-                    player.play();
-                }
-                scheduleIntervalAdvance();
-                long costMs = (System.nanoTime() - startNanos) / 1_000_000L;
-                Log.d(TAG, "rebindFreshSurfaceToPlayer fast rebind completed in " + costMs + "ms");
-                return true;
-            } catch (Exception e) {
-                Log.w(TAG, "rebindFreshSurfaceToPlayer failed: " + e.getMessage());
-            }
-        }
-        return false;
-    }
 
     private boolean isDeviceInteractive() {
         try {

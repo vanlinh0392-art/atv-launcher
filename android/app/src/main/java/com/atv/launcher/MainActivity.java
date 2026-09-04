@@ -3562,6 +3562,9 @@ public class MainActivity extends FlutterActivity {
         String resolvedName = TextUtils.isEmpty(fileName)
                 ? "atv-launcher-backup.json"
                 : new File(fileName).getName();
+        if (resolvedName.contains("\\")) {
+            resolvedName = new File(resolvedName.replace('\\', '/')).getName();
+        }
         if (!resolvedName.endsWith(".json")) {
             resolvedName = resolvedName + ".json";
         }

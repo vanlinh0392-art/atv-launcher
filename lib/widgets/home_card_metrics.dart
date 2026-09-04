@@ -59,7 +59,9 @@ class HomeCardMetrics {
     final minimumHeight = homeDockScrollTopPadding +
         homeDockScrollBottomPadding +
         slotMainAxisExtent;
-    return targetHeight.clamp(minimumHeight, maxHeight).toDouble();
+    final effectiveMaxHeight =
+        maxHeight < minimumHeight ? minimumHeight : maxHeight;
+    return targetHeight.clamp(minimumHeight, effectiveMaxHeight).toDouble();
   }
 }
 

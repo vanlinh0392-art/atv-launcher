@@ -26,7 +26,8 @@ void main() {
       if (fileName == null || fileName.trim().isEmpty) {
         return '';
       }
-      final sanitizedName = File(fileName).uri.pathSegments.lastWhere(
+      final normalized = fileName.replaceAll(r'\', '/');
+      final sanitizedName = File(normalized).uri.pathSegments.lastWhere(
             (s) => s.isNotEmpty,
             orElse: () => '',
           );
@@ -54,7 +55,8 @@ void main() {
       if (fileName == null || fileName.trim().isEmpty) {
         return false;
       }
-      final sanitizedName = File(fileName).uri.pathSegments.lastWhere(
+      final normalized = fileName.replaceAll(r'\', '/');
+      final sanitizedName = File(normalized).uri.pathSegments.lastWhere(
             (s) => s.isNotEmpty,
             orElse: () => '',
           );
@@ -84,7 +86,8 @@ void main() {
       if (fileName == null || fileName.trim().isEmpty) {
         resolvedName = 'atv-launcher-backup.json';
       } else {
-        resolvedName = File(fileName).uri.pathSegments.lastWhere(
+        final normalized = fileName.replaceAll(r'\', '/');
+        resolvedName = File(normalized).uri.pathSegments.lastWhere(
               (s) => s.isNotEmpty,
               orElse: () => 'atv-launcher-backup.json',
             );
