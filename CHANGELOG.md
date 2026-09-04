@@ -5,6 +5,13 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-09-04 - Official release 2026.09.005 — Khắc phục xung đột cờ vòng đời nguồn Xiaomi TV & Bảo đảm bấm phím nguồn vào Ngủ sâu (Standby)
+
+### 1. Khắc Phục Xung Đột Cờ Vòng Đời Nguồn Xiaomi (Power State Machine Fix)
+- **Chuẩn Hóa Policy Auto-Heal Xiaomi**: Tách biệt hoàn toàn cờ trạng thái vòng đời nội bộ `system_str` của firmware Xiaomi khỏi cấu hình `mitv.short.power.action`.
+- **Tránh Xung Đột `PowerManagerService.isInStrMode()`**: Loại bỏ lệnh ghi đè `system_str = 1` trong `SystemBridgeCoordinator.java` để hệ điều hành Xiaomi tự do chuyển đổi trạng thái Suspend-To-RAM mà không đánh chặn sự kiện `goToSleep()`.
+- **Đảm Bảo Bấm 1 Lần Phím Nguồn Luôn Vào Ngủ Sâu**: Phím nguồn remote đưa TV vào chế độ Standby ngay lập tức khi nhấn 1 lần; bấm tiếp tục thức dậy tức thì; giữ phím nguồn mở menu tắt nguồn (Power Off) như mặc định.
+
 ## 2026-09-04 - Official release 2026.09.004 — Tùy biến Nút Quay lại (Nhấn 1 lần & Nhấn giữ), Tinh gọn Giao diện Cài đặt & Tối ưu Wake Focus
 
 ### 1. Tùy Biến Hành Động Nút Quay Lại (Single Press & Long Press)

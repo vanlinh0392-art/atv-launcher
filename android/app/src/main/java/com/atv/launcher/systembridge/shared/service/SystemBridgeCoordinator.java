@@ -177,6 +177,7 @@ public final class SystemBridgeCoordinator {
         summary.markIfChanged("\u2713 ADB", adbPolicyResult.changed);
         HomeGuardResult homeGuardResult = applyHomeGuard(appContext, reason);
         summary.markIfChanged("\u2713 HOME", homeGuardResult.launched);
+        ensureXiaomiPowerPolicy(appContext);
 
         AccessibilityState accessibilityState = readAccessibilityState(appContext);
         AccessibilityRepairPlan repairPlan = buildTargetAccessibilityState(appContext, accessibilityState);
@@ -717,6 +718,35 @@ public final class SystemBridgeCoordinator {
             message = "ADB automation could not fully apply on this firmware.";
         }
         return new ApplyAdbPolicyResult(success, changed, message);
+    }
+
+    private static void ensureXiaomiPowerPolicy(Context context) {
+        String brand = android.os.Build.BRAND != null ? android.os.Build.BRAND.toLowerCase(Locale.ROOT) : "";
+        String manufacturer = android.os.Build.MANUFACTURER != null ? android.os.Build.MANUFACTURER.toLowerCase(Locale.ROOT) : "";
+        String model = android.os.Build.MODEL != null ? android.os.Build.MODEL.toLowerCase(Locale.ROOT) : "";
+        boolean isXiaomi = brand.contains("xiaomi") || brand.contains("redmi")
+                || manufacturer.contains("xiaomi")
+                || model.contains("mitv");
+        if (!isXiaomi) {
+            return;
+        }
+        try {
+            int currentAction = Settings.System.getInt(context.getContentResolver(), "mitv.short.power.action", -1);
+            if (currentAction != 1) {
+                try {
+                    Settings.System.putInt(context.getContentResolver(), "mitv.short.power.action", 1);
+                    Settings.System.putInt(context.getContentResolver(), "short_power_action_view_id", 0);
+                } catch (Exception ignored) {
+                }
+                LocalAdbBridge.executeShell(
+                        context,
+                        "settings put system mitv.short.power.action 1 && settings put system short_power_action_view_id 0"
+                );
+                Log.i(TAG, "Xiaomi TV power policy auto-healed to Standby/STR (1)");
+            }
+        } catch (Exception exception) {
+            Log.w(TAG, "Failed to verify or auto-heal Xiaomi power policy", exception);
+        }
     }
 
     private static boolean setGlobalIntWithFallback(Context context, String key, int value) {
