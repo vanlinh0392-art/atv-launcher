@@ -2,6 +2,7 @@ import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/network_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
+import 'package:flauncher/widgets/date_time_widget.dart';
 import 'package:flauncher/widgets/focus_aware_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -118,14 +119,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text(localizations.searchHint), findsOneWidget);
+    expect(find.text(localizations.searchHint), findsNothing);
+    expect(find.byIcon(Icons.search_rounded), findsNothing);
+    expect(find.text(localizations.reorder), findsOneWidget);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text(localizations.searchHint), findsNothing);
-    expect(find.text(localizations.reorder), findsOneWidget);
+    expect(find.text(localizations.reorder), findsNothing);
+    expect(find.text(localizations.settings), findsOneWidget);
   });
 
   testWidgets('tapping the network badge opens Wi-Fi settings',
@@ -158,7 +161,7 @@ void main() {
     });
     when(bridge.openSpecificSettingsPage('wifi'))
         .thenAnswer((_) async => true);
-    when(channel.addNetworkChangedListener(any)).thenAnswer((_) {});
+    when(channel.addNetworkChangedListener(any)).thenAnswer((_) => null);
     when(channel.getActiveNetworkInformation()).thenAnswer(
       (_) async => <String, dynamic>{
         'networkType': 1,
@@ -196,5 +199,88 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(bridge.openSpecificSettingsPage('wifi')).called(1);
+  });
+
+  testWidgets(
+      'renders 2-tier layout with action icons on top and date/time below',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final settings = MockSettingsService();
+    final apps = MockAppsService();
+    final bridge = MockSystemBridgeService();
+
+    when(settings.showRamInStatusBar).thenReturn(false);
+    when(settings.autoHideAppBarEnabled).thenReturn(false);
+    when(settings.homeDockGlassIntensityPercent).thenReturn(20);
+    when(settings.showDateInStatusBar).thenReturn(true);
+    when(settings.showTimeInStatusBar).thenReturn(true);
+    when(settings.dateFormat).thenReturn("Thứ 5 ngày d/M/y");
+    when(settings.timeFormat).thenReturn("HH:mm");
+    when(settings.statusBarClockScalePercent).thenReturn(100);
+    when(apps.homeReorderModeEnabled).thenReturn(false);
+    when(bridge.memoryStatus).thenReturn(const <String, dynamic>{});
+    when(bridge.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+      'requirements': <Map<String, dynamic>>[],
+    });
+
+    final channel = MockFLauncherChannel();
+    when(channel.addNetworkChangedListener(any)).thenAnswer((_) => null);
+    when(channel.getActiveNetworkInformation()).thenAnswer(
+      (_) async => <String, dynamic>{
+        'networkType': 1,
+        'internetAccess': true,
+        'wirelessSignalLevel': 4,
+      },
+    );
+    final networkService = NetworkService(channel);
+    addTearDown(networkService.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<SettingsService>.value(value: settings),
+          Provider<AppsService>.value(value: apps),
+          Provider<SystemBridgeService>.value(value: bridge),
+          ChangeNotifierProvider<NetworkService>.value(value: networkService),
+        ],
+        child: MediaQuery(
+          data: const MediaQueryData(size: Size(1280, 720)),
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              appBar: FocusAwareAppBar(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final settingsIconFinder = find.byIcon(Icons.settings_outlined);
+    expect(settingsIconFinder, findsOneWidget);
+
+    final dateTimeWidgets = find.byType(DateTimeWidget);
+    expect(dateTimeWidgets, findsNWidgets(2));
+
+    final settingsIconBottom = tester.getBottomRight(settingsIconFinder).dy;
+    final dateTop = tester.getTopLeft(dateTimeWidgets.first).dy;
+    expect(dateTop, greaterThanOrEqualTo(settingsIconBottom));
+
+    final excludeFocusFinder = find.ancestor(
+      of: dateTimeWidgets.first,
+      matching: find.byType(ExcludeFocus),
+    );
+    expect(excludeFocusFinder, findsWidgets);
+    final ExcludeFocus excludeFocusWidget =
+        tester.widget(excludeFocusFinder.first);
+    expect(excludeFocusWidget.excluding, isTrue);
   });
 }

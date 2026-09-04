@@ -18,11 +18,13 @@
 
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/settings/applications_panel_page.dart';
 import '../widgets/settings/back_button_actions.dart';
+import '../widgets/settings/settings_panel.dart';
 import 'apps_service.dart';
 
 class LauncherState extends ChangeNotifier {
@@ -80,24 +82,76 @@ class LauncherState extends ChangeNotifier {
   }
 
   void handleBackNavigation(BuildContext context) {
+    handleBackSinglePress(context);
+  }
+
+  void handleBackSinglePress(BuildContext context) {
     AppsService appsService = context.read<AppsService>();
     LauncherState launcherState = context.read<LauncherState>();
     SettingsService settingsService = context.read<SettingsService>();
 
     if (kDebugMode || launcherState.isDefaultLauncher) {
       launcherState.refresh(appsService, force: true);
-      String action = settingsService.backButtonAction;
-
-      switch (action) {
-        case BACK_BUTTON_ACTION_CLOCK:
-          launcherState.toggleLauncherVisibility();
-          break;
-        case BACK_BUTTON_ACTION_SCREENSAVER:
-          appsService.startAmbientMode();
-          break;
-      }
+      final action = settingsService.backButtonAction;
+      _executeAction(context, action);
     } else {
       SystemNavigator.pop();
+    }
+  }
+
+  void handleBackLongPress(BuildContext context) {
+    AppsService appsService = context.read<AppsService>();
+    LauncherState launcherState = context.read<LauncherState>();
+    SettingsService settingsService = context.read<SettingsService>();
+
+    if (kDebugMode || launcherState.isDefaultLauncher) {
+      launcherState.refresh(appsService, force: true);
+      final action = settingsService.backButtonLongPressAction;
+      _executeAction(context, action);
+    }
+  }
+
+  void _executeAction(BuildContext context, String action) {
+    AppsService appsService = context.read<AppsService>();
+    LauncherState launcherState = context.read<LauncherState>();
+
+    switch (action) {
+      case BACK_BUTTON_ACTION_TOGGLE_MUTE:
+        appsService.toggleMute();
+        break;
+      case BACK_BUTTON_ACTION_CLOCK:
+        launcherState.toggleLauncherVisibility();
+        break;
+      case BACK_BUTTON_ACTION_SCREENSAVER:
+        appsService.startAmbientMode();
+        break;
+      case BACK_BUTTON_ACTION_TV_SETTINGS:
+        appsService.openSettings();
+        break;
+      case BACK_BUTTON_ACTION_FLAUNCHER_SETTINGS:
+        if (context.mounted) {
+          showDialog<void>(
+            context: context,
+            builder: (_) => const SettingsPanel(),
+          );
+        }
+        break;
+      case BACK_BUTTON_ACTION_APP_DRAWER:
+        if (context.mounted) {
+          showDialog<void>(
+            context: context,
+            builder: (_) => const SettingsPanel(
+              initialRoute: ApplicationsPanelPage.routeName,
+            ),
+          );
+        }
+        break;
+      case BACK_BUTTON_ACTION_SLEEP:
+        appsService.sleepTv();
+        break;
+      case BACK_BUTTON_ACTION_NOTHING:
+      default:
+        break;
     }
   }
 }

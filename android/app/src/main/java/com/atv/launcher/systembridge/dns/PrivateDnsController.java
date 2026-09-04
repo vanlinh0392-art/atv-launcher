@@ -48,6 +48,9 @@ public final class PrivateDnsController {
 
     public static Map<String, Object> apply(Context context, String mode, String host) {
         String normalizedMode = normalizeMode(mode);
+        if (MODE_HOSTNAME.equals(normalizedMode) && !isValidHostname(host)) {
+            return failure(context, "Invalid Private DNS hostname. Must comply with RFC 1123.");
+        }
         String normalizedHost = normalizeHost(host);
         Snapshot before = readSnapshot(context);
         if (!prefs(context).getBoolean(KEY_HAS_RESTORE_SNAPSHOT, false)) {
@@ -85,7 +88,13 @@ public final class PrivateDnsController {
         Snapshot restore = readRestoreSnapshot(context);
         WriteResult writeResult;
         if (restore != null) {
-            writeResult = writeSnapshot(context, normalizeMode(restore.mode), restore.specifier);
+            String normalizedRestoreSpecifier = normalizeHost(restore.specifier);
+            String normalizedRestoreMode = normalizeMode(restore.mode);
+            if (MODE_HOSTNAME.equals(normalizedRestoreMode) && TextUtils.isEmpty(normalizedRestoreSpecifier)) {
+                normalizedRestoreMode = MODE_OPPORTUNISTIC;
+                normalizedRestoreSpecifier = null;
+            }
+            writeResult = writeSnapshot(context, normalizedRestoreMode, normalizedRestoreSpecifier);
         } else {
             writeResult = writeSnapshot(context, MODE_OPPORTUNISTIC, null);
         }
@@ -123,8 +132,11 @@ public final class PrivateDnsController {
 
         StringBuilder command = new StringBuilder();
         if (MODE_HOSTNAME.equals(mode)) {
+            if (!isValidHostname(specifier)) {
+                return WriteResult.failure("Invalid DoT hostname (RFC 1123 violation).");
+            }
             command.append("settings put global ").append(KEY_PRIVATE_DNS_SPECIFIER)
-                    .append(" ").append(specifier).append(" && ");
+                    .append(" ").append(specifier.trim()).append(" && ");
             command.append("settings put global ").append(KEY_PRIVATE_DNS_MODE)
                     .append(" ").append(MODE_HOSTNAME);
         } else {
@@ -144,7 +156,10 @@ public final class PrivateDnsController {
 
     private static boolean writeGlobals(Context context, String mode, String specifier) {
         if (MODE_HOSTNAME.equals(mode)) {
-            return Settings.Global.putString(context.getContentResolver(), KEY_PRIVATE_DNS_SPECIFIER, specifier)
+            if (!isValidHostname(specifier)) {
+                return false;
+            }
+            return Settings.Global.putString(context.getContentResolver(), KEY_PRIVATE_DNS_SPECIFIER, specifier.trim())
                     && Settings.Global.putString(context.getContentResolver(), KEY_PRIVATE_DNS_MODE, mode);
         }
         return Settings.Global.putString(context.getContentResolver(), KEY_PRIVATE_DNS_MODE, mode)
@@ -221,8 +236,22 @@ public final class PrivateDnsController {
         return MODE_OPPORTUNISTIC;
     }
 
-    private static String normalizeHost(String host) {
+    private static final java.util.regex.Pattern RFC1123_HOSTNAME_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$");
+
+    public static boolean isValidHostname(String host) {
         if (TextUtils.isEmpty(host)) {
+            return false;
+        }
+        String trimmed = host.trim();
+        if (trimmed.length() > 253) {
+            return false;
+        }
+        return RFC1123_HOSTNAME_PATTERN.matcher(trimmed).matches();
+    }
+
+    private static String normalizeHost(String host) {
+        if (!isValidHostname(host)) {
             return DEFAULT_DNS_HOST;
         }
         return host.trim();

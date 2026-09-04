@@ -65,6 +65,12 @@ class FLauncherChannel {
   Future<void> startAmbientMode() async =>
       await _methodChannel.invokeMethod('startAmbientMode');
 
+  Future<Map<String, dynamic>> toggleMute() async =>
+      _invokeMapMethod('toggleMute');
+
+  Future<Map<String, dynamic>> sleepTv() async =>
+      _invokeMapMethod('sleepTv');
+
   Future<Map<String, dynamic>> getSystemBridgeStatus() async =>
       _invokeMapMethod('getSystemBridgeStatus');
 
@@ -363,25 +369,30 @@ class FLauncherChannel {
   Future<Map<String, dynamic>> updateDynamicFreeAiModels() =>
       _invokeMapMethod('updateDynamicFreeAiModels');
 
-  void addAppsChangedListener(void Function(Map<String, dynamic>) listener) =>
+  StreamSubscription<dynamic>? addAppsChangedListener(
+          void Function(Map<String, dynamic>) listener) =>
       _appsEventChannel.receiveBroadcastStream().listen((event) {
-        final eventMap = (event as Map).cast<String, dynamic>();
-        listener(eventMap);
+        if (event is Map) {
+          listener(event.cast<String, dynamic>());
+        }
       });
 
-  void addNetworkChangedListener(
+  StreamSubscription<dynamic>? addNetworkChangedListener(
           void Function(Map<String, dynamic>) listener) =>
       _networkEventChannel.receiveBroadcastStream().listen((event) {
-        final eventMap = (event as Map).cast<String, dynamic>();
-        listener(eventMap);
+        if (event is Map) {
+          listener(event.cast<String, dynamic>());
+        }
       });
 
   StreamSubscription<dynamic> addSystemChangedListener(
     void Function(Map<String, dynamic>) listener,
   ) =>
       _systemEventChannel.receiveBroadcastStream().listen((event) {
-        final eventMap = (event as Map).cast<String, dynamic>();
-        listener(eventMap);
+        if (event is Map) {
+          final eventMap = event.cast<String, dynamic>();
+          listener(eventMap);
+        }
       });
 
   Future<void> showToast(String message) async {

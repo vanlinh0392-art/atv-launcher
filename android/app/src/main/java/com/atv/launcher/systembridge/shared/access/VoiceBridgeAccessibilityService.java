@@ -17,13 +17,18 @@ import com.atv.launcher.systembridge.shared.voice.VoiceKeyHandler;
 public class VoiceBridgeAccessibilityService extends AccessibilityService {
     private static final String TAG = "VoiceBridge";
 
-    private static volatile VoiceBridgeAccessibilityService instance;
+    private static volatile java.lang.ref.WeakReference<VoiceBridgeAccessibilityService> sServiceRef;
     private static volatile String currentForegroundPackage = "com.atv.launcher";
+    private static final java.util.Set<String> IGNORED_PACKAGES = new java.util.HashSet<>(java.util.Arrays.asList(
+            "com.android.systemui",
+            "com.google.android.inputmethod.latin",
+            "android"
+    ));
     private final VoiceKeyHandler voiceKeyHandler = new VoiceKeyHandler(TAG, "accessibility");
     private BroadcastReceiver wakeReceiver;
 
     public static VoiceBridgeAccessibilityService getInstance() {
-        return instance;
+        return sServiceRef != null ? sServiceRef.get() : null;
     }
 
     @Override
@@ -31,7 +36,10 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
         if (event != null && event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             CharSequence pkg = event.getPackageName();
             if (pkg != null && pkg.length() > 0) {
-                currentForegroundPackage = pkg.toString();
+                String pkgStr = pkg.toString();
+                if (!IGNORED_PACKAGES.contains(pkgStr) && !pkgStr.contains("inputmethod")) {
+                    currentForegroundPackage = pkgStr;
+                }
             }
         }
     }
@@ -77,7 +85,7 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
-        instance = this;
+        sServiceRef = new java.lang.ref.WeakReference<>(this);
         Log.i(TAG, "connected process=" + getPackageName()
                 + " key=" + BridgeStateStore.getKeyCode(this)
                 + " mode=" + BridgeStateStore.getMode(this));
@@ -88,14 +96,24 @@ public class VoiceBridgeAccessibilityService extends AccessibilityService {
     }
 
     @Override
+    public boolean onUnbind(Intent intent) {
+        cleanupService();
+        return super.onUnbind(intent);
+    }
+
+    @Override
     public void onDestroy() {
         Log.i(TAG, "destroyed");
-        instance = null;
+        cleanupService();
+        SystemBridgeCoordinator.startCore(this, "accessibility_destroyed");
+        super.onDestroy();
+    }
+
+    private void cleanupService() {
+        sServiceRef = null;
         com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.setAccessibilityService(null);
         voiceKeyHandler.clearPendingActions();
         unregisterWakeReceiver();
-        SystemBridgeCoordinator.startCore(this, "accessibility_destroyed");
-        super.onDestroy();
     }
 
     private void registerWakeReceiver() {

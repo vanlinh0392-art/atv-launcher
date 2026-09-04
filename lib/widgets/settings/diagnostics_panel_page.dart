@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
-import 'package:flauncher/widgets/settings/settings_localized_values.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,7 +23,6 @@ class DiagnosticsPanelPage extends StatefulWidget {
 }
 
 class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
-  static const String _summaryDebugLabel = 'diagnostics_summary_metrics';
   static const String _reportDebugLabel = 'diagnostics_report_section';
   final ScrollController _reportScrollController = ScrollController();
 
@@ -50,14 +48,6 @@ class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
     final report = context.select<SystemBridgeService, String>(
       (service) => service.diagnosticsReport,
     );
-    final adbStatus = context.select<SystemBridgeService, Map<String, dynamic>>(
-      (service) => service.adbAutomationStatus,
-    );
-    final systemCoreStatus =
-        context.select<SystemBridgeService, Map<String, dynamic>>(
-      (service) => service.systemCoreStatus,
-    );
-    final lineCount = report.isEmpty ? 0 : '\n'.allMatches(report).length + 1;
     final reportViewportHeight =
         (viewSize.height * 0.5).clamp(220.0, 420.0).toDouble();
 
@@ -65,78 +55,34 @@ class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
       key: const PageStorageKey<String>(DiagnosticsPanelPage.routeName),
       padding: const EdgeInsets.only(bottom: 16),
       children: [
-        SettingsSummarySection(
-          debugLabel: _summaryDebugLabel,
-          child: SettingsMetricsGrid(
-            minChildWidth: 168,
-            maxColumns: 3,
-            children: [
-              SettingsMetricTile(
-                label: localizations.reportLines,
-                value: lineCount.toString(),
-                icon: Icons.receipt_long_outlined,
-                minHeight: 44,
-              ),
-              SettingsMetricTile(
-                label: localizations.adbAutomationPolicyTitle,
-                value: localizedAdbPolicy(
-                  localizations,
-                  adbStatus['policy']?.toString() ?? '',
-                ),
-                icon: Icons.adb_outlined,
-                minHeight: 44,
-              ),
-              SettingsMetricTile(
-                label: localizations.coreHealthLabel,
-                value: localizedBridgeHealth(
-                  localizations,
-                  systemCoreStatus['coreServiceHealth']?.toString() ?? '',
-                ),
-                icon: Icons.favorite_outline,
-                minHeight: 44,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
         SettingsSurfaceCard(
-          padding: const EdgeInsets.all(12),
+          padding: TvDrawerTokens.surfacePadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SettingsAdaptiveGrid(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: TvDrawerTokens.rowSpacing,
                 minChildWidth: 240,
                 maxColumns: 2,
                 children: [
                   _buildCompactActionCard(
                     key: const Key('diagnostics_refresh_button'),
                     focusNode: widget.primaryFocusNode,
-                    onMoveUpAtBoundary: () =>
-                        focusCurrentSettingsNodeByDebugLabel(
-                      _summaryDebugLabel,
-                    ),
                     title: localizations.refreshLabel,
-                    subtitle: localizations.reportLines,
                     icon: Icons.refresh,
                     onPressed: () async => bridgeService.refreshFull(),
                   ),
                   _buildCompactActionCard(
                     key: const Key('diagnostics_copy_button'),
-                    onMoveUpAtBoundary: () =>
-                        focusCurrentSettingsNodeByDebugLabel(
-                      _summaryDebugLabel,
-                    ),
                     title: localizations.copyReport,
-                    subtitle: localizations.reportLines,
                     icon: Icons.copy_outlined,
                     onPressed: () async =>
                         Clipboard.setData(ClipboardData(text: report)),
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: TvDrawerTokens.rowSpacing),
               _DiagnosticsReportSection(
                 report: report,
                 viewportHeight: reportViewportHeight,
@@ -155,28 +101,24 @@ class _DiagnosticsPanelPageState extends State<DiagnosticsPanelPage> {
     FocusNode? focusNode,
     SettingsBoundaryMoveHandler? onMoveUpAtBoundary,
     required String title,
-    required String subtitle,
     required IconData icon,
     required Future<void> Function()? onPressed,
   }) {
-    return SizedBox(
-      height: 76,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58.0),
       child: SettingsActionCard(
         key: key,
         focusNode: focusNode,
         onMoveUpAtBoundary: onMoveUpAtBoundary,
         title: title,
-        subtitle: subtitle,
         icon: icon,
         focusEmphasis: 1.16,
         onPressed: onPressed,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
-          vertical: 9,
+          vertical: 10,
         ),
         titleMaxLines: 1,
-        subtitleMaxLines: 1,
-        titleSubtitleSpacing: 1,
         iconSize: 20,
         trailingIconSize: 20,
       ),

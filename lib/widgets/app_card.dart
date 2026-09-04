@@ -41,6 +41,8 @@ import '../models/category.dart';
 const _validationKeys = [
   LogicalKeyboardKey.select,
   LogicalKeyboardKey.enter,
+  LogicalKeyboardKey.numpadEnter,
+  LogicalKeyboardKey.space,
   LogicalKeyboardKey.gameButtonA,
 ];
 
@@ -57,7 +59,7 @@ typedef AppCardMoveEndCallback = Future<void> Function(
 typedef AppCardNavigateCallback = bool Function(AxisDirection direction);
 
 class AppCard extends StatefulWidget {
-  static const int _maxImageCacheSize = 24;
+  static const int _maxImageCacheSize = 96;
   static const int _maxConcurrentImageLoads = 2;
   static const Duration _deferredImageLoadDelay = Duration(milliseconds: 900);
   static final LinkedHashMap<String, Tuple2<AppImageType, ImageProvider>>
@@ -430,7 +432,8 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) => FocusKeyboardListener(
-        onPressed: (key) => _onPressed(context, key),
+        onKeyAction: (key, {isRepeat = false}) =>
+            _onPressed(context, key, isRepeat: isRepeat),
         onLongPress: (key) => _onLongPress(context, key),
         builder: (context) {
           final shouldHighlight = _shouldHighlight(context);
@@ -1005,7 +1008,11 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
         ),
       );
 
-  KeyEventResult _onPressed(BuildContext context, LogicalKeyboardKey? key) {
+  KeyEventResult _onPressed(
+    BuildContext context,
+    LogicalKeyboardKey? key, {
+    bool isRepeat = false,
+  }) {
     final homeReorderModeEnabled =
         context.read<AppsService>().homeReorderModeEnabled;
     final navigationDirection = _navigationDirectionForKey(key);
@@ -1038,7 +1045,8 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
       if (!isTest) {
         final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - _lastDpadTime < 95) {
+        final debounceMs = isRepeat ? 30 : 50;
+        if (now - _lastDpadTime < debounceMs) {
           return KeyEventResult.handled;
         }
         _lastDpadTime = now;

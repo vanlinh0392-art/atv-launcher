@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../mocks.mocks.dart';
 
@@ -160,5 +161,65 @@ void main() {
     expect(service.updateStatus['state'], 'idle');
     expect(service.fileAccessStatus['granted'], isTrue);
     expect(service.backupStatus['lastExportName'], 'backup.json');
+  });
+
+  test(
+      'autoProvisionAdbPermissions and autoGrantAdbOnWake sync 2-way with SharedPreferences',
+      () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      SystemBridgeService.autoGrantAdbPrefKey: false,
+    });
+    final prefs = await SharedPreferences.getInstance();
+
+    final channel = MockFLauncherChannel();
+    final systemEvents = StreamController<Map<String, dynamic>>();
+    addTearDown(systemEvents.close);
+
+    when(channel.getSystemBridgeStatusLite()).thenAnswer(
+      (_) async => <String, dynamic>{
+        'snapshotKind': 'lite',
+        'provisioning': <String, dynamic>{
+          'health': 'healthy',
+          'missingRequiredCount': 0,
+        },
+      },
+    );
+    when(channel.addSystemChangedListener(any)).thenAnswer((invocation) {
+      final listener = invocation.positionalArguments.single as void Function(
+          Map<String, dynamic>);
+      return systemEvents.stream.listen(listener);
+    });
+
+    final service = SystemBridgeService(channel, prefs);
+    await untilCalled(channel.addSystemChangedListener(any));
+
+    expect(service.autoGrantAdbOnWake, isFalse);
+    expect(service.autoProvisionAdbPermissions, isFalse);
+    expect(service.permissionsSnapshot.autoGrantAdbOnWake, isFalse);
+
+    await service.setAutoGrantAdbOnWake(true);
+    expect(service.autoGrantAdbOnWake, isTrue);
+    expect(service.autoProvisionAdbPermissions, isTrue);
+    expect(service.permissionsSnapshot.autoGrantAdbOnWake, isTrue);
+    expect(prefs.getBool(SystemBridgeService.autoGrantAdbPrefKey), isTrue);
+
+    // Native event sync
+    systemEvents.add(<String, dynamic>{
+      'provisioning': <String, dynamic>{
+        'health': 'missing_required',
+        'missingRequiredCount': 2,
+        'autoGrantAdbOnWake': false,
+        'requirements': [
+          {'name': 'android.permission.WRITE_SECURE_SETTINGS', 'granted': false}
+        ],
+      },
+    });
+    await Future<void>.delayed(Duration.zero);
+
+    expect(service.autoGrantAdbOnWake, isFalse);
+    expect(prefs.getBool(SystemBridgeService.autoGrantAdbPrefKey), isFalse);
+    expect(service.permissionsSnapshot.health, 'missing_required');
+    expect(service.permissionsSnapshot.missingRequiredCount, 2);
+    expect(service.permissionsSnapshot.requirements.length, 1);
   });
 }

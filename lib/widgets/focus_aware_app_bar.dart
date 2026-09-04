@@ -4,6 +4,7 @@ import 'package:flauncher/widgets/pin_pad_dialog.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/providers/weather_service.dart';
 import 'package:flauncher/widgets/focus_keyboard_listener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ import 'network_widget.dart';
 
 class FocusAwareAppBar extends StatefulWidget implements PreferredSizeWidget {
   final FocusNode? primaryFocusNode;
+  static const double statusBarHeight = 80.0;
 
   const FocusAwareAppBar({
     super.key,
@@ -29,11 +31,25 @@ class FocusAwareAppBar extends StatefulWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(statusBarHeight);
 }
 
 class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
   bool focused = false;
+  final FocusNode _settingsFocusNode =
+      FocusNode(debugLabel: 'status_bar_settings');
+  final FocusNode _permissionsFocusNode =
+      FocusNode(debugLabel: 'status_bar_permissions');
+  final FocusNode _wifiFocusNode =
+      FocusNode(debugLabel: 'status_bar_wifi');
+
+  @override
+  void dispose() {
+    _settingsFocusNode.dispose();
+    _permissionsFocusNode.dispose();
+    _wifiFocusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _openSettings(BuildContext context,
       {String? initialRoute}) async {
@@ -56,22 +72,17 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
       return;
     }
     wallpaperService.notifyHomeVisibleAndUsable();
-  }
-
-  Future<void> _startVoiceSearch(BuildContext context) async {
-    final result = await context.read<SystemBridgeService>().testVoiceSearch();
-    if (!context.mounted) {
-      return;
-    }
-    if (result['success'] == true) {
-      return;
-    }
-    final message = result['message']?.toString().trim();
-    if (message == null || message.isEmpty) {
-      return;
-    }
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) {
+        return;
+      }
+      if (initialRoute == PermissionsPanelPage.routeName &&
+          _permissionsFocusNode.canRequestFocus) {
+        _permissionsFocusNode.requestFocus();
+      } else if (_settingsFocusNode.canRequestFocus) {
+        _settingsFocusNode.requestFocus();
+      }
+    });
   }
 
   void _toggleHomeReorderMode(BuildContext context) {
@@ -86,7 +97,24 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
   Widget build(BuildContext context) {
     final isCompact = MediaQuery.sizeOf(context).width < 1000;
     final showRam = context.select<SettingsService, bool>(
-      (settings) => settings.showRamInStatusBar,
+      (settings) {
+        try {
+          final dynamic val = settings.showRamInStatusBar;
+          return val is bool ? val : false;
+        } catch (_) {
+          return false;
+        }
+      },
+    );
+    final showWeather = context.select<SettingsService, bool>(
+      (settings) {
+        try {
+          final dynamic val = settings.showWeatherInStatusBar;
+          return val is bool ? val : false;
+        } catch (_) {
+          return false;
+        }
+      },
     );
     final homeReorderModeEnabled = context.select<AppsService, bool>(
       (service) => service.homeReorderModeEnabled,
@@ -100,7 +128,7 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
                 child: AnimatedContainer(
                     curve: Curves.decelerate,
                     duration: const Duration(milliseconds: 250),
-                    height: focused ? kToolbarHeight : 0,
+                    height: focused ? FocusAwareAppBar.statusBarHeight : 0,
                     child: widget!),
                 onFocusChange: (hasFocus) {
                   setState(() {
@@ -117,18 +145,31 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
           surfaceTintColor: Colors.transparent,
           shadowColor: Colors.transparent,
           elevation: 0,
-          leadingWidth: showRam
-              ? (isCompact
-                  ? _statusBarRamChipLeadingWidthCompact
-                  : _statusBarRamChipLeadingWidthRegular)
-              : 18,
-          titleSpacing: showRam ? 12 : 16,
-          leading: showRam
-              ? const Padding(
-                  padding: EdgeInsets.only(left: 16),
+          toolbarHeight: FocusAwareAppBar.statusBarHeight,
+          leadingWidth:
+              _computeStatusLeadingWidth(isCompact, showRam, showWeather),
+          titleSpacing: (showRam || showWeather) ? 12 : 16,
+          leading: (showRam || showWeather)
+              ? Padding(
+                  padding: const EdgeInsets.only(left: 16),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: _MemoryStatusChip(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showRam)
+                          const Flexible(
+                            fit: FlexFit.loose,
+                            child: _MemoryStatusChip(),
+                          ),
+                        if (showRam && showWeather) const SizedBox(width: 8),
+                        if (showWeather)
+                          const Flexible(
+                            fit: FlexFit.loose,
+                            child: _WeatherStatusChip(),
+                          ),
+                      ],
+                    ),
                   ),
                 )
               : const SizedBox.shrink(),
@@ -137,106 +178,138 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
               padding: EdgeInsets.only(
                 left: 16,
                 right: isCompact ? 16 : 32,
+                top: 4,
+                bottom: 4,
               ),
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _StatusBarIconButton(
-                    focusNode: widget.primaryFocusNode,
-                    icon: Icons.search_rounded,
-                    tooltip: AppLocalizations.of(context)!.searchHint,
-                    onPressed: () => _startVoiceSearch(context),
-                  ),
-                  const SizedBox(width: _statusBarActionSpacing),
-                  _StatusBarIconButton(
-                    icon: homeReorderModeEnabled
-                        ? Icons.open_with_rounded
-                        : Icons.drive_file_move_outline,
-                    tooltip: AppLocalizations.of(context)!.reorder,
-                    iconColor: homeReorderModeEnabled
-                        ? const Color(0xFF7BE0A5)
-                        : _statusBarGlyphColor,
-                    badgeColor:
-                        homeReorderModeEnabled ? const Color(0xFF7BE0A5) : null,
-                    onPressed: () => _toggleHomeReorderMode(context),
-                  ),
-                  const SizedBox(width: _statusBarActionSpacing),
-                  _StatusBarIconButton(
-                    icon: Icons.settings_outlined,
-                    tooltip: AppLocalizations.of(context)!.settings,
-                    onPressed: () => _openSettings(context),
-                    onLongPress: () => _openSettings(
-                      context,
-                      initialRoute: ApplicationsPanelPage.routeName,
-                    ),
+                  // TẦNG 1: Dãy icon thao tác gom hết về góc phải
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _StatusBarIconButton(
+                        focusNode: widget.primaryFocusNode,
+                        icon: homeReorderModeEnabled
+                            ? Icons.open_with_rounded
+                            : Icons.drive_file_move_outline,
+                        tooltip: AppLocalizations.of(context)!.reorder,
+                        iconColor: homeReorderModeEnabled
+                            ? const Color(0xFF7BE0A5)
+                            : _statusBarGlyphColor,
+                        badgeColor:
+                            homeReorderModeEnabled ? const Color(0xFF7BE0A5) : null,
+                        onPressed: () => _toggleHomeReorderMode(context),
+                      ),
+                      const SizedBox(width: _statusBarActionSpacing),
+                      _StatusBarIconButton(
+                        focusNode: _settingsFocusNode,
+                        icon: Icons.settings_outlined,
+                        tooltip: AppLocalizations.of(context)!.settings,
+                        onPressed: () => _openSettings(context),
+                        onLongPress: () => _openSettings(
+                          context,
+                          initialRoute: ApplicationsPanelPage.routeName,
+                        ),
+                      ),
+                      if (!isCompact) ...[
+                        const SizedBox(width: _statusBarActionSpacing),
+                        _StatusBarActionSurface(
+                          focusNode: _wifiFocusNode,
+                          tooltip: AppLocalizations.of(context)!.openWifiSettings,
+                          onPressed: () => _openWifiSettings(context),
+                          child: IconTheme.merge(
+                            data: const IconThemeData(
+                              color: _statusBarGlyphColor,
+                              size: _statusBarGlyphSize,
+                            ),
+                            child: DefaultTextStyle.merge(
+                              style: const TextStyle(color: _statusBarGlyphColor),
+                              child: const NetworkWidget(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: _statusBarActionSpacing),
+                        _GrantHealthChipButton(
+                          focusNode: _permissionsFocusNode,
+                          onPressed: () => _openSettings(
+                            context,
+                            initialRoute: PermissionsPanelPage.routeName,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   if (!isCompact) ...[
-                    const SizedBox(width: _statusBarActionSpacing),
-                    _StatusBarActionSurface(
-                      tooltip: AppLocalizations.of(context)!.openWifiSettings,
-                      onPressed: () => _openWifiSettings(context),
-                      child: IconTheme.merge(
-                        data: const IconThemeData(
-                          color: _statusBarGlyphColor,
-                          size: _statusBarGlyphSize,
+                    const SizedBox(height: 4),
+                    // TẦNG 2: Khối thứ ngày tháng nằm ngay dưới các icon, căn lề phải
+                    ExcludeFocus(
+                      excluding: true,
+                      child: RepaintBoundary(
+                        child: Selector<
+                            SettingsService,
+                            ({
+                              bool showDateInStatusBar,
+                              bool showTimeInStatusBar,
+                              String dateFormat,
+                              String timeFormat,
+                              int clockScalePercent,
+                              String dateStyle,
+                            })>(
+                          selector: (context, service) => (
+                            showDateInStatusBar: service.showDateInStatusBar,
+                            showTimeInStatusBar: service.showTimeInStatusBar,
+                            dateFormat: service.dateFormat,
+                            timeFormat: service.timeFormat,
+                            clockScalePercent:
+                                service.statusBarClockScalePercent,
+                            dateStyle: () {
+                              try {
+                                return service.statusBarDateStyle;
+                              } catch (_) {
+                                return SettingsService.defaultDateStyle;
+                              }
+                            }(),
+                          ),
+                          builder: (context, dateTimeSettings, _) {
+                            if (!dateTimeSettings.showDateInStatusBar &&
+                                !dateTimeSettings.showTimeInStatusBar) {
+                              return const SizedBox.shrink();
+                            }
+                            final scale = (dateTimeSettings.clockScalePercent
+                                    .clamp(100, 180) /
+                                100.0);
+                            final textStyle = _scaledStatusBarTextStyle(
+                              context,
+                              scale: scale,
+                              stylePreset: dateTimeSettings.dateStyle,
+                            );
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (dateTimeSettings.showDateInStatusBar)
+                                  DateTimeWidget(
+                                    dateTimeSettings.dateFormat,
+                                    updateInterval:
+                                        const Duration(minutes: 1),
+                                    textStyle: textStyle,
+                                  ),
+                                if (dateTimeSettings.showDateInStatusBar &&
+                                    dateTimeSettings.showTimeInStatusBar)
+                                  const SizedBox(width: 8),
+                                if (dateTimeSettings.showTimeInStatusBar)
+                                  DateTimeWidget(
+                                    dateTimeSettings.timeFormat,
+                                    textStyle: textStyle,
+                                  )
+                              ],
+                            );
+                          },
                         ),
-                        child: DefaultTextStyle.merge(
-                          style: const TextStyle(color: _statusBarGlyphColor),
-                          child: const NetworkWidget(),
-                        ),
                       ),
-                    ),
-                    const SizedBox(width: _statusBarActionSpacing),
-                    _GrantHealthChipButton(
-                      onPressed: () => _openSettings(
-                        context,
-                        initialRoute: PermissionsPanelPage.routeName,
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    Selector<
-                        SettingsService,
-                        ({
-                          bool showDateInStatusBar,
-                          bool showTimeInStatusBar,
-                          String dateFormat,
-                          String timeFormat,
-                          int clockScalePercent
-                        })>(
-                      selector: (context, service) => (
-                        showDateInStatusBar: service.showDateInStatusBar,
-                        showTimeInStatusBar: service.showTimeInStatusBar,
-                        dateFormat: service.dateFormat,
-                        timeFormat: service.timeFormat,
-                        clockScalePercent: service.statusBarClockScalePercent
-                      ),
-                      builder: (context, dateTimeSettings, _) {
-                        final scale =
-                            dateTimeSettings.clockScalePercent.clamp(100, 180) /
-                                100.0;
-                        return Row(mainAxisSize: MainAxisSize.min, children: [
-                          if (dateTimeSettings.showDateInStatusBar)
-                            DateTimeWidget(
-                              dateTimeSettings.dateFormat,
-                              updateInterval: const Duration(minutes: 1),
-                              textStyle: _scaledStatusBarTextStyle(
-                                context,
-                                scale: scale,
-                              ),
-                            ),
-                          if (dateTimeSettings.showDateInStatusBar &&
-                              dateTimeSettings.showTimeInStatusBar)
-                            const SizedBox(width: 16),
-                          if (dateTimeSettings.showTimeInStatusBar)
-                            DateTimeWidget(
-                              dateTimeSettings.timeFormat,
-                              textStyle: _scaledStatusBarTextStyle(
-                                context,
-                                scale: scale,
-                              ),
-                            )
-                        ]);
-                      },
                     ),
                   ],
                 ],
@@ -248,9 +321,11 @@ class _FocusAwareAppBarState extends State<FocusAwareAppBar> {
 }
 
 class _GrantHealthChipButton extends StatelessWidget {
+  final FocusNode? focusNode;
   final VoidCallback onPressed;
 
   const _GrantHealthChipButton({
+    this.focusNode,
     required this.onPressed,
   });
 
@@ -291,6 +366,7 @@ class _GrantHealthChipButton extends StatelessWidget {
           _ => localizations.grantChipMissing(missingCount),
         };
         return _StatusBarChipButton(
+          focusNode: focusNode,
           icon: icon,
           label: label,
           color: color,
@@ -327,7 +403,8 @@ class _MemoryStatusChip extends StatelessWidget {
               );
         return Semantics(
           label: semanticsLabel,
-          child: SizedBox.expand(
+          child: SizedBox(
+            height: 32,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -388,7 +465,163 @@ class _MemoryStatusChip extends StatelessWidget {
   }
 }
 
+class _WeatherStatusChip extends StatelessWidget {
+  const _WeatherStatusChip();
+
+  @override
+  Widget build(BuildContext context) {
+    WeatherSnapshot? weather;
+    try {
+      weather = context.select<WeatherService, WeatherSnapshot?>(
+        (service) => service.snapshot,
+      );
+    } catch (_) {
+      weather = null;
+    }
+
+    if (weather == null) {
+      return const Focus(
+        canRequestFocus: false,
+        descendantsAreFocusable: false,
+        child: SizedBox(
+          height: 32,
+          child: Center(
+            child: SizedBox(
+              width: 44,
+              height: 18,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Color(0x1AFFFFFF),
+                  borderRadius: BorderRadius.all(Radius.circular(16)),
+                  border: Border.fromBorderSide(
+                    BorderSide(
+                      color: Color(0x1FFFFFFF),
+                      width: 1.0,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final isCompact = MediaQuery.sizeOf(context).width < 1000;
+    final condition = weather.condition;
+    final iconData = condition.getIcon(isDay: weather.isDay);
+    final iconColor = condition.color;
+
+    return Focus(
+      canRequestFocus: false,
+      descendantsAreFocusable: false,
+      child: Semantics(
+        label: '${weather.cityName}, ${weather.tempC}°C',
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF132134).withOpacity(0.55),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.18),
+              width: 1.0,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                offset: Offset(0, 2),
+                blurRadius: 4,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Flexible(
+                fit: FlexFit.loose,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isCompact ? 76.0 : 88.0,
+                  ),
+                  child: Text(
+                    weather.cityName,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: isCompact ? 12.0 : 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFFCFD8DC),
+                      letterSpacing: 0.2,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black87,
+                          offset: Offset(0, 1),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                iconData,
+                size: 17,
+                color: iconColor,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '${weather.tempC}°C',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFF5F8FF),
+                  fontFeatures: [FontFeature.tabularFigures()],
+                  shadows: [
+                    Shadow(
+                      color: Colors.black54,
+                      offset: Offset(0, 1),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+double _computeStatusLeadingWidth(
+  bool isCompact,
+  bool showRam,
+  bool showWeather,
+) {
+  if (!showRam && !showWeather) {
+    return 18.0;
+  }
+  if (showRam && !showWeather) {
+    return isCompact
+        ? _statusBarRamChipLeadingWidthCompact
+        : _statusBarRamChipLeadingWidthRegular;
+  }
+  if (!showRam && showWeather) {
+    return isCompact
+        ? _statusBarWeatherChipLeadingWidthCompact
+        : _statusBarWeatherChipLeadingWidthRegular;
+  }
+  return isCompact
+      ? _statusBarBothChipsLeadingWidthCompact
+      : _statusBarBothChipsLeadingWidthRegular;
+}
+
 class _StatusBarChipButton extends StatelessWidget {
+  final FocusNode? focusNode;
   final IconData icon;
   final String label;
   final Color color;
@@ -396,6 +629,7 @@ class _StatusBarChipButton extends StatelessWidget {
   final Color? badgeColor;
 
   const _StatusBarChipButton({
+    this.focusNode,
     required this.icon,
     required this.label,
     required this.color,
@@ -413,6 +647,7 @@ class _StatusBarChipButton extends StatelessWidget {
             height: _statusBarActionExtent,
           ),
           child: _StatusBarActionSurface(
+            focusNode: focusNode,
             tooltip: label,
             onPressed: onPressed,
             badgeColor: badgeColor,
@@ -548,17 +783,17 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: _statusBarBaseSurface.withOpacity(0.88),
-                    width: 2,
+                    width: 1.5,
                   ),
                   boxShadow: const [
                     BoxShadow(
                       color: Colors.black38,
-                      blurRadius: 6,
-                      offset: Offset(0, 2),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
                     ),
                   ],
                 ),
-                child: const SizedBox(width: 12, height: 12),
+                child: const SizedBox(width: 8.5, height: 8.5),
               ),
             ),
         ],
@@ -624,25 +859,67 @@ class _StatusBarActionSurfaceState extends State<_StatusBarActionSurface> {
 TextStyle _scaledStatusBarTextStyle(
   BuildContext context, {
   required double scale,
+  String stylePreset = SettingsService.defaultDateStyle,
 }) {
   final baseStyle = Theme.of(context).textTheme.titleLarge!;
+  FontWeight weight = FontWeight.w500;
+  String? fontFamily;
+  double letterSpacing = 0.2;
+  List<FontFeature> fontFeatures = const [];
+  List<Shadow> shadows = const [
+    Shadow(
+      color: Colors.black54,
+      offset: Offset(0, 2),
+      blurRadius: 8,
+    )
+  ];
+
+  switch (stylePreset) {
+    case SettingsService.dateStyleBold:
+      weight = FontWeight.w800;
+      letterSpacing = 0.3;
+      shadows = const [
+        Shadow(color: Colors.black87, offset: Offset(0, 1), blurRadius: 2.0),
+        Shadow(color: Colors.black54, offset: Offset(0, 3), blurRadius: 8.0),
+      ];
+      break;
+    case SettingsService.dateStyleMonospace:
+      fontFamily = 'monospace';
+      weight = FontWeight.w600;
+      letterSpacing = 0.8;
+      fontFeatures = const [FontFeature.tabularFigures()];
+      shadows = const [
+        Shadow(color: Color(0x664FC3F7), offset: Offset(0, 0), blurRadius: 6.0),
+        Shadow(color: Colors.black87, offset: Offset(0, 2), blurRadius: 4.0),
+      ];
+      break;
+    case SettingsService.dateStyleStandard:
+    default:
+      weight = FontWeight.w500;
+      letterSpacing = 0.2;
+      break;
+  }
+
   return baseStyle.copyWith(
-    fontSize: (baseStyle.fontSize ?? 22) * scale,
-    shadows: const [
-      Shadow(
-        color: Colors.black54,
-        offset: Offset(0, 2),
-        blurRadius: 8,
-      )
-    ],
+    fontSize: (baseStyle.fontSize ?? 22) * (scale * 0.72),
+    fontWeight: weight,
+    fontFamily: fontFamily,
+    letterSpacing: letterSpacing,
+    fontFeatures: fontFeatures,
+    shadows: shadows,
+    height: 1.25,
   );
 }
 
-const double _statusBarActionSpacing = 12;
-const double _statusBarActionExtent = 50;
-const double _statusBarGlyphSize = 21;
+const double _statusBarActionSpacing = 8;
+const double _statusBarActionExtent = 36;
+const double _statusBarGlyphSize = 18;
 const double _statusBarRamChipLeadingWidthCompact = 128;
 const double _statusBarRamChipLeadingWidthRegular = 142;
+const double _statusBarWeatherChipLeadingWidthCompact = 172;
+const double _statusBarWeatherChipLeadingWidthRegular = 184;
+const double _statusBarBothChipsLeadingWidthCompact = 292;
+const double _statusBarBothChipsLeadingWidthRegular = 318;
 const Color _statusBarGlyphColor = Color(0xFFF5F8FF);
 const Color _statusBarBaseSurface = Color(0xFF132134);
 const Color _statusBarBaseFocusedSurface = Color(0xFF1D314D);
@@ -673,7 +950,7 @@ ButtonStyle _statusBarCompactButtonStyle(double intensityFactor) {
               : Colors.white.withOpacity(
                   _statusBarSurfaceBorderOpacity(intensityFactor),
                 ),
-          width: states.contains(WidgetState.focused) ? 2.0 : 1.15,
+          width: states.contains(WidgetState.focused) ? 2.0 : 1.0,
         ),
       ),
     ),
@@ -691,7 +968,7 @@ Decoration _statusBarSurfaceDecoration(double intensityFactor) {
         color: Colors.white.withOpacity(
           _statusBarSurfaceBorderOpacity(intensityFactor),
         ),
-        width: 1.15,
+        width: 1.0,
       ),
     ),
   );

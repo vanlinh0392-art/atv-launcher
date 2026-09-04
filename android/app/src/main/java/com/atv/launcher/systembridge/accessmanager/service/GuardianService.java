@@ -16,11 +16,14 @@ import android.util.Log;
 
 import com.atv.launcher.R;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class GuardianService extends Service {
     private static final String TAG = "AccessManagerBoot";
     private static final int NOTIFICATION_ID = 0x291;
 
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService guardianExecutor = Executors.newSingleThreadExecutor();
     private BroadcastReceiver wakeReceiver;
 
     @Override
@@ -35,7 +38,7 @@ public class GuardianService extends Service {
         String reason = intent != null ? intent.getStringExtra(AccessibilityGrantCoordinator.EXTRA_REASON) : null;
         String resolvedReason = reason == null ? "service_start" : reason;
         Log.i(TAG, "GuardianService onStartCommand: " + resolvedReason);
-        mainHandler.post(() -> AccessibilityGrantCoordinator.ensureManagedAccessibility(getApplicationContext(), resolvedReason));
+        guardianExecutor.execute(() -> AccessibilityGrantCoordinator.ensureManagedAccessibility(getApplicationContext(), resolvedReason));
         return START_STICKY;
     }
 
@@ -54,6 +57,7 @@ public class GuardianService extends Service {
             }
         }
         AccessibilityGrantCoordinator.scheduleExactHeal(this, 2000L, "service_destroyed");
+        guardianExecutor.shutdown();
         super.onDestroy();
     }
 
@@ -85,8 +89,15 @@ public class GuardianService extends Service {
         filter.addAction(Intent.ACTION_USER_PRESENT);
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         filter.addAction(Intent.ACTION_DREAMING_STOPPED);
+        filter.addAction("android.intent.action.SCREEN_ON");
+        filter.addAction("android.intent.action.USER_PRESENT");
         filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_ON");
         filter.addAction("com.xiaomi.tv.ACTION_OPEN_CLOSE_SCREEN_SAVER");
+        filter.addAction("mitv.action.STR_BOOT_COMPLETED");
+        filter.addAction("com.xiaomi.mitv.action.STR_BOOT_COMPLETED");
+        filter.addAction("com.tcl.tv.action.SCREEN_ON");
+        filter.addAction("com.sony.dtv.intent.action.PANEL_ON");
+        filter.addAction("com.hisense.tv.action.PANEL_ON");
         filter.setPriority(999999);
 
         if (Build.VERSION.SDK_INT >= 33) {

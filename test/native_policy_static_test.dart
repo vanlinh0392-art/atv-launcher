@@ -79,11 +79,11 @@ void main() {
       'private LocalAdbBridge.Result runLocalAdbGrantBatch(',
     );
 
-    expect(checklist, isNot(contains('deviceidle whitelist')));
-    expect(grantBatch, isNot(contains('deviceidle whitelist')));
+    expect(checklist, contains('deviceidle whitelist'));
+    expect(grantBatch, contains('deviceidle whitelist'));
     expect(
       checklist,
-      contains('Only whitelist battery optimization on Android boxes'),
+      contains('Whitelist battery optimization'),
     );
     expect(mainActivity, contains('shouldRecommendBatteryOptimization()'));
     expect(mainActivity, contains('? "recommended" : "optional"'));
@@ -105,6 +105,16 @@ void main() {
     expect(densityController, isNot(contains('Log.i(TAG, "Shell attempt ')));
     expect(
         densityController, isNot(contains('Log.i(TAG, "Local ADB attempt ')));
+  });
+
+  test('DensityController enforces strict density whitelist', () {
+    final densityController = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/density/DensityController.java',
+    ).readAsStringSync();
+
+    expect(densityController, contains('isAllowedDensity(int density)'));
+    expect(densityController, contains('density == 240 || density == 280 || density == 320 || density == 360'));
+    expect(densityController, contains('if (!isAllowedDensity(density))'));
   });
 
   test('MapVoice accessibility service stays bindable on launcher ROMs', () {
@@ -412,6 +422,77 @@ void main() {
         qualityProfile, contains('appCardFilterQuality: FilterQuality.medium'));
     expect(smoothProfile, contains('appCardFilterQuality: FilterQuality.low'));
     expect(offProfile, contains('appCardFilterQuality: FilterQuality.none'));
+  });
+
+  test('native video controller measures wallpaper_wake_to_first_frame', () {
+    final controller = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/wallpaper/VideoWallpaperController.java',
+    ).readAsStringSync();
+
+    expect(controller, contains('wallpaper_wake_to_first_frame'));
+    expect(controller, contains('wakeRearmStartedAtNanos'));
+    expect(controller, contains('onRenderedFirstFrame'));
+  });
+
+  test(
+      'native rapid wake sequence handles pause -> resume -> focus_gained idempotently',
+      () {
+    final mainActivity = File(
+      'android/app/src/main/java/com/atv/launcher/MainActivity.java',
+    ).readAsStringSync();
+    final controller = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/wallpaper/VideoWallpaperController.java',
+    ).readAsStringSync();
+
+    expect(
+      mainActivity,
+      contains('sharedVideoWallpaperController.onPause(isDeviceInteractive())'),
+    );
+    expect(
+      mainActivity,
+      contains(
+        'sharedVideoWallpaperController.resumePlayback("activity_resume")',
+      ),
+    );
+    expect(
+      mainActivity,
+      contains(
+        'sharedVideoWallpaperController.resumePlayback("window_focus_gained")',
+      ),
+    );
+    expect(
+      controller,
+      contains(
+        'if (player != null && player.isPlaying() && surface != null && surface.isValid())',
+      ),
+    );
+    expect(
+      controller,
+      contains(
+        'logWakeInfo("wallpaper_hot_standby_entered: kept surface and player in RAM")',
+      ),
+    );
+  });
+
+  test('rapid wake integration test script targets pause, resume, and focus', () {
+    final script = File('scripts/smoke_rapid_wake_focus.py').readAsStringSync();
+
+    expect(script, contains('wallpaper_resume reason=activity_resume'));
+    expect(script, contains('wallpaper_resume reason=window_focus_gained'));
+    expect(script, contains('KEYCODE_SLEEP'));
+    expect(script, contains('KEYCODE_WAKEUP'));
+    expect(script, contains('KEYCODE_HOME'));
+  });
+
+  test('native video controller cleans zombie surface and guards wake glitches', () {
+    final controller = File(
+      'android/app/src/main/java/com/atv/launcher/systembridge/wallpaper/VideoWallpaperController.java',
+    ).readAsStringSync();
+
+    expect(controller, contains('releaseSurface();'));
+    expect(controller, contains('ensureSurface();'));
+    expect(controller, contains('boolean inWakeCooldown = (timeSinceWakeMs < WAKE_COOLDOWN_MS);'));
+    expect(controller, contains('boolean isWakeGlitch = inWakeCooldown ||'));
   });
 }
 

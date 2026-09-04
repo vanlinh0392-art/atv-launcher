@@ -79,10 +79,13 @@ class _FLauncherAppState extends State<FLauncherApp>
   bool _adbOnboardingVisible = false;
   bool _adbOnboardingHandledThisSession = false;
   Timer? _updateToastTimer;
+  Timer? _backButtonHoldTimer;
+  bool _backButtonHoldTriggered = false;
 
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleGlobalHardwareKeyEvent);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshDefaultLauncherState(force: true);
@@ -149,11 +152,72 @@ class _FLauncherAppState extends State<FLauncherApp>
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalHardwareKeyEvent);
+    _backButtonHoldTimer?.cancel();
     _updateToastTimer?.cancel();
     _appInstalledSubscription?.cancel();
     _systemBridgeService?.removeListener(_handleSystemBridgeChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  bool _isBackKey(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.gameButtonB;
+  }
+
+  bool _handleGlobalHardwareKeyEvent(KeyEvent event) {
+    if (!_isBackKey(event.logicalKey)) {
+      return false;
+    }
+
+    final navigator = _navigatorKey.currentState;
+    final rootContext = _navigatorKey.currentContext;
+
+    // Trường hợp 1: Có route con/dialog/modal đang mở trên Navigator -> Đóng ngay lập tức (0ms delay)
+    if (navigator != null && navigator.canPop()) {
+      if (event is KeyDownEvent) {
+        _backButtonHoldTimer?.cancel();
+        _backButtonHoldTimer = null;
+        _backButtonHoldTriggered = false;
+        navigator.maybePop();
+        return true;
+      }
+      return true;
+    }
+
+    // Trường hợp 2: Đang ở màn hình chính FLauncher (Home)
+    if (event is KeyDownEvent) {
+      if (_backButtonHoldTimer == null && !_backButtonHoldTriggered) {
+        _backButtonHoldTimer = Timer(const Duration(milliseconds: 500), () {
+          _backButtonHoldTriggered = true;
+          _backButtonHoldTimer = null;
+          if (rootContext != null && rootContext.mounted) {
+            final launcherState = rootContext.read<LauncherState>();
+            launcherState.handleBackLongPress(rootContext);
+          }
+        });
+      }
+      return true;
+    } else if (event is KeyRepeatEvent) {
+      return true;
+    } else if (event is KeyUpEvent) {
+      final wasHold = _backButtonHoldTriggered;
+      _backButtonHoldTimer?.cancel();
+      _backButtonHoldTimer = null;
+      _backButtonHoldTriggered = false;
+
+      if (!wasHold) {
+        if (rootContext != null && rootContext.mounted) {
+          final launcherState = rootContext.read<LauncherState>();
+          launcherState.handleBackSinglePress(rootContext);
+        }
+      }
+      return true;
+    }
+
+    return false;
   }
 
   @override
@@ -458,14 +522,13 @@ class _FLauncherAppState extends State<FLauncherApp>
 
   @override
   Widget build(BuildContext context) {
-    final Locale? locale = context.select<SettingsService, Locale?>((service) {
+    final Locale locale = context.select<SettingsService, Locale>((service) {
       switch (service.appLocaleMode) {
         case SettingsService.appLocaleEnglish:
           return const Locale('en');
         case SettingsService.appLocaleVietnamese:
-          return const Locale('vi');
         default:
-          return null;
+          return const Locale('vi');
       }
     });
 
@@ -480,6 +543,7 @@ class _FLauncherAppState extends State<FLauncherApp>
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
+      navigatorObservers: [homeRouteObserver],
       locale: locale,
       shortcuts: {
         ...WidgetsApp.defaultShortcuts,

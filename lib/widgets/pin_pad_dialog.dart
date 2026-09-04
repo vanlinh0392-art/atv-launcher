@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flauncher/models/app.dart';
 import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -123,28 +124,56 @@ class _PinPadDialogState extends State<_PinPadDialog> {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     final pinLength = _pinBuffer.length;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final horizontalInset = constraints.maxWidth >= 1200 ? 220.0 : 24.0;
-        final verticalInset = constraints.maxHeight >= 720 ? 40.0 : 20.0;
-        final maxDialogWidth = math.min(
-          620.0,
-          math.max(320.0, constraints.maxWidth - (horizontalInset * 2)),
-        );
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.symmetric(
-            horizontal: horizontalInset,
-            vertical: verticalInset,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxDialogWidth,
-              maxHeight: math.max(
-                360.0,
-                constraints.maxHeight - (verticalInset * 2),
+    final shortcuts = <ShortcutActivator, VoidCallback>{
+      const SingleActivator(LogicalKeyboardKey.digit0): () => _appendDigit('0'),
+      const SingleActivator(LogicalKeyboardKey.digit1): () => _appendDigit('1'),
+      const SingleActivator(LogicalKeyboardKey.digit2): () => _appendDigit('2'),
+      const SingleActivator(LogicalKeyboardKey.digit3): () => _appendDigit('3'),
+      const SingleActivator(LogicalKeyboardKey.digit4): () => _appendDigit('4'),
+      const SingleActivator(LogicalKeyboardKey.digit5): () => _appendDigit('5'),
+      const SingleActivator(LogicalKeyboardKey.digit6): () => _appendDigit('6'),
+      const SingleActivator(LogicalKeyboardKey.digit7): () => _appendDigit('7'),
+      const SingleActivator(LogicalKeyboardKey.digit8): () => _appendDigit('8'),
+      const SingleActivator(LogicalKeyboardKey.digit9): () => _appendDigit('9'),
+      const SingleActivator(LogicalKeyboardKey.numpad0): () => _appendDigit('0'),
+      const SingleActivator(LogicalKeyboardKey.numpad1): () => _appendDigit('1'),
+      const SingleActivator(LogicalKeyboardKey.numpad2): () => _appendDigit('2'),
+      const SingleActivator(LogicalKeyboardKey.numpad3): () => _appendDigit('3'),
+      const SingleActivator(LogicalKeyboardKey.numpad4): () => _appendDigit('4'),
+      const SingleActivator(LogicalKeyboardKey.numpad5): () => _appendDigit('5'),
+      const SingleActivator(LogicalKeyboardKey.numpad6): () => _appendDigit('6'),
+      const SingleActivator(LogicalKeyboardKey.numpad7): () => _appendDigit('7'),
+      const SingleActivator(LogicalKeyboardKey.numpad8): () => _appendDigit('8'),
+      const SingleActivator(LogicalKeyboardKey.numpad9): () => _appendDigit('9'),
+      const SingleActivator(LogicalKeyboardKey.backspace): _backspace,
+      const SingleActivator(LogicalKeyboardKey.delete): _clear,
+    };
+    return CallbackShortcuts(
+      bindings: shortcuts,
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalInset = constraints.maxWidth >= 1200 ? 220.0 : 24.0;
+            final verticalInset = constraints.maxHeight >= 720 ? 40.0 : 20.0;
+            final maxDialogWidth = math.min(
+              620.0,
+              math.max(320.0, constraints.maxWidth - (horizontalInset * 2)),
+            );
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: horizontalInset,
+                vertical: verticalInset,
               ),
-            ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: maxDialogWidth,
+                  maxHeight: math.max(
+                    360.0,
+                    constraints.maxHeight - (verticalInset * 2),
+                  ),
+                ),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(34),
@@ -281,7 +310,24 @@ class _PinPadDialogState extends State<_PinPadDialog> {
           ),
         );
       },
-    );
+    ),
+  ),
+);
+  }
+
+  void _appendDigit(String digit) {
+    final localizations = AppLocalizations.of(context)!;
+    _handlePress(digit, localizations);
+  }
+
+  void _backspace() {
+    final localizations = AppLocalizations.of(context)!;
+    _handlePress(localizations.backspaceAction, localizations);
+  }
+
+  void _clear() {
+    final localizations = AppLocalizations.of(context)!;
+    _handlePress(localizations.clearAction, localizations);
   }
 
   void _handlePress(String label, AppLocalizations localizations) {
@@ -324,13 +370,22 @@ class _PinButton extends StatelessWidget {
       width: width,
       child: FilledButton.tonal(
         style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
         ),
         onPressed: onPressed,
-        child: Text(label, style: Theme.of(context).textTheme.titleLarge),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
       ),
     );
   }

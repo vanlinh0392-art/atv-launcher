@@ -263,6 +263,7 @@ class _CategorySettingsState extends State<_CategorySettings> {
   final FocusNode _textFieldFocusNode;
 
   late final TextEditingController _nameController;
+  FocusScopeNode? _attachedFocusScope;
 
   bool _ignoreTextFieldKeyEvent;
   CategorySort _categorySort;
@@ -286,10 +287,10 @@ class _CategorySettingsState extends State<_CategorySettings> {
 
   @override
   void dispose() {
-    super.dispose();
-
+    _attachedFocusScope?.onKeyEvent = null;
     _nameController.dispose();
     _textFieldFocusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -317,8 +318,8 @@ class _CategorySettingsState extends State<_CategorySettings> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final FocusScopeNode focusScopeNode = FocusScope.of(context);
-    focusScopeNode.onKeyEvent = (node, keyEvent) {
+    _attachedFocusScope = FocusScope.of(context);
+    _attachedFocusScope?.onKeyEvent = (node, keyEvent) {
       if (_textFieldFocusNode.hasFocus &&
           (keyEvent.logicalKey == LogicalKeyboardKey.arrowUp ||
               keyEvent.logicalKey == LogicalKeyboardKey.arrowDown)) {
@@ -526,6 +527,7 @@ class _LauncherSpacerSettingsState extends State<_LauncherSpacerSettings> {
   final FocusNode _textFieldFocusNode;
 
   late final TextEditingController _valueController;
+  FocusScopeNode? _attachedFocusScope;
 
   bool _ignoreTextFieldKeyEvent;
   bool _valid;
@@ -561,8 +563,8 @@ class _LauncherSpacerSettingsState extends State<_LauncherSpacerSettings> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final scope = FocusScope.of(context);
-    scope.onKeyEvent = (node, keyEvent) {
+    _attachedFocusScope = FocusScope.of(context);
+    _attachedFocusScope?.onKeyEvent = (node, keyEvent) {
       if (_textFieldFocusNode.hasFocus &&
           (keyEvent.logicalKey == LogicalKeyboardKey.arrowUp ||
               keyEvent.logicalKey == LogicalKeyboardKey.arrowDown)) {
@@ -586,10 +588,10 @@ class _LauncherSpacerSettingsState extends State<_LauncherSpacerSettings> {
 
   @override
   void dispose() {
-    super.dispose();
-
+    _attachedFocusScope?.onKeyEvent = null;
     _valueController.dispose();
     _textFieldFocusNode.dispose();
+    super.dispose();
   }
 
   @override

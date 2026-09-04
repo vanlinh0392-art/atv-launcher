@@ -16,9 +16,14 @@ public final class VietnameseTextPreprocessor {
 
     private static final Pattern TIME_PATTERN_1 = Pattern.compile("\\b(\\d{1,2}):(\\d{2})\\b");
     private static final Pattern TIME_PATTERN_2 = Pattern.compile("\\b(\\d{1,2})h(\\d{2})?\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TEMP_PATTERN = Pattern.compile("(-?\\d+(?:\\.\\d+)?)\\s*°C", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SPEED_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*km/h", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PERCENT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*%");
+    private static final Pattern TEMP_PATTERN = Pattern.compile("(-?\\d+(?:[.,]\\d+)?)\\s*(?:°C| độ C|oC|°)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SPEED_PATTERN = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(?:km/h|km/g|kmh)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PERCENT_PATTERN = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*%(?:\\b|\\s)");
+    private static final Pattern CURRENCY_K_PATTERN = Pattern.compile("\\b(\\d+)\\s*k\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CURRENCY_VND_PATTERN = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+)\\s*(?:đ|vnđ|vnd|đồng)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SENTENCE_SPLIT_PATTERN = Pattern.compile(
+            "(?<=[.!?;\n])(?<!\\b(?:TP|tp|PGS|pgs|TS|ts|ThS|ths|BS|bs|GS|gs|Q|q|P|p|v\\.v)\\.)(?<!\\b\\d\\.)\\s+(?=[A-ZÀ-Ỹ0-9])"
+    );
 
     private VietnameseTextPreprocessor() {
     }
@@ -33,22 +38,38 @@ public final class VietnameseTextPreprocessor {
         // 1. Loại bỏ các ký tự Markdown và link URL
         text = MARKDOWN_PATTERN.matcher(text).replaceAll(" ");
 
-        // 2. Chuẩn hóa thời gian (19:30 -> 19 giờ 30 phút)
+        // 2. Chuẩn hóa thời gian (19:30 hoặc 19h30 -> 19 giờ 30 phút)
         Matcher timeMatcher1 = TIME_PATTERN_1.matcher(text);
-        StringBuffer sbTime = new StringBuffer();
+        StringBuffer sbTime1 = new StringBuffer();
         while (timeMatcher1.find()) {
             String hour = timeMatcher1.group(1);
             String minute = timeMatcher1.group(2);
             if ("00".equals(minute)) {
-                timeMatcher1.appendReplacement(sbTime, hour + " giờ");
+                timeMatcher1.appendReplacement(sbTime1, hour + " giờ");
             } else {
-                timeMatcher1.appendReplacement(sbTime, hour + " giờ " + minute + " phút");
+                timeMatcher1.appendReplacement(sbTime1, hour + " giờ " + minute + " phút");
             }
         }
-        timeMatcher1.appendTail(sbTime);
-        text = sbTime.toString();
+        timeMatcher1.appendTail(sbTime1);
+        text = sbTime1.toString();
 
-        // 3. Chuẩn hóa nhiệt độ, tốc độ, phần trăm
+        Matcher timeMatcher2 = TIME_PATTERN_2.matcher(text);
+        StringBuffer sbTime2 = new StringBuffer();
+        while (timeMatcher2.find()) {
+            String hour = timeMatcher2.group(1);
+            String minute = timeMatcher2.group(2);
+            if (minute == null || "00".equals(minute)) {
+                timeMatcher2.appendReplacement(sbTime2, hour + " giờ");
+            } else {
+                timeMatcher2.appendReplacement(sbTime2, hour + " giờ " + minute + " phút");
+            }
+        }
+        timeMatcher2.appendTail(sbTime2);
+        text = sbTime2.toString();
+
+        // 3. Chuẩn hóa tiền tệ, nhiệt độ, tốc độ, phần trăm
+        text = CURRENCY_K_PATTERN.matcher(text).replaceAll("$1 nghìn");
+        text = CURRENCY_VND_PATTERN.matcher(text).replaceAll("$1 đồng");
         text = TEMP_PATTERN.matcher(text).replaceAll("$1 độ C");
         text = SPEED_PATTERN.matcher(text).replaceAll("$1 kilômét một giờ");
         text = PERCENT_PATTERN.matcher(text).replaceAll("$1 phần trăm");
@@ -103,6 +124,13 @@ public final class VietnameseTextPreprocessor {
         text = text.replaceAll("(?i)\\bANTV\\b", "An Ninh Ti Vi");
         text = text.replaceAll("(?i)\\bQPVN\\b", "Quốc Phòng Việt Nam");
 
+        // K+
+        text = text.replaceAll("(?i)\\bK\\+\\s*SPORT\\s*1\\b", "K cộng Thể thao một");
+        text = text.replaceAll("(?i)\\bK\\+\\s*SPORT\\s*2\\b", "K cộng Thể thao hai");
+        text = text.replaceAll("(?i)\\bK\\+\\s*CINE\\b", "K cộng Cine");
+        text = text.replaceAll("(?i)\\bK\\+\\s*ACTION\\b", "K cộng Action");
+        text = text.replaceAll("(?i)\\bK\\+\\s*KIDS\\b", "K cộng Kids");
+
         // Chất lượng
         text = text.replaceAll("(?i)\\bHD\\b", "Hát Đê");
         text = text.replaceAll("(?i)\\bFull\\s*HD\\b", "Full Hát Đê");
@@ -128,7 +156,7 @@ public final class VietnameseTextPreprocessor {
             return Collections.emptyList();
         }
 
-        String[] rawSentences = text.split("(?<=[.!?;\n])\\s+");
+        String[] rawSentences = SENTENCE_SPLIT_PATTERN.split(text.trim());
         List<String> list = new ArrayList<>();
         for (String s : rawSentences) {
             String trimmed = s.trim();

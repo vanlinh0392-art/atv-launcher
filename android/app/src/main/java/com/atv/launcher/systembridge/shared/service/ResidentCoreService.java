@@ -21,6 +21,8 @@ public class ResidentCoreService extends Service {
     private static final int NOTIFICATION_ID = 0x181;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final java.util.concurrent.ExecutorService BACKGROUND_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
     private BroadcastReceiver wakeReceiver;
 
     @Override
@@ -36,7 +38,7 @@ public class ResidentCoreService extends Service {
         String resolvedReason = reason == null ? "service_start" : reason;
         boolean allowToast = reason == null || !reason.startsWith("silent_launcher_tap");
         Log.i(TAG, "ResidentCoreService onStartCommand: " + resolvedReason);
-        mainHandler.post(() -> SystemBridgeCoordinator.ensureSystemState(getApplicationContext(), resolvedReason, allowToast));
+        BACKGROUND_EXECUTOR.execute(() -> SystemBridgeCoordinator.ensureSystemState(getApplicationContext(), resolvedReason, allowToast));
         return START_STICKY;
     }
 
@@ -86,8 +88,7 @@ public class ResidentCoreService extends Service {
             public void onReceive(Context context, Intent intent) {
                 String action = intent != null ? intent.getAction() : "wake";
                 String resolvedAction = action == null ? "wake" : action;
-                if (Intent.ACTION_SCREEN_OFF.equals(resolvedAction)
-                        || Intent.ACTION_DREAMING_STARTED.equals(resolvedAction)) {
+                if (isSleepAction(resolvedAction)) {
                     SystemBridgeCoordinator.handleSleepTransition(context, resolvedAction);
                     return;
                 }
@@ -108,9 +109,18 @@ public class ResidentCoreService extends Service {
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         filter.addAction(Intent.ACTION_DREAMING_STARTED);
         filter.addAction(Intent.ACTION_DREAMING_STOPPED);
+        filter.addAction("android.intent.action.SCREEN_ON");
+        filter.addAction("android.intent.action.SCREEN_OFF");
         filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_ON");
+        filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_OFF");
         filter.addAction("com.xiaomi.tv.ACTION_OPEN_CLOSE_SCREEN_SAVER");
         filter.addAction("mitv.action.STR_BOOT_COMPLETED");
+        filter.addAction("com.tcl.tv.action.SCREEN_ON");
+        filter.addAction("com.tcl.tv.action.SCREEN_OFF");
+        filter.addAction("com.sony.dtv.intent.action.PANEL_ON");
+        filter.addAction("com.sony.dtv.intent.action.PANEL_OFF");
+        filter.addAction("com.hisense.tv.action.PANEL_ON");
+        filter.addAction("com.hisense.tv.action.PANEL_OFF");
         filter.setPriority(999999);
 
         if (Build.VERSION.SDK_INT >= 33) {
@@ -118,6 +128,16 @@ public class ResidentCoreService extends Service {
         } else {
             registerReceiver(wakeReceiver, filter);
         }
+    }
+
+    private static boolean isSleepAction(String action) {
+        return Intent.ACTION_SCREEN_OFF.equals(action)
+                || Intent.ACTION_DREAMING_STARTED.equals(action)
+                || "android.intent.action.SCREEN_OFF".equals(action)
+                || "com.sony.dtv.intent.action.PANEL_OFF".equals(action)
+                || "com.tcl.tv.action.SCREEN_OFF".equals(action)
+                || "com.hisense.tv.action.PANEL_OFF".equals(action)
+                || "com.xiaomi.mitv.ACTION_SCREEN_OFF".equals(action);
     }
 
     private Notification buildNotification() {

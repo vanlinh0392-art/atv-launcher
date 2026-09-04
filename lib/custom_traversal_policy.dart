@@ -139,7 +139,15 @@ extension Geometry on FocusNode {
   }
 
   bool isOnTheSameRow(FocusNode other) {
-    return rect.center.dy.round() == other.rect.center.dy.round();
+    final double top = rect.top;
+    final double bottom = rect.bottom;
+    final double otherTop = other.rect.top;
+    final double otherBottom = other.rect.bottom;
+    final double overlap = max(0.0, min(bottom, otherBottom) - max(top, otherTop));
+    final double minHeight = min(rect.height, other.rect.height);
+    return (minHeight > 0 && overlap >= (minHeight * 0.40)) ||
+        (rect.center.dy - other.rect.center.dy).abs() <= 12.0 ||
+        rect.center.dy.round() == other.rect.center.dy.round();
   }
 
   double distance(FocusNode other) {

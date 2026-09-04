@@ -19,7 +19,7 @@ public final class SleepTimerManager {
     }
 
     public static synchronized boolean setSleepTimer(Context context, int minutes) {
-        if (minutes <= 0) {
+        if (minutes <= 0 || minutes > 720) {
             cancelSleepTimer(context);
             return false;
         }
@@ -65,19 +65,27 @@ public final class SleepTimerManager {
     }
 
     private static void performSleep(Context context) {
-        try {
-            VoiceBridgeAccessibilityService accessibility = VoiceBridgeAccessibilityService.getInstance();
-            if (accessibility != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                    accessibility.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN);
-                } else {
-                    accessibility.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_POWER_DIALOG);
+        new Thread(() -> {
+            boolean lockScreenSuccess = false;
+            try {
+                VoiceBridgeAccessibilityService accessibility = VoiceBridgeAccessibilityService.getInstance();
+                if (accessibility != null) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        lockScreenSuccess = accessibility.performGlobalAction(
+                                android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN
+                        );
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error executing accessibility sleep command", e);
+            }
+            if (!lockScreenSuccess) {
+                try {
+                    com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.executeShell(context, "input keyevent 223");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error executing ADB sleep command", e);
                 }
             }
-            Intent sleepIntent = new Intent(Intent.ACTION_SCREEN_OFF);
-            context.sendBroadcast(sleepIntent);
-        } catch (Exception e) {
-            Log.e(TAG, "Error executing sleep command", e);
-        }
+        }, "SleepTimerExecutor").start();
     }
 }

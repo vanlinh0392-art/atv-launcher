@@ -1,4 +1,5 @@
 import 'package:flauncher/providers/settings_service.dart';
+import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,7 +45,7 @@ void main() {
     primaryFocusNode.requestFocus();
     await tester.pumpAndSettle();
 
-    for (var index = 0; index < 4; index += 1) {
+    for (var index = 0; index < 3; index += 1) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pumpAndSettle();
     }
@@ -63,6 +64,70 @@ void main() {
       settings.statusBarClockScalePercent,
       initial + SettingsService.statusBarClockScaleStep,
     );
+  });
+
+  testWidgets('weather toggle switch triggers setShowWeatherInStatusBar',
+      (tester) async {
+    final settings = await _createSettingsService();
+
+    expect(settings.showWeatherInStatusBar, isTrue);
+
+    await _pumpWidget(tester, settings);
+
+    final weatherSwitch = find.widgetWithText(
+      RoundedSwitchListTile,
+      'Show weather in status bar',
+    );
+    expect(weatherSwitch, findsOneWidget);
+
+    // Tap to turn OFF
+    await tester.tap(weatherSwitch);
+    await tester.pumpAndSettle();
+
+    expect(settings.showWeatherInStatusBar, isFalse);
+
+    // Tap to turn ON
+    await tester.tap(weatherSwitch);
+    await tester.pumpAndSettle();
+
+    expect(settings.showWeatherInStatusBar, isTrue);
+  });
+
+  testWidgets('date format and style cards are present and scrollable',
+      (tester) async {
+    final settings = await _createSettingsService();
+
+    await _pumpWidget(tester, settings);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('status_bar_date_format_card')),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('status_bar_date_format_card')), findsOneWidget);
+    expect(find.text('Định dạng ngày'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('status_bar_date_style_card')),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('status_bar_date_style_card')), findsOneWidget);
+    expect(find.text('Kiểu chữ'), findsOneWidget);
+  });
+
+  testWidgets('time format card is present at top and displays options',
+      (tester) async {
+    final settings = await _createSettingsService();
+
+    await _pumpWidget(tester, settings);
+
+    expect(find.byKey(const Key('status_bar_time_format_card')), findsOneWidget);
+    expect(find.text('Định dạng giờ'), findsOneWidget);
   });
 }
 

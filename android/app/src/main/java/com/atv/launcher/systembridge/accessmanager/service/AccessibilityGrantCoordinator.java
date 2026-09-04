@@ -161,8 +161,21 @@ public final class AccessibilityGrantCoordinator {
         scheduleRecurringWork(appContext, reason);
 
         if (!beforeState.writeSecureSettingsGranted) {
-            AccessStateStore.setLastVerifyResult(appContext, RESULT_MISSING_WSS);
-            return new RecoveryResult(false, RESULT_MISSING_WSS);
+            boolean adbAvailable = isAdbEnabled(appContext) || LocalAdbBridge.isRootAvailable();
+            if (adbAvailable) {
+                Log.i(TAG, "Missing WRITE_SECURE_SETTINGS in ensureManagedAccessibility (" + reason + "), attempting background grant via LocalAdbBridge...");
+                LocalGrantResult grantResult = tryGrantWriteSecureSettingsWithLocalAdb(appContext);
+                if (grantResult.success) {
+                    Log.i(TAG, "Background WRITE_SECURE_SETTINGS grant succeeded.");
+                    beforeState = readAccessibilityState(appContext);
+                } else {
+                    Log.w(TAG, "Background WRITE_SECURE_SETTINGS grant failed: " + grantResult.message);
+                }
+            }
+            if (!beforeState.writeSecureSettingsGranted) {
+                AccessStateStore.setLastVerifyResult(appContext, RESULT_MISSING_WSS);
+                return new RecoveryResult(false, RESULT_MISSING_WSS);
+            }
         }
 
         if (managedServiceIds.isEmpty()) {
@@ -675,9 +688,8 @@ public final class AccessibilityGrantCoordinator {
             try {
                 ApplicationInfo applicationInfo = packageManager.getApplicationInfo(packageName, 0);
                 String resolvedLabel = applicationInfo.loadLabel(packageManager).toString();
-                Drawable resolvedIcon = applicationInfo.loadIcon(packageManager);
                 boolean resolvedSystem = (applicationInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
-                return new PackageAccumulator(packageName, resolvedLabel, resolvedSystem, resolvedIcon);
+                return new PackageAccumulator(packageName, resolvedLabel, resolvedSystem, null);
             } catch (Exception ignored) {
                 return new PackageAccumulator(packageName, packageName, false, null);
             }

@@ -58,6 +58,7 @@ class AppsService extends ChangeNotifier {
   bool _homeReorderModeEnabled = false;
   Timer? _liveSyncRetryTimer;
   Timer? _appsChangedNotifyTimer;
+  StreamSubscription<dynamic>? _appsChangedSubscription;
   Future<void>? _liveSyncFuture;
   final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
   bool _firstRenderableLogged = false;
@@ -128,7 +129,8 @@ class AppsService extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    _fLauncherChannel.addAppsChangedListener((event) async {
+    _appsChangedSubscription =
+        _fLauncherChannel.addAppsChangedListener((event) async {
       String? changedImagePackageName;
       switch (event["action"]) {
         case "PACKAGE_ADDED":
@@ -529,7 +531,7 @@ class AppsService extends ChangeNotifier {
       category.applications.sortBy((application) => application.name);
     } else {
       category.applications.sortBy<num>(
-          (application) => application.categoryOrders[category.id]!);
+          (application) => application.categoryOrders[category.id] ?? 999999);
     }
   }
 
@@ -582,6 +584,10 @@ class AppsService extends ChangeNotifier {
   Future<bool> isDefaultLauncher() => _fLauncherChannel.isDefaultLauncher();
 
   Future<void> startAmbientMode() => _fLauncherChannel.startAmbientMode();
+
+  Future<Map<String, dynamic>> toggleMute() => _fLauncherChannel.toggleMute();
+
+  Future<Map<String, dynamic>> sleepTv() => _fLauncherChannel.sleepTv();
 
   Future<void> addToCategory(App app, Category category,
       {bool shouldNotifyListeners = true}) async {
@@ -1383,6 +1389,7 @@ class AppsService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _appsChangedSubscription?.cancel();
     _liveSyncRetryTimer?.cancel();
     _appsChangedNotifyTimer?.cancel();
     _appInstalledController.close();

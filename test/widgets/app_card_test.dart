@@ -94,7 +94,7 @@ void main() {
     final appsService = MockAppsService();
     _stubAppsServiceDefaults(appsService);
     final applications = List.generate(
-      30,
+      105,
       (index) => fakeApp(
         packageName: 'cache.trim.$index',
         name: 'Cache Trim $index',

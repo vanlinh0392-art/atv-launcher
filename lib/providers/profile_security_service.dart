@@ -6,7 +6,9 @@ import 'package:crypto/crypto.dart';
 import 'package:flauncher/models/app.dart';
 import 'package:flauncher/models/category.dart';
 import 'package:flauncher/models/launcher_profile.dart';
+import 'package:flauncher/widgets/pin_pad_dialog.dart' as pin_pad_dialog;
 import 'package:flutter/widgets.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _profilesKey = 'security_profiles';
@@ -106,6 +108,19 @@ class ProfileSecurityService extends ChangeNotifier
       return _settingsLockEnabled && !_isUnlockSessionValid();
     }
     return !_isUnlockSessionValid();
+  }
+
+  Future<bool> ensureSecurityAccess(
+    BuildContext context, {
+    String? title,
+    String? description,
+  }) {
+    final localizations = AppLocalizations.of(context)!;
+    return pin_pad_dialog.ensureSecurityAccess(
+      context,
+      title: title ?? localizations.unlockSettingsTitle,
+      description: description ?? localizations.unlockSettingsDescription,
+    );
   }
 
   bool isAppVisible(App app) => !app.hidden;

@@ -30,14 +30,11 @@ class UpdatePanelPage extends StatefulWidget {
 
 class _UpdatePanelPageState extends State<UpdatePanelPage>
     with WidgetsBindingObserver {
-  static const String _summaryDebugLabel = 'update_panel_summary_metrics';
   static const String _statusDebugLabel = 'update_panel_status_section';
   static const String _releaseDetailsDebugLabel =
       'update_panel_release_details';
-  static const double _actionCardHeight = 60;
   static const Color _statusOkColor = Color(0xFF7BE0A5);
   static const Color _statusNeedsActionColor = Color(0xFFFFC970);
-  static const Color _statusInfoColor = Color(0xFF8CCBFF);
 
   late final LauncherUpdateSession _updateSession;
   late final bool _ownsUpdateSession;
@@ -111,71 +108,23 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       builder: (context, updateStatus, _) {
         final permissionReady =
             updateStatus['canRequestPackageInstalls'] == true;
-        final adbEnabled = updateStatus['adbEnabled'] == true;
         final latestAsset = _updateSession.latestReleaseAsset;
-        final latestAssetSizeLabel = _resolveLatestAssetSizeLabel(
-          localizations,
-          latestAsset,
-        );
-        final latestReleaseLabel = _resolveLatestReleaseLabel(localizations);
-        final installerLabel = permissionReady
-            ? localizations.launcherUpdatePermissionReady
-            : localizations.launcherUpdatePermissionMissing;
-        final downloadedLabel = _resolveDownloadedLabel(localizations);
-        final checkCardSubtitle = _resolveCheckCardSubtitle(
-          localizations,
-          latestReleaseLabel,
-        );
-        final downloadCardSubtitle = _resolveDownloadCardSubtitle(
-          context,
-          localizations,
-          latestAsset,
-        );
-        final installCardSubtitle = _resolveInstallCardSubtitle(
-          localizations,
-          permissionReady,
-          downloadedLabel,
-        );
-        final localAdbCardSubtitle = _resolveLocalAdbCardSubtitle(
-          localizations,
-          adbEnabled,
-        );
-        final installsCardSubtitle = permissionReady
-            ? localizations.launcherUpdatePermissionReady
-            : localizations.launcherUpdatePermissionMissing;
-        final cleanupCardSubtitle = _resolveCleanupCardSubtitle(
-          localizations,
-        );
 
         return ListView(
           key: const PageStorageKey<String>(UpdatePanelPage.routeName),
           padding: const EdgeInsets.only(bottom: 16),
           children: [
-            _buildOverviewSummary(
-              localizations: localizations,
-              latestReleaseLabel: latestReleaseLabel,
-              latestAssetSizeLabel: latestAssetSizeLabel,
-              installerLabel: installerLabel,
-              downloadedLabel: downloadedLabel,
-              permissionReady: permissionReady,
-            ),
-            const SizedBox(height: 14),
             SettingsSurfaceCard(
-              padding: const EdgeInsets.all(12),
+              padding: TvDrawerTokens.surfacePadding,
               child: SettingsAdaptiveGrid(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: TvDrawerTokens.rowSpacing,
                 minChildWidth: 520,
                 maxColumns: 1,
                 children: [
                   _buildUniformActionCard(
                     focusNode: widget.primaryFocusNode,
-                    onMoveUpAtBoundary: () =>
-                        focusCurrentSettingsNodeByDebugLabel(
-                      _summaryDebugLabel,
-                    ),
                     title: localizations.checkLatestRelease,
-                    subtitle: checkCardSubtitle,
                     icon: Icons.system_update_alt_outlined,
                     onPressed: _updateSession.busy
                         ? null
@@ -183,67 +132,34 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
                   ),
                   _buildUniformActionCard(
                     title: localizations.downloadLatestApk,
-                    subtitle: downloadCardSubtitle,
                     icon: Icons.download_for_offline_outlined,
                     onPressed: _updateSession.busy || latestAsset == null
                         ? null
                         : () => _downloadLatestApk(latestAsset),
                   ),
-                  _buildUniformActionCard(
-                    title: localizations.installDownloadedApk,
-                    subtitle: installCardSubtitle,
-                    icon: Icons.system_update_alt_outlined,
-                    onPressed: _updateSession.busy ||
-                            _updateSession.downloadedApkPath == null
-                        ? null
-                        : () => _installDownloadedApk(
-                              bridge: bridge,
-                              openPermissionIfNeeded: true,
-                            ),
-                  ),
-                  _buildUniformActionCard(
-                    title: localizations.grantInstallPermissionViaLocalAdb,
-                    subtitle: localAdbCardSubtitle,
-                    icon: Icons.adb_outlined,
-                    onPressed: _updateSession.busy
-                        ? null
-                        : () => _grantInstallerPermissionViaLocalAdb(
-                              bridge: bridge,
-                              adbEnabled: adbEnabled,
-                            ),
-                  ),
-                  _buildUniformActionCard(
-                    title: localizations.allowAppInstalls,
-                    subtitle: installsCardSubtitle,
-                    icon: Icons.admin_panel_settings_outlined,
-                    onPressed: _updateSession.busy
-                        ? null
-                        : () => _openUnknownAppsPermission(
-                              bridge,
-                              resumeInstallAfterPermission: false,
-                            ),
-                  ),
-                  _buildUniformActionCard(
-                    title: localizations.cleanupDownloadedApks,
-                    subtitle: cleanupCardSubtitle,
-                    icon: Icons.delete_sweep_outlined,
-                    onPressed: _updateSession.busy ||
-                            _updateSession.downloadedApkCount == 0
-                        ? null
-                        : _clearDownloadedApks,
-                  ),
+                  if (_updateSession.downloadedApkPath != null)
+                    _buildUniformActionCard(
+                      title: localizations.installDownloadedApk,
+                      icon: Icons.system_update_alt_outlined,
+                      onPressed: _updateSession.busy
+                          ? null
+                          : () => _installDownloadedApk(
+                                bridge: bridge,
+                                openPermissionIfNeeded: true,
+                              ),
+                    ),
                 ],
               ),
             ),
             if (_updateSession.lastMessage.trim().isNotEmpty ||
                 _showDownloadProgress) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: TvDrawerTokens.surfaceSpacing),
               _buildStatusSummary(
                 context: context,
                 localizations: localizations,
               ),
             ],
-            const SizedBox(height: 14),
+            const SizedBox(height: TvDrawerTokens.surfaceSpacing),
             SettingsSurfaceCard(
               child: SettingsSummarySection(
                 debugLabel: _releaseDetailsDebugLabel,
@@ -279,21 +195,35 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       return;
     }
     final bridge = context.read<SystemBridgeService>();
-    await bridge.refreshLite();
-    if (!mounted ||
-        !_updateSession.resumeInstallAfterPermission ||
+    if (!_updateSession.resumeInstallAfterPermission ||
         _updateSession.downloadedApkPath == null) {
+      await bridge.refreshLite();
       return;
     }
-    final permissionReady =
-        bridge.updateStatus['canRequestPackageInstalls'] == true;
-    if (!permissionReady) {
-      return;
+    const retryDelays = [
+      Duration.zero,
+      Duration(milliseconds: 300),
+      Duration(milliseconds: 600),
+      Duration(milliseconds: 1200),
+    ];
+    for (final delay in retryDelays) {
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
+      if (!mounted) {
+        return;
+      }
+      await bridge.refreshLite();
+      final permissionReady =
+          bridge.updateStatus['canRequestPackageInstalls'] == true;
+      if (permissionReady) {
+        await _installDownloadedApk(
+          bridge: bridge,
+          openPermissionIfNeeded: false,
+        );
+        return;
+      }
     }
-    await _installDownloadedApk(
-      bridge: bridge,
-      openPermissionIfNeeded: false,
-    );
   }
 
   Future<void> _checkLatestRelease() async {
@@ -319,37 +249,6 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
         bridge: bridge,
         openPermissionIfNeeded: true,
       );
-    }
-  }
-
-  Future<void> _grantInstallerPermissionViaLocalAdb({
-    required SystemBridgeService bridge,
-    required bool adbEnabled,
-  }) async {
-    final localizations = AppLocalizations.of(context)!;
-    if (!adbEnabled) {
-      await bridge.openSpecificSettingsPage('development');
-      if (!mounted) {
-        return;
-      }
-      _updateSession.setLastMessage(localizations.launcherUpdateEnableAdbFirst);
-      return;
-    }
-
-    _updateSession.setBusy(true);
-    try {
-      final result = await bridge.prepareLauncherUpdateInstall();
-      if (!mounted) {
-        return;
-      }
-      _updateSession.setLastMessage(
-        result['message']?.toString().trim().isNotEmpty == true
-            ? result['message'].toString()
-            : localizations.launcherUpdateLocalAdbFallbackResult,
-      );
-      _requestSectionFocus(_statusFocusNode);
-    } finally {
-      _updateSession.setBusy(false);
     }
   }
 
@@ -420,143 +319,29 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     }
   }
 
-  Future<void> _clearDownloadedApks() async {
-    final localizations = AppLocalizations.of(context)!;
-    await _updateSession.clearDownloadedApks(localizations);
-    if (!mounted) {
-      return;
-    }
-    _requestSectionFocus(_statusFocusNode);
-  }
-
-  String _resolveLatestAssetSizeLabel(
-    AppLocalizations localizations,
-    LauncherUpdateAsset? asset,
-  ) {
-    if (!_updateSession.hasCheckedOfficialRelease) {
-      return localizations.launcherUpdateNotChecked;
-    }
-    if (_updateSession.latestRelease == null) {
-      return localizations.launcherUpdateNoOfficialRelease;
-    }
-    if (asset == null) {
-      return localizations.launcherUpdateNoApkAsset;
-    }
-    return formatUpdateFileSize(asset.sizeBytes);
-  }
-
   Widget _buildUniformActionCard({
     FocusNode? focusNode,
     SettingsBoundaryMoveHandler? onMoveUpAtBoundary,
     required String title,
-    required String subtitle,
     required IconData icon,
     required Future<void> Function()? onPressed,
   }) {
-    return SizedBox(
-      height: _actionCardHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: TvDrawerTokens.cardMinHeight),
       child: SettingsActionCard(
         focusNode: focusNode,
         onMoveUpAtBoundary: onMoveUpAtBoundary,
         title: title,
-        subtitle: subtitle,
         icon: icon,
         focusEmphasis: 1.18,
         onPressed: onPressed,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
-          vertical: 8,
+          vertical: 10,
         ),
         titleMaxLines: 1,
-        subtitleMaxLines: 1,
-        titleSubtitleSpacing: 1,
         iconSize: 20,
         trailingIconSize: 20,
-      ),
-    );
-  }
-
-  Widget _buildOverviewSummary({
-    required AppLocalizations localizations,
-    required String latestReleaseLabel,
-    required String latestAssetSizeLabel,
-    required String installerLabel,
-    required String downloadedLabel,
-    required bool permissionReady,
-  }) {
-    final chips = <Widget>[
-      SettingsStatusChip(
-        label: _resolveOverviewChipLabel(localizations),
-        color: _resolveOverviewChipColor(),
-      ),
-      SettingsStatusChip(
-        label: _resolveAbiChipLabel(localizations),
-        color: _resolveAbiChipColor(),
-      ),
-      SettingsStatusChip(
-        label: installerLabel,
-        color: permissionReady ? _statusOkColor : _statusNeedsActionColor,
-      ),
-    ];
-    if (_updateSession.downloadedApkCount > 0) {
-      chips.add(
-        SettingsStatusChip(
-          label: downloadedLabel,
-          color: _statusInfoColor,
-        ),
-      );
-    }
-    if (_updateSession.latestReleaseAsset != null) {
-      chips.add(
-        SettingsStatusChip(
-          label: latestAssetSizeLabel,
-          color: const Color(0xFFC6A6FF),
-        ),
-      );
-    }
-
-    return SettingsSummarySection(
-      debugLabel: _summaryDebugLabel,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: chips,
-          ),
-          const SizedBox(height: 12),
-          SettingsMetricsGrid(
-            minChildWidth: 188,
-            maxColumns: 4,
-            children: [
-              SettingsMetricTile(
-                label: localizations.launcherUpdateInstalledVersion,
-                value: _installedVersionLabel,
-                icon: Icons.info_outline,
-              ),
-              SettingsMetricTile(
-                label: localizations.launcherUpdateLatestRelease,
-                value: latestReleaseLabel,
-                icon: Icons.system_update_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.launcherUpdateInstallerPermission,
-                value: installerLabel,
-                icon: permissionReady
-                    ? Icons.verified_user_outlined
-                    : Icons.warning_amber_outlined,
-                accentColor:
-                    permissionReady ? _statusOkColor : _statusNeedsActionColor,
-              ),
-              SettingsMetricTile(
-                label: localizations.launcherUpdateDownloadedBuild,
-                value: downloadedLabel,
-                icon: Icons.download_done_outlined,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -572,7 +357,7 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
           );
 
     return SettingsSurfaceCard(
-      padding: const EdgeInsets.all(10),
+      padding: TvDrawerTokens.surfacePadding,
       child: SettingsSummarySection(
         debugLabel: _statusDebugLabel,
         focusNode: _statusFocusNode,
@@ -669,40 +454,6 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     });
   }
 
-  String _resolveLatestReleaseLabel(AppLocalizations localizations) {
-    if (_updateSession.latestRelease?.displayName.trim().isNotEmpty == true) {
-      return _updateSession.latestRelease!.displayName;
-    }
-    if (_updateSession.hasCheckedOfficialRelease) {
-      return localizations.launcherUpdateNoOfficialRelease;
-    }
-    return localizations.launcherUpdateNotChecked;
-  }
-
-  String _resolveAbiChipLabel(AppLocalizations localizations) {
-    if (_updateSession.abiResolutionPending) {
-      return localizations.launcherUpdateAbiResolving;
-    }
-    if (_updateSession.abiResolutionDegraded) {
-      return localizations.launcherUpdateAbiFallbackChip;
-    }
-    final deviceAbis = _updateSession.deviceAbis;
-    if (deviceAbis.isEmpty) {
-      return localizations.launcherUpdateAbiUnavailable;
-    }
-    return localizations.launcherUpdateAbiChip(deviceAbis.join(', '));
-  }
-
-  Color _resolveAbiChipColor() {
-    if (_updateSession.abiResolutionPending) {
-      return _statusInfoColor;
-    }
-    if (_updateSession.abiResolutionDegraded) {
-      return _statusNeedsActionColor;
-    }
-    return _statusOkColor;
-  }
-
   String _resolveDeviceAbiSummary(AppLocalizations localizations) {
     final deviceAbis = _updateSession.deviceAbis;
     if (deviceAbis.isEmpty) {
@@ -721,85 +472,6 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
     return null;
   }
 
-  String _resolveOverviewChipLabel(AppLocalizations localizations) {
-    if (!_updateSession.hasCheckedOfficialRelease) {
-      return localizations.launcherUpdateNotChecked;
-    }
-    if (_updateSession.latestRelease == null) {
-      return localizations.launcherUpdateNoOfficialRelease;
-    }
-    return _updateSession.latestRelease!.matchesInstalledVersion(
-      _installedVersionLabel,
-    )
-        ? localizations.launcherUpdateInstalledChip
-        : localizations.launcherUpdateLatestChip;
-  }
-
-  Color _resolveOverviewChipColor() {
-    if (!_updateSession.hasCheckedOfficialRelease) {
-      return _statusInfoColor;
-    }
-    if (_updateSession.latestRelease == null) {
-      return _statusNeedsActionColor;
-    }
-    return _updateSession.latestRelease!.matchesInstalledVersion(
-      _installedVersionLabel,
-    )
-        ? _statusOkColor
-        : _statusInfoColor;
-  }
-
-  String _resolveCheckCardSubtitle(
-    AppLocalizations localizations,
-    String latestReleaseLabel,
-  ) {
-    if (!_updateSession.hasCheckedOfficialRelease) {
-      return localizations.launcherUpdateNotChecked;
-    }
-    return latestReleaseLabel;
-  }
-
-  String _resolveDownloadCardSubtitle(
-    BuildContext context,
-    AppLocalizations localizations,
-    LauncherUpdateAsset? asset,
-  ) {
-    if (!_updateSession.hasCheckedOfficialRelease) {
-      return localizations.launcherUpdateNotChecked;
-    }
-    if (_updateSession.latestRelease == null) {
-      return localizations.launcherUpdateNoOfficialRelease;
-    }
-    if (asset == null) {
-      return localizations.launcherUpdateNoApkAsset;
-    }
-    return '${formatUpdateFileSize(asset.sizeBytes)} | ${_formatUpdateDateTime(context, asset.uploadedAt, includeTime: false)}';
-  }
-
-  String _resolveInstallCardSubtitle(
-    AppLocalizations localizations,
-    bool permissionReady,
-    String downloadedLabel,
-  ) {
-    if (_updateSession.downloadedApkPath == null) {
-      return localizations.launcherUpdateNoDownloadedApk;
-    }
-    if (!permissionReady) {
-      return localizations.launcherUpdatePermissionMissing;
-    }
-    return downloadedLabel;
-  }
-
-  String _resolveLocalAdbCardSubtitle(
-    AppLocalizations localizations,
-    bool adbEnabled,
-  ) {
-    if (!adbEnabled) {
-      return localizations.launcherUpdateEnableAdbFirst;
-    }
-    return '127.0.0.1:5555';
-  }
-
   String _resolveDownloadBytesLabel(AppLocalizations localizations) {
     final downloaded = formatUpdateFileSize(_updateSession.downloadedBytes);
     if (_updateSession.downloadTotalBytes > 0) {
@@ -809,28 +481,6 @@ class _UpdatePanelPageState extends State<UpdatePanelPage>
       );
     }
     return localizations.launcherUpdateDownloadBytesReceived(downloaded);
-  }
-
-  String _resolveDownloadedLabel(AppLocalizations localizations) {
-    if (_updateSession.downloadedApkCount <= 0) {
-      return localizations.launcherUpdateNoDownloadedApk;
-    }
-    if (_updateSession.downloadedApkCount == 1 &&
-        (_updateSession.downloadedAssetName ?? '').isNotEmpty) {
-      return _updateSession.downloadedAssetName!;
-    }
-    return localizations.launcherUpdateDownloadedCount(
-      _updateSession.downloadedApkCount,
-    );
-  }
-
-  String _resolveCleanupCardSubtitle(AppLocalizations localizations) {
-    if (_updateSession.downloadedApkCount <= 0) {
-      return localizations.launcherUpdateNoDownloadedApk;
-    }
-    return localizations.launcherUpdateDownloadedCount(
-      _updateSession.downloadedApkCount,
-    );
   }
 
   Widget _buildReleaseDetails(
@@ -893,48 +543,47 @@ class _ReleaseDetailsCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    release.displayName.isEmpty
-                        ? release.tagName
-                        : release.displayName,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    release.tagName.isEmpty ? '-' : release.tagName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(color: Colors.white70),
-                  ),
-                ],
-              ),
+            Text(
+              release.displayName.isEmpty
+                  ? release.tagName
+                  : release.displayName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            SettingsStatusChip(
-              label: matchesInstalled
-                  ? localizations.launcherUpdateInstalledChip
-                  : localizations.launcherUpdateLatestChip,
-              color: matchesInstalled
-                  ? const Color(0xFF7BE0A5)
-                  : const Color(0xFF8CCBFF),
+            const SizedBox(height: 2),
+            Text(
+              release.tagName.isEmpty ? '-' : release.tagName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: Colors.white70),
             ),
-            const SizedBox(width: 10),
-            SettingsStatusChip(
-              label: permissionReady
-                  ? localizations.launcherUpdatePermissionReady
-                  : localizations.launcherUpdatePermissionMissing,
-              color: permissionColor,
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                SettingsStatusChip(
+                  label: matchesInstalled
+                      ? localizations.launcherUpdateInstalledChip
+                      : localizations.launcherUpdateLatestChip,
+                  color: matchesInstalled
+                      ? const Color(0xFF7BE0A5)
+                      : const Color(0xFF8CCBFF),
+                ),
+                SettingsStatusChip(
+                  label: permissionReady
+                      ? localizations.launcherUpdatePermissionReady
+                      : localizations.launcherUpdatePermissionMissing,
+                  color: permissionColor,
+                ),
+              ],
             ),
           ],
         ),
@@ -946,10 +595,6 @@ class _ReleaseDetailsCard extends StatelessWidget {
             _ReleaseMetaChip(
               label: localizations.launcherUpdateTagLabel,
               value: release.tagName.isEmpty ? '-' : release.tagName,
-            ),
-            _ReleaseMetaChip(
-              label: localizations.launcherUpdatePublishedAt,
-              value: _formatUpdateDateTime(context, publishedAt),
             ),
             _ReleaseMetaChip(
               label: localizations.launcherUpdateUploadedAt,
@@ -964,14 +609,9 @@ class _ReleaseDetailsCard extends StatelessWidget {
                 label: localizations.launcherUpdateSizeLabel,
                 value: formatUpdateFileSize(selectedAsset.sizeBytes),
               ),
-            if (selectedAsset != null)
-              _ReleaseMetaChip(
-                label: localizations.launcherUpdateDownloadsLabel,
-                value: selectedAsset.downloadCount.toString(),
-              ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _ReleaseInfoRow(
           label: localizations.launcherUpdateAssetLabel,
           value: selectedAsset == null
@@ -997,7 +637,7 @@ class _ReleaseDetailsCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             release.body.trim(),
-            maxLines: 7,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context)
                 .textTheme
@@ -1080,24 +720,17 @@ class _ReleaseInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: Colors.white60),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+      padding: const EdgeInsets.only(top: 6, bottom: 2),
+      child: Text(
+        '$label: $value',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white60,
+            ),
       ),
     );
   }
 }
+
+

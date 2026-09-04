@@ -28,6 +28,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import android.media.AudioFocusRequest;
+import android.os.Build;
+import java.util.concurrent.TimeUnit;
+
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -45,7 +49,10 @@ public final class VietnameseTtsEngine {
     private static volatile VietnameseTtsEngine instance;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    private Object ttsFocusRequest;
+    private Context lastAudioContext;
 
     private TextToSpeech nativeTts;
     private boolean nativeTtsInitialized;
@@ -153,6 +160,47 @@ public final class VietnameseTtsEngine {
         }
     }
 
+    private void acquireTtsAudioFocus(Context context) {
+        if (context == null) return;
+        lastAudioContext = context.getApplicationContext();
+        AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (am != null) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    AudioAttributes attrs = new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build();
+                    AudioFocusRequest req = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                            .setAudioAttributes(attrs)
+                            .build();
+                    ttsFocusRequest = req;
+                    am.requestAudioFocus(req);
+                } else {
+                    am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void releaseTtsAudioFocus() {
+        if (lastAudioContext == null) return;
+        AudioManager am = (AudioManager) lastAudioContext.getSystemService(Context.AUDIO_SERVICE);
+        if (am != null) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && ttsFocusRequest instanceof AudioFocusRequest) {
+                    am.abandonAudioFocusRequest((AudioFocusRequest) ttsFocusRequest);
+                    ttsFocusRequest = null;
+                } else {
+                    am.abandonAudioFocus(null);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        lastAudioContext = null;
+    }
+
     public void speak(Context context, String rawText, TtsCallback callback) {
         final String textToSpeak = VietnameseTextPreprocessor.preprocessForSpeech(rawText);
         if (TextUtils.isEmpty(textToSpeak)) {
@@ -161,6 +209,8 @@ public final class VietnameseTtsEngine {
         }
 
         stop();
+        cleanupTempFiles();
+        acquireTtsAudioFocus(context);
         isStopped = false;
         activeCallback = callback;
         playbackQueue.clear();
@@ -360,6 +410,7 @@ public final class VietnameseTtsEngine {
     }
 
     private void notifyComplete(TtsCallback callback) {
+        releaseTtsAudioFocus();
         mainHandler.post(() -> {
             if (callback != null) {
                 try {
@@ -384,8 +435,8 @@ public final class VietnameseTtsEngine {
     }
 
     private static final OkHttpClient OK_HTTP_CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(java.time.Duration.ofMillis(3500))
-            .readTimeout(java.time.Duration.ofMillis(5500))
+            .connectTimeout(3500, TimeUnit.MILLISECONDS)
+            .readTimeout(5500, TimeUnit.MILLISECONDS)
             .build();
 
     private String resolveVoiceName(String eng) {
@@ -629,6 +680,7 @@ public final class VietnameseTtsEngine {
         playbackQueue.clear();
         stopMediaPlayer();
         cleanupTempFiles();
+        releaseTtsAudioFocus();
         if (nativeTts != null && nativeTtsInitialized) {
             try {
                 nativeTts.stop();
@@ -672,6 +724,7 @@ public final class VietnameseTtsEngine {
             }
             nativeTts = null;
         }
-        executor.shutdown();
+        mainHandler.removeCallbacksAndMessages(null);
+        executor.shutdownNow();
     }
 }

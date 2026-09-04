@@ -1,10 +1,10 @@
+import 'dart:async';
+
 import 'package:flauncher/providers/system_bridge_service.dart';
-import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 class DensityPanelPage extends StatefulWidget {
@@ -21,31 +21,40 @@ class DensityPanelPage extends StatefulWidget {
 }
 
 class _DensityPanelPageState extends State<DensityPanelPage> {
-  static const String _summaryDebugLabel = 'density_summary_metrics';
-  static const String _customInputDebugLabel = 'density_custom_input';
-  late final TextEditingController _controller;
-  late final FocusNode _customDpiFocusNode;
-  bool _customDpiFocused = false;
+  late final FocusNode _presetFocusNode;
+  late final bool _ownsPresetFocusNode;
+
+  static const List<int> _presetDensities = <int>[240, 280, 320, 360];
+
+  static const List<SettingsChoiceOption<int>> _presetOptions =
+      <SettingsChoiceOption<int>>[
+    SettingsChoiceOption<int>(value: 240, label: '240 (Nhỏ gọn)'),
+    SettingsChoiceOption<int>(value: 280, label: '280 (Cân đối)'),
+    SettingsChoiceOption<int>(value: 320, label: '320 (Tiêu chuẩn)'),
+    SettingsChoiceOption<int>(value: 360, label: '360 (Lớn)'),
+  ];
 
   @override
   void initState() {
     super.initState();
-    final density = context
-            .read<SystemBridgeService>()
-            .densityStatus['currentDensity']
-            ?.toString() ??
-        '';
-    _controller = TextEditingController(text: density);
-    _customDpiFocusNode = FocusNode(debugLabel: _customInputDebugLabel);
-    _customDpiFocusNode.addListener(_handleCustomDpiFocusChanged);
+    _ownsPresetFocusNode = widget.primaryFocusNode == null;
+    _presetFocusNode = widget.primaryFocusNode ??
+        FocusNode(debugLabel: 'density_primary_apply');
+    if (_ownsPresetFocusNode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final focusLabel = FocusManager.instance.primaryFocus?.debugLabel ?? '';
+        if (focusLabel.contains('settings_rail_')) return;
+        _presetFocusNode.requestFocus();
+      });
+    }
   }
 
   @override
   void dispose() {
-    _customDpiFocusNode
-      ..removeListener(_handleCustomDpiFocusChanged)
-      ..dispose();
-    _controller.dispose();
+    if (_ownsPresetFocusNode) {
+      _presetFocusNode.dispose();
+    }
     super.dispose();
   }
 
@@ -57,163 +66,160 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
       (service) => service.densityStatus,
     );
 
-    return ListView(
-      key: const PageStorageKey<String>(DensityPanelPage.routeName),
-      children: [
-        SettingsSummarySection(
-          debugLabel: _summaryDebugLabel,
-          child: SettingsMetricsGrid(
-            minChildWidth: 176,
-            maxColumns: 3,
-            children: [
-              SettingsMetricTile(
-                label: localizations.currentDpi,
-                value: status['currentDensity']?.toString() ?? '-',
-                icon: Icons.monitor_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.factoryDpi,
-                value: status['factoryDensity']?.toString() ?? '-',
-                icon: Icons.settings_backup_restore_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.overrideLabel,
-                value: status['overrideDensity']?.toString() ?? '-',
-                icon: Icons.tune_outlined,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        SettingsSurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.alt_route_outlined),
-                title: Text(localizations.executionPathLabel),
-                subtitle: Text(status['executionPath']?.toString() ?? '-'),
-              ),
-              EnsureVisible(
-                alignment: EnsureVisible.settingsAlignment,
-                preferImmediate: true,
-                child: Focus(
-                  canRequestFocus: false,
-                  onKeyEvent: (_, event) {
-                    if (event is! KeyDownEvent ||
-                        !_customDpiFocusNode.hasFocus) {
-                      return KeyEventResult.ignored;
-                    }
-                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                      if (focusCurrentSettingsNodeByDebugLabel(
-                        _summaryDebugLabel,
-                      )) {
-                        return KeyEventResult.handled;
-                      }
-                    }
-                    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                      if (_focusPrimaryAction()) {
-                        return KeyEventResult.handled;
-                      }
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: SettingsFocusFrame(
-                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                    borderRadius: BorderRadius.circular(18),
-                    focusEmphasis: 1.12,
-                    variant: SettingsFocusFrameVariant.rowOnly,
-                    focused: _customDpiFocused,
-                    child: TextField(
-                      key: const Key('density_custom_input_field'),
-                      focusNode: _customDpiFocusNode,
-                      controller: _controller,
-                      autofocus: false,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: localizations.customDpiRange,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SettingsAdaptiveGrid(
-                minChildWidth: 220,
-                maxColumns: 2,
-                forceSingleColumn: false,
+    final currentDensityVal = status['currentDensity'];
+    final currentDensity = currentDensityVal is int
+        ? currentDensityVal
+        : int.tryParse(currentDensityVal?.toString() ?? '') ?? 320;
+
+    final factoryDensityVal = status['factoryDensity'];
+    final factoryDensity = factoryDensityVal is int
+        ? factoryDensityVal
+        : int.tryParse(factoryDensityVal?.toString() ?? '');
+
+    final isPreset = _presetDensities.contains(currentDensity);
+
+    return FocusTraversalGroup(
+      policy: WidgetOrderTraversalPolicy(),
+      child: ListView(
+        key: const PageStorageKey<String>(DensityPanelPage.routeName),
+        children: [
+          if (!isPreset) ...[
+            SettingsSurfaceCard(
+              child: Row(
                 children: [
-                  SettingsActionCard(
-                    key: const Key('density_apply_button'),
-                    focusNode: widget.primaryFocusNode,
-                    onMoveUpAtBoundary: _focusCustomDpiField,
-                    title: localizations.applyLabel,
-                    subtitle: localizations.customDpiRange,
-                    icon: Icons.check_circle_outline,
-                    onPressed: () async {
-                      final density = int.tryParse(_controller.text.trim());
-                      if (density == null) {
-                        _showMessage(context, localizations.enterValidDpi);
-                        return;
-                      }
-                      _showMessage(
-                        context,
-                        (await bridgeService.applyDensity(density))['message']
-                                ?.toString() ??
-                            localizations.densityUpdated,
-                      );
-                    },
+                  const Icon(
+                    Icons.info_outline,
+                    color: Colors.amberAccent,
+                    size: 22,
                   ),
-                  SettingsActionCard(
-                    onMoveUpAtBoundary: _focusCustomDpiField,
-                    title: localizations.reset,
-                    subtitle: localizations.factoryDpi,
-                    icon: Icons.restart_alt,
-                    onPressed: () async => _showMessage(
-                      context,
-                      (await bridgeService.resetDensity())['message']
-                              ?.toString() ??
-                          localizations.densityReset,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      factoryDensity != null
+                          ? 'Đang dùng DPI tùy chỉnh: $currentDensity DPI (Gốc: $factoryDensity)'
+                          : 'Đang dùng DPI tùy chỉnh: $currentDensity DPI',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withOpacity(0.92),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
+            const SizedBox(height: TvDrawerTokens.surfaceSpacing),
+          ],
+          SettingsSurfaceCard(
+            child: SettingsChoiceCard<int>(
+              focusNode: _presetFocusNode,
+              selectorKey: const Key('density_preset_selector'),
+              optionKeyPrefix: 'density_preset_option',
+              title: localizations.settingsDestinationDensityTitle,
+              icon: Icons.monitor_outlined,
+              value: currentDensity,
+              options: _presetOptions,
+              valueLabelBuilder: _densityValueLabel,
+              onChanged: (newDensity) => _handleDensityChanged(
+                context,
+                bridgeService,
+                status,
+                localizations,
+                newDensity,
+              ),
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: TvDrawerTokens.surfaceSpacing),
+          SettingsSurfaceCard(
+            child: SettingsActionCard(
+              key: const Key('density_reset_button'),
+              title: 'Đặt lại DPI gốc',
+              subtitle: factoryDensity != null
+                  ? 'Mặc định: $factoryDensity DPI'
+                  : null,
+              icon: Icons.restart_alt,
+              onPressed: () => _handleResetDensity(
+                context,
+                bridgeService,
+                localizations,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _handleCustomDpiFocusChanged() {
-    if (_customDpiFocused == _customDpiFocusNode.hasFocus) {
-      return;
+  String _densityValueLabel(int value) {
+    switch (value) {
+      case 240:
+        return '240 (Nhỏ gọn)';
+      case 280:
+        return '280 (Cân đối)';
+      case 320:
+        return '320 (Tiêu chuẩn)';
+      case 360:
+        return '360 (Lớn)';
+      default:
+        return '$value DPI';
     }
-    if (!mounted) {
-      _customDpiFocused = _customDpiFocusNode.hasFocus;
-      return;
-    }
-    setState(() {
-      _customDpiFocused = _customDpiFocusNode.hasFocus;
-    });
   }
 
-  bool _focusCustomDpiField() {
-    if (!_customDpiFocusNode.canRequestFocus) {
-      return false;
+  Future<void> _handleDensityChanged(
+    BuildContext context,
+    SystemBridgeService bridgeService,
+    Map<String, dynamic> status,
+    AppLocalizations localizations,
+    int newDensity,
+  ) async {
+    final prevDensityVal = status['currentDensity'];
+    final prevDensity = prevDensityVal is int
+        ? prevDensityVal
+        : int.tryParse(prevDensityVal?.toString() ?? '');
+    final hadOverride = status['overrideDensity'] != null;
+
+    if (newDensity == prevDensity) {
+      return;
     }
-    _customDpiFocusNode.requestFocus();
-    return true;
+
+    final result = await bridgeService.applyDensity(newDensity);
+    if (!context.mounted) return;
+
+    _showMessage(
+      context,
+      result['message']?.toString() ?? localizations.densityUpdated,
+    );
+
+    final keep = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _DpiSafetyConfirmationDialog(
+        newDensity: newDensity,
+      ),
+    );
+
+    if (keep != true && context.mounted) {
+      if (hadOverride && prevDensity != null && prevDensity > 0) {
+        await bridgeService.applyDensity(prevDensity);
+      } else {
+        await bridgeService.resetDensity();
+      }
+      if (context.mounted) {
+        _showMessage(context, 'Đã hoàn tác DPI.');
+      }
+    }
   }
 
-  bool _focusPrimaryAction() {
-    final primaryFocusNode = widget.primaryFocusNode;
-    if (primaryFocusNode != null && primaryFocusNode.canRequestFocus) {
-      primaryFocusNode.requestFocus();
-      return true;
-    }
-    return focusCurrentSettingsNodeByDebugLabel('density_primary_apply');
+  Future<void> _handleResetDensity(
+    BuildContext context,
+    SystemBridgeService bridgeService,
+    AppLocalizations localizations,
+  ) async {
+    final result = await bridgeService.resetDensity();
+    if (!context.mounted) return;
+    _showMessage(
+      context,
+      result['message']?.toString() ?? localizations.densityReset,
+    );
   }
 
   void _showMessage(BuildContext context, String message) {
@@ -222,5 +228,79 @@ class _DensityPanelPageState extends State<DensityPanelPage> {
     }
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _DpiSafetyConfirmationDialog extends StatefulWidget {
+  final int newDensity;
+
+  const _DpiSafetyConfirmationDialog({required this.newDensity});
+
+  @override
+  State<_DpiSafetyConfirmationDialog> createState() =>
+      _DpiSafetyConfirmationDialogState();
+}
+
+class _DpiSafetyConfirmationDialogState
+    extends State<_DpiSafetyConfirmationDialog> {
+  Timer? _timer;
+  int _secondsLeft = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_secondsLeft <= 1) {
+        timer.cancel();
+        Navigator.of(context).pop(false);
+      } else {
+        setState(() {
+          _secondsLeft -= 1;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        Navigator.of(context).pop(false);
+      },
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: AlertDialog(
+            title: const Text('Xác nhận mật độ DPI mới'),
+            content: Text(
+              'Đã áp dụng DPI ${widget.newDensity}. Bạn có muốn giữ lại thiết lập này không?\n\nTự động hoàn tác sau $_secondsLeft giây...',
+            ),
+            actions: [
+              FilledButton(
+                autofocus: true,
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Hoàn tác ngay (Khuyên dùng)'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Giữ lại'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -331,6 +331,113 @@ void main() {
   });
 
   testWidgets(
+      'screen_wake and home_reentry maintain Texture continuously without flickering to base wallpaper',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    final channel = MockFLauncherChannel();
+    when(channel.addSystemChangedListener(any))
+        .thenReturn(const Stream<dynamic>.empty().listen((_) {}));
+    final bridgeService = _MutableSystemBridgeService(
+      channel,
+      const <String, dynamic>{
+        'memory': <String, dynamic>{},
+        'navigation': <String, dynamic>{
+          'homeSequence': 1,
+          'reason': 'initial',
+        },
+        'provisioning': <String, dynamic>{
+          'health': 'healthy',
+          'requirements': <Map<String, dynamic>>[],
+          'missingRequiredCount': 0,
+          'missingRecommendedCount': 0,
+        },
+        'wallpaper': <String, dynamic>{
+          'videoReady': true,
+          'playbackSuppressed': false,
+          'lastError': '',
+          'videoWidth': 1920,
+          'videoHeight': 1080,
+        },
+      },
+    );
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn(const <LauncherSection>[]);
+    _stubWallpaperService(
+      wallpaperService,
+      wallpaperMode: 'video',
+      wallpaper: MemoryImage(Uint8List.fromList(kTransparentImage)),
+      isVideoMode: true,
+      videoTextureId: 42,
+      videoDimPercent: 0,
+    );
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+    );
+
+    // Initial state: Texture is visible, no baseWallpaper (zero-overdraw)
+    expect(find.byType(Texture), findsOneWidget);
+    expect(find.byKey(const Key('background')), findsNothing);
+
+    // Receive screen_wake event
+    bridgeService.setNavigationStatus(const <String, dynamic>{
+      'homeSequence': 2,
+      'reason': 'screen_wake',
+    });
+    await tester.pump();
+
+    // Verify Texture is maintained continuously, no opacity dip or fallback
+    expect(find.byType(Texture), findsOneWidget);
+    expect(find.byKey(const Key('background')), findsNothing);
+
+    // Simulate transient 1-frame videoReady drop from native side during wake/rebind
+    bridgeService.setWallpaperStatus(const <String, dynamic>{
+      'videoReady': false,
+      'playbackSuppressed': false,
+      'lastError': '',
+      'videoWidth': 1920,
+      'videoHeight': 1080,
+    });
+    await tester.pump();
+
+    // Texture MUST still be rendered (freeze-frame hold, zero-flicker)
+    expect(find.byType(Texture), findsOneWidget);
+    expect(find.byKey(const Key('background')), findsNothing);
+
+    // Receive home_reentry event
+    bridgeService.setNavigationStatus(const <String, dynamic>{
+      'homeSequence': 3,
+      'reason': 'home_reentry',
+    });
+    await tester.pump();
+
+    expect(find.byType(Texture), findsOneWidget);
+    expect(find.byKey(const Key('background')), findsNothing);
+
+    // Only fallback to base wallpaper on actual fatal video error
+    bridgeService.setWallpaperStatus(const <String, dynamic>{
+      'videoReady': false,
+      'playbackSuppressed': false,
+      'lastError': 'All wallpaper videos quarantined',
+      'videoWidth': 0,
+      'videoHeight': 0,
+    });
+    await tester.pump();
+
+    expect(find.byType(Texture), findsNothing);
+    expect(find.byKey(const Key('background')), findsOneWidget);
+  });
+
+  testWidgets(
       'dock height presets scale by visible rows when auto collapse is off',
       (tester) async {
     _prepareView(tester);
@@ -879,7 +986,7 @@ void main() {
     expect(_primaryFocusIsDescendantOf(tester, find.byType(AppBar)), isTrue);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      contains('status_bar_primary_search'),
+      contains('status_bar_primary_reorder'),
     );
 
     for (var index = 0; index < 20; index += 1) {
@@ -900,7 +1007,7 @@ void main() {
 
       expect(
         tester.binding.focusManager.primaryFocus?.debugLabel,
-        contains('status_bar_primary_search'),
+        contains('status_bar_primary_reorder'),
       );
     }
   });
@@ -971,7 +1078,7 @@ void main() {
     expect(_primaryFocusIsDescendantOf(tester, find.byType(AppBar)), isTrue);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      contains('status_bar_primary_search'),
+      contains('status_bar_primary_reorder'),
     );
     expect(tester.getSize(dockFinder).height, collapsedHeight);
   });
@@ -1708,6 +1815,213 @@ void main() {
     verifyNever(appsService.setHomeReorderModeEnabled(false));
     expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
   });
+
+  testWidgets(
+      'Focus Recovery Watchdog recovers focus to dock on navigation screen_wake',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final channel = MockFLauncherChannel();
+    when(channel.addSystemChangedListener(any))
+        .thenReturn(const Stream<dynamic>.empty().listen((_) {}));
+    final bridgeService = _MutableSystemBridgeService(
+      channel,
+      const <String, dynamic>{
+        'memory': <String, dynamic>{},
+        'navigation': <String, dynamic>{
+          'homeSequence': 1,
+          'reason': 'home_reentry',
+        },
+        'provisioning': <String, dynamic>{
+          'health': 'healthy',
+          'requirements': <Map<String, dynamic>>[],
+          'missingRequiredCount': 0,
+          'missingRecommendedCount': 0,
+        },
+        'wallpaper': <String, dynamic>{},
+      },
+    );
+    final settingsService = await _createSettingsService();
+    final favorites =
+        fakeCategory(name: 'Favorites', order: 0, type: CategoryType.row);
+    favorites.applications
+        .add(fakeApp(packageName: 'row.app', name: 'Row App'));
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([favorites]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+    await settingsService.setHomeDockAutoCollapseEnabled(false);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('row.app'))), isTrue);
+
+    // Simulate focus loss (e.g. FocusManager unfocus moves focus to scope)
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('row.app'))), isFalse);
+
+    // Send navigation event (screen_wake)
+    bridgeService.setNavigationStatus(const <String, dynamic>{
+      'homeSequence': 2,
+      'reason': 'screen_wake',
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Watchdog must recover focus back to the dock
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('row.app'))), isTrue);
+  });
+
+  testWidgets('Focus Recovery Watchdog restores focus after dialog pop',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final favorites =
+        fakeCategory(name: 'Favorites', order: 0, type: CategoryType.row);
+    favorites.applications
+        .add(fakeApp(packageName: 'row.app', name: 'Row App'));
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([favorites]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+    await settingsService.setHomeDockAutoCollapseEnabled(false);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('row.app'))), isTrue);
+
+    // Open a dummy dialog on top
+    final BuildContext homeContext = tester.element(find.byType(FLauncher));
+    unawaited(showDialog<void>(
+      context: homeContext,
+      builder: (ctx) => const AlertDialog(title: Text('Test Dialog')),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Test Dialog'), findsOneWidget);
+
+    // Now close the dialog
+    Navigator.of(tester.element(find.text('Test Dialog'))).pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Test Dialog'), findsNothing);
+    // Focus should be safely on dock item
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('row.app'))), isTrue);
+  });
+
+  testWidgets(
+      'D-pad key repeat does not drop navigation events on remote hold',
+      (tester) async {
+    _prepareView(tester);
+    final appsService = MockAppsService();
+    final wallpaperService = MockWallpaperService();
+    _stubWallpaperService(wallpaperService);
+    final bridgeService = MockSystemBridgeService();
+    final channel = MockFLauncherChannel();
+    final settingsService = await _createSettingsService();
+    final favorites =
+        fakeCategory(name: 'Favorites', order: 0, type: CategoryType.row);
+    favorites.applications.addAll([
+      fakeApp(packageName: 'app.0', name: 'App 0'),
+      fakeApp(packageName: 'app.1', name: 'App 1'),
+      fakeApp(packageName: 'app.2', name: 'App 2'),
+    ]);
+    when(appsService.initialized).thenReturn(true);
+    when(appsService.launcherSections).thenReturn([favorites]);
+    when(appsService.getAppBanner(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(appsService.getAppIcon(any))
+        .thenAnswer((_) async => kTransparentImage);
+    when(wallpaperService.wallpaperMode).thenReturn('gradient');
+    when(wallpaperService.wallpaper).thenReturn(null);
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
+    when(wallpaperService.isVideoMode).thenReturn(false);
+    when(wallpaperService.videoTextureId).thenReturn(null);
+    when(bridgeService.wallpaperStatus).thenReturn(const <String, dynamic>{});
+    when(bridgeService.provisioningStatus).thenReturn(const <String, dynamic>{
+      'health': 'healthy',
+      'requirements': <Map<String, dynamic>>[],
+      'missingRequiredCount': 0,
+      'missingRecommendedCount': 0,
+    });
+    when(channel.addNetworkChangedListener(any)).thenReturn(null);
+    when(channel.getActiveNetworkInformation())
+        .thenAnswer((_) async => <String, dynamic>{});
+    await settingsService.setHomeDockAutoCollapseEnabled(false);
+
+    await _pumpLauncher(
+      tester,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      channel: channel,
+      settingsService: settingsService,
+    );
+
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('app.0'))), isTrue);
+
+    // Simulate holding arrowRight (KeyDown followed by KeyRepeat)
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('app.1'))), isTrue);
+
+    // Send KeyRepeatEvent while key is held down
+    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(_primaryFocusIsDescendantOf(tester, find.byKey(const Key('app.2'))), isTrue);
+
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+  });
 }
 
 void _expectCardNearDockCenter(WidgetTester tester, Key appKey) {
@@ -1779,6 +2093,7 @@ Future<void> _pumpLauncher(
         ChangeNotifierProvider(create: (_) => NetworkService(channel)),
       ],
       child: MaterialApp(
+        navigatorObservers: [homeRouteObserver],
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const FLauncher(),
@@ -1867,6 +2182,14 @@ class _MutableSystemBridgeService extends SystemBridgeService {
     _status = <String, dynamic>{
       ..._status,
       'navigation': Map<String, dynamic>.from(navigation),
+    };
+    notifyListeners();
+  }
+
+  void setWallpaperStatus(Map<String, dynamic> wallpaper) {
+    _status = <String, dynamic>{
+      ..._status,
+      'wallpaper': Map<String, dynamic>.from(wallpaper),
     };
     notifyListeners();
   }

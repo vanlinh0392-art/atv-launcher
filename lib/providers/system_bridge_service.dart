@@ -2,17 +2,106 @@ import 'dart:async';
 
 import 'package:flauncher/flauncher_channel.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PermissionsSnapshot {
+  final String health;
+  final int missingRequiredCount;
+  final int missingRecommendedCount;
+  final int missingOptionalCount;
+  final List<Map<String, dynamic>> requirements;
+  final List<String> commands;
+  final bool autoGrantAdbOnWake;
+  final bool autoProvisionAdbPermissions;
+  final Map<String, dynamic> raw;
+
+  const PermissionsSnapshot({
+    this.health = 'missing_required',
+    this.missingRequiredCount = 0,
+    this.missingRecommendedCount = 0,
+    this.missingOptionalCount = 0,
+    this.requirements = const [],
+    this.commands = const [],
+    this.autoGrantAdbOnWake = true,
+    this.autoProvisionAdbPermissions = true,
+    this.raw = const {},
+  });
+
+  factory PermissionsSnapshot.fromMap(
+    Map<String, dynamic> map, {
+    bool autoGrantAdbOnWake = true,
+    bool autoProvisionAdbPermissions = true,
+  }) {
+    final effectiveAutoGrant = map['autoGrantAdbOnWake'] as bool? ??
+        map['autoProvisionAdbPermissions'] as bool? ??
+        autoGrantAdbOnWake;
+    final effectiveAutoProvision =
+        map['autoProvisionAdbPermissions'] as bool? ??
+            map['autoGrantAdbOnWake'] as bool? ??
+            autoProvisionAdbPermissions;
+    return PermissionsSnapshot(
+      health: map['health']?.toString() ?? 'missing_required',
+      missingRequiredCount:
+          ((map['missingRequiredCount'] as num?) ?? 0).toInt(),
+      missingRecommendedCount:
+          ((map['missingRecommendedCount'] as num?) ?? 0).toInt(),
+      missingOptionalCount:
+          ((map['missingOptionalCount'] as num?) ?? 0).toInt(),
+      requirements: ((map['requirements'] as List?) ?? const [])
+          .map((item) => (item as Map).cast<String, dynamic>())
+          .toList(growable: false),
+      commands: ((map['commands'] as List?) ?? const [])
+          .map((item) => item.toString())
+          .toList(growable: false),
+      autoGrantAdbOnWake: effectiveAutoGrant,
+      autoProvisionAdbPermissions: effectiveAutoProvision,
+      raw: map,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is PermissionsSnapshot &&
+        other.health == health &&
+        other.missingRequiredCount == missingRequiredCount &&
+        other.missingRecommendedCount == missingRecommendedCount &&
+        other.missingOptionalCount == missingOptionalCount &&
+        other.autoGrantAdbOnWake == autoGrantAdbOnWake &&
+        other.autoProvisionAdbPermissions == autoProvisionAdbPermissions &&
+        mapEquals(other.raw, raw);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        health,
+        missingRequiredCount,
+        missingRecommendedCount,
+        missingOptionalCount,
+        autoGrantAdbOnWake,
+        autoProvisionAdbPermissions,
+      );
+}
 
 class SystemBridgeService extends ChangeNotifier {
+  static const String autoGrantAdbPrefKey =
+      'launcher_pref_auto_grant_adb_permissions';
+
   final FLauncherChannel _channel;
+  final SharedPreferences? _prefs;
   StreamSubscription<dynamic>? _systemSubscription;
 
   Map<String, dynamic> _status = const {};
   Map<String, dynamic> _accessibilitySnapshot = const {};
+  PermissionsSnapshot _permissionsSnapshot = const PermissionsSnapshot();
   String _diagnosticsReport = '';
   bool _initialized = false;
+  bool _autoGrantAdbOnWake = true;
 
   bool get initialized => _initialized;
+  bool get autoGrantAdbOnWake => _autoGrantAdbOnWake;
+  bool get autoProvisionAdbPermissions => _autoGrantAdbOnWake;
+  PermissionsSnapshot get permissionsSnapshot => _permissionsSnapshot;
   Map<String, dynamic> get status => _status;
   Map<String, dynamic> get navigationStatus =>
       _nestedMap(_status['navigation']);
@@ -40,11 +129,51 @@ class SystemBridgeService extends ChangeNotifier {
           .toList(growable: false);
   String get diagnosticsReport => _diagnosticsReport;
 
-  SystemBridgeService(this._channel) {
+  SystemBridgeService(this._channel, [this._prefs]) {
     _init();
   }
 
+  Future<SharedPreferences> _getPrefs() async {
+    return _prefs ?? await SharedPreferences.getInstance();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final prefs = await _getPrefs();
+      if (prefs.containsKey(autoGrantAdbPrefKey)) {
+        _autoGrantAdbOnWake = prefs.getBool(autoGrantAdbPrefKey) ?? true;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistAutoGrantPreference(bool value) async {
+    try {
+      final prefs = await _getPrefs();
+      await prefs.setBool(autoGrantAdbPrefKey, value);
+    } catch (_) {}
+  }
+
+  Future<void> setAutoGrantAdbOnWake(bool value) async {
+    if (_autoGrantAdbOnWake == value) return;
+    _autoGrantAdbOnWake = value;
+    await _persistAutoGrantPreference(value);
+    _updatePermissionsSnapshot();
+    notifyListeners();
+  }
+
+  Future<void> setAutoProvisionAdbPermissions(bool value) =>
+      setAutoGrantAdbOnWake(value);
+
+  void _updatePermissionsSnapshot() {
+    _permissionsSnapshot = PermissionsSnapshot.fromMap(
+      provisioningStatus,
+      autoGrantAdbOnWake: _autoGrantAdbOnWake,
+      autoProvisionAdbPermissions: _autoGrantAdbOnWake,
+    );
+  }
+
   Future<void> _init() async {
+    await _loadPreferences();
     await refreshLite();
     _systemSubscription = _channel.addSystemChangedListener((event) {
       if (_applyStatusSnapshot(event)) {
@@ -321,10 +450,25 @@ class SystemBridgeService extends ChangeNotifier {
       value is Map ? value.cast<String, dynamic>() : <String, dynamic>{};
 
   bool _applyStatusSnapshot(Map<String, dynamic> snapshot) {
+    final incomingProvisioning = snapshot['provisioning'];
+    var prefChanged = false;
+    if (incomingProvisioning is Map) {
+      final incomingAutoGrant =
+          incomingProvisioning['autoGrantAdbOnWake'] as bool? ??
+              incomingProvisioning['autoProvisionAdbPermissions'] as bool?;
+      if (incomingAutoGrant != null && incomingAutoGrant != _autoGrantAdbOnWake) {
+        _autoGrantAdbOnWake = incomingAutoGrant;
+        _persistAutoGrantPreference(incomingAutoGrant);
+        prefChanged = true;
+      }
+    }
+
     final snapshotKind = snapshot['snapshotKind']?.toString();
     final changed = snapshotKind == null
         ? _applyDeltaSnapshot(snapshot)
         : _applyFullSnapshot(snapshot);
+    _updatePermissionsSnapshot();
+
     final diagnosticsReport = snapshot['diagnosticsReport']?.toString();
     if (diagnosticsReport != null &&
         diagnosticsReport.isNotEmpty &&
@@ -332,7 +476,7 @@ class SystemBridgeService extends ChangeNotifier {
       _diagnosticsReport = diagnosticsReport;
       return true;
     }
-    return changed;
+    return changed || prefChanged;
   }
 
   bool _applyFullSnapshot(Map<String, dynamic> snapshot) {
@@ -377,17 +521,28 @@ class SystemBridgeService extends ChangeNotifier {
     return merged;
   }
 
+  static dynamic _normalizeValue(dynamic val) {
+    if (val is Map) {
+      return val.map((k, v) => MapEntry(k.toString(), _normalizeValue(v)));
+    }
+    if (val is List) {
+      return val.map(_normalizeValue).toList();
+    }
+    return val;
+  }
+
   static Map<String, dynamic> _mergeDeltaMap(
     Map<String, dynamic> current,
     Map<String, dynamic> update,
   ) {
     Map<String, dynamic>? merged;
     update.forEach((key, value) {
+      final normalizedValue = _normalizeValue(value);
       final existingValue = current[key];
-      if (existingValue is Map && value is Map) {
+      if (existingValue is Map && normalizedValue is Map) {
         final mergedChild = _mergeDeltaMap(
           existingValue.cast<String, dynamic>(),
-          value.cast<String, dynamic>(),
+          normalizedValue.cast<String, dynamic>(),
         );
         if (!_deepEquals(mergedChild, existingValue)) {
           merged ??= Map<String, dynamic>.from(current);
@@ -395,11 +550,11 @@ class SystemBridgeService extends ChangeNotifier {
         }
         return;
       }
-      if (_deepEquals(existingValue, value)) {
+      if (_deepEquals(existingValue, normalizedValue)) {
         return;
       }
       merged ??= Map<String, dynamic>.from(current);
-      merged![key] = value;
+      merged![key] = normalizedValue;
     });
     return merged ?? current;
   }

@@ -113,9 +113,9 @@ class _SearchOverlayDialogState extends State<SearchOverlayDialog> {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     final mediaSize = MediaQuery.sizeOf(context);
-    final dialogWidth = math.min(1220.0, math.max(720.0, mediaSize.width - 72));
+    final dialogWidth = math.min(1220.0, math.max(480.0, mediaSize.width - 48.0));
     final dialogHeight =
-        math.min(760.0, math.max(520.0, mediaSize.height - 72));
+        math.min(760.0, math.max(380.0, mediaSize.height - 40.0));
     final compactLayout = dialogHeight < 700;
     final contentPadding = compactLayout ? 20.0 : 24.0;
     final sectionGap = compactLayout ? 8.0 : 12.0;
@@ -312,7 +312,9 @@ class _SearchOverlayDialogState extends State<SearchOverlayDialog> {
                     ? () => _focusFilter(_filters[index + 1])
                     : null,
                 onUp: _queryFocusNode.requestFocus,
-                onDown: hasResults ? () => _focusResult(0) : null,
+                onDown: hasResults
+                    ? () => _focusResult(0)
+                    : _closeFocusNode.requestFocus,
               ),
             );
           }),

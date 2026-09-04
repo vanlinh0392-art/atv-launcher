@@ -30,12 +30,14 @@ const longPressableKeys = [
 class FocusKeyboardListener extends StatefulWidget {
   final WidgetBuilder builder;
   final KeyEventResult Function(LogicalKeyboardKey)? onPressed;
+  final KeyEventResult Function(LogicalKeyboardKey, {bool isRepeat})? onKeyAction;
   final KeyEventResult Function(LogicalKeyboardKey)? onLongPress;
 
   FocusKeyboardListener({
     Key? key,
     required this.builder,
     this.onPressed,
+    this.onKeyAction,
     this.onLongPress,
   }) : super(key: key);
 
@@ -75,6 +77,9 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
 
   KeyEventResult _keyDownEvent(LogicalKeyboardKey key) {
     if (!longPressableKeys.contains(key)) {
+      if (widget.onKeyAction != null) {
+        return widget.onKeyAction!(key, isRepeat: false);
+      }
       return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
     }
 
@@ -102,6 +107,9 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
         _longPressTriggered = false;
         return KeyEventResult.handled;
       }
+      if (widget.onKeyAction != null) {
+        return widget.onKeyAction!(key, isRepeat: false);
+      }
       return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
     }
     return KeyEventResult.ignored;
@@ -113,6 +121,9 @@ class _FocusKeyboardListenerState extends State<FocusKeyboardListener> {
         return _keyDownEvent(key);
       }
       return KeyEventResult.handled;
+    }
+    if (widget.onKeyAction != null) {
+      return widget.onKeyAction!(key, isRepeat: true);
     }
     return widget.onPressed?.call(key) ?? KeyEventResult.ignored;
   }

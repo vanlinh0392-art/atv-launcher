@@ -29,17 +29,14 @@ class WallpaperPanelPage extends StatefulWidget {
 
 class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
   static const String _scrollStorageId = 'wallpaper_panel_scroll_offset';
-  static const String _summaryDebugLabel = 'wallpaper_summary_metrics';
 
   late final ScrollController _scrollController;
-  late final FocusNode _summaryFocusNode;
   bool _showDeferredSections = false;
   Timer? _deferredSectionsTimer;
 
   @override
   void initState() {
     super.initState();
-    _summaryFocusNode = FocusNode(debugLabel: _summaryDebugLabel);
     _scrollController = ScrollController(keepScrollOffset: false);
     _scrollController.addListener(_persistScrollOffset);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -62,7 +59,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
     _deferredSectionsTimer?.cancel();
     _scrollController.removeListener(_persistScrollOffset);
     _scrollController.dispose();
-    _summaryFocusNode.dispose();
     super.dispose();
   }
 
@@ -83,51 +79,22 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
       key: const PageStorageKey<String>(WallpaperPanelPage.routeName),
       padding: const EdgeInsets.only(bottom: 16),
       children: [
-        SettingsSummarySection(
-          debugLabel: _summaryDebugLabel,
-          focusNode: _summaryFocusNode,
-          child: SettingsMetricsGrid(
-            minChildWidth: 168,
-            maxColumns: 4,
-            children: [
-              SettingsMetricTile(
-                label: localizations.modeSettingLabel,
-                value: localizedWallpaperMode(
-                  localizations,
-                  wallpaperService.wallpaperMode,
-                ),
-                icon: Icons.wallpaper_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.sourceLabel,
-                value: _sourceSummaryLabel(localizations, wallpaperService),
-                icon: Icons.video_library_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.mediaAccess,
-                value: hasMediaPermission
-                    ? localizations.grantedLabel
-                    : localizations.missingLabel,
-                icon: Icons.folder_open_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.playlistSize,
-                value: wallpaperService.videoUris.length.toString(),
-                icon: Icons.playlist_play_outlined,
-              ),
-            ],
-          ),
-        ),
         if (!hasMediaPermission) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: TvDrawerTokens.surfaceSpacing),
           SettingsSurfaceCard(
             child: Row(
               children: [
-                const Icon(Icons.folder_off_outlined, color: Color(0xFFFFC970)),
+                const Icon(
+                  Icons.folder_off_outlined,
+                  color: Color(0xFFFFC970),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    localizations.grantVideoLibraryAccessHint,
+                    localizations.grantMediaAccess,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -142,42 +109,24 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
           ),
         ],
         if (videoBlockedByPerformanceMode) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: TvDrawerTokens.surfaceSpacing),
           SettingsSurfaceCard(
             highlighted: true,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.speed_outlined, color: Color(0xFFFFC970)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        localizations
-                            .videoWallpaperDisabledByPerformanceModeTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        localizations
-                            .videoWallpaperDisabledByPerformanceModeMessage(
-                          localizations.homeDockPerformanceModeOff,
-                        ),
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: Colors.white70),
-                      ),
-                    ],
+                  child: Text(
+                    localizations.videoWallpaperDisabledByPerformanceModeTitle,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
               ],
             ),
           ),
         ],
-        const SizedBox(height: 18),
+        const SizedBox(height: TvDrawerTokens.surfaceSpacing),
         SettingsSurfaceCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,10 +140,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                 children: [
                   SettingsActionCard(
                     focusNode: widget.primaryFocusNode,
-                    onMoveUpAtBoundary: () {
-                      _summaryFocusNode.requestFocus();
-                      return true;
-                    },
                     title: localizations.gradient,
                     icon: Icons.gradient,
                     onPressed: () async {
@@ -204,10 +149,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                     },
                   ),
                   SettingsActionCard(
-                    onMoveUpAtBoundary: () {
-                      _summaryFocusNode.requestFocus();
-                      return true;
-                    },
                     title: localizations.picture,
                     icon: Icons.image_outlined,
                     onPressed: () async {
@@ -215,10 +156,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                     },
                   ),
                   SettingsActionCard(
-                    onMoveUpAtBoundary: () {
-                      _summaryFocusNode.requestFocus();
-                      return true;
-                    },
                     title: localizations.singleVideo,
                     icon: Icons.movie_outlined,
                     onPressed: videoBlockedByPerformanceMode
@@ -289,7 +226,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
           ),
         ),
         if (_showDeferredSections) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: TvDrawerTokens.surfaceSpacing),
           SettingsSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,7 +238,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                   selectorKey: const Key('wallpaper_order_mode_selector'),
                   optionKeyPrefix: 'wallpaper_order_mode_option',
                   title: localizations.sourceLabel,
-                  subtitle: localizations.playlistBehaviourTitle,
                   icon: Icons.playlist_play_outlined,
                   value: wallpaperService.videoOrderMode,
                   options: <SettingsChoiceOption<String>>[
@@ -322,12 +258,11 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       ? wallpaperService.setVideoOrderMode
                       : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 SettingsChoiceCard<String>(
                   selectorKey: const Key('wallpaper_advance_mode_selector'),
                   optionKeyPrefix: 'wallpaper_advance_mode_option',
                   title: localizations.playlistBehaviourTitle,
-                  subtitle: localizations.fixedInterval,
                   icon: Icons.schedule_outlined,
                   value: wallpaperService.videoAdvanceMode,
                   options: <SettingsChoiceOption<String>>[
@@ -348,10 +283,10 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       ? wallpaperService.setVideoAdvanceMode
                       : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 if (wallpaperService.videoAdvanceMode != 'fixed_interval')
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.only(bottom: TvDrawerTokens.rowSpacing),
                     child: SettingsStepperCard(
                       selectorKey:
                           const Key('video_repeat_count_per_item_stepper'),
@@ -359,7 +294,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       title: localizations.repeatEachVideoCount(
                         wallpaperService.videoRepeatCountPerItem,
                       ),
-                      subtitle: localizations.repeatEachVideoDescription,
                       icon: Icons.repeat_one_on_outlined,
                       value: wallpaperService.videoRepeatCountPerItem,
                       valueLabelBuilder: (value) => '${value}x',
@@ -376,7 +310,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                   ),
                 if (wallpaperService.videoAdvanceMode == 'fixed_interval')
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.only(bottom: TvDrawerTokens.rowSpacing),
                     child: SettingsStepperCard(
                       selectorKey:
                           const Key('video_switch_interval_seconds_stepper'),
@@ -384,7 +318,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       title: localizations.switchIntervalSeconds(
                         wallpaperService.videoSwitchIntervalSeconds,
                       ),
-                      subtitle: localizations.fixedInterval,
                       icon: Icons.timer_outlined,
                       value: wallpaperService.videoSwitchIntervalSeconds,
                       valueLabelBuilder: (value) => '${value}s',
@@ -397,6 +330,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                     ),
                   ),
                 RoundedSwitchListTile(
+                  key: const Key('wallpaper_video_playlist_loop_switch'),
                   debugLabel: 'wallpaper_loop_playlist',
                   value: wallpaperService.videoPlaylistLoop,
                   onChanged: videoControlsEnabled
@@ -411,7 +345,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: TvDrawerTokens.surfaceSpacing),
           SettingsSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,7 +365,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                   ),
                   secondary: const Icon(Icons.loop_outlined),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 RoundedSwitchListTile(
                   debugLabel: 'wallpaper_video_mute',
                   value: wallpaperService.videoMute,
@@ -444,7 +378,7 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                   ),
                   secondary: const Icon(Icons.volume_off_outlined),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 RoundedSwitchListTile(
                   debugLabel: 'wallpaper_video_auto_resume',
                   value: wallpaperService.videoAutoResume,
@@ -457,12 +391,11 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                   ),
                   secondary: const Icon(Icons.home_max_outlined),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 SettingsChoiceCard<String>(
                   selectorKey: const Key('wallpaper_video_fit_selector'),
                   optionKeyPrefix: 'wallpaper_video_fit_option',
                   title: localizations.videoFitLabel,
-                  subtitle: localizations.playbackAppearanceTitle,
                   icon: Icons.crop,
                   value: wallpaperService.videoFit,
                   options: <SettingsChoiceOption<String>>[
@@ -485,12 +418,11 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       ? wallpaperService.setVideoFit
                       : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 SettingsChoiceCard<String>(
                   selectorKey: const Key('wallpaper_video_blur_selector'),
                   optionKeyPrefix: 'wallpaper_video_blur_option',
                   title: localizations.videoBlurLabel,
-                  subtitle: localizations.playbackAppearanceTitle,
                   icon: Icons.blur_on_outlined,
                   value: wallpaperService.videoBlur,
                   options: <SettingsChoiceOption<String>>[
@@ -517,13 +449,12 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
                       ? wallpaperService.setVideoBlur
                       : null,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: TvDrawerTokens.rowSpacing),
                 SettingsStepperCard(
                   selectorKey: const Key('video_dim_percent_stepper'),
                   buttonKeyPrefix: 'video_dim_percent',
                   title: localizations
                       .dimOverlayPercent(wallpaperService.videoDimPercent),
-                  subtitle: localizations.playbackAppearanceTitle,
                   icon: Icons.dark_mode_outlined,
                   value: wallpaperService.videoDimPercent,
                   valueLabelBuilder: (value) => '${value}%',
@@ -667,23 +598,6 @@ class _WallpaperPanelPageState extends State<WallpaperPanelPage> {
     );
   }
 
-  String _sourceSummaryLabel(
-    AppLocalizations localizations,
-    WallpaperService wallpaperService,
-  ) {
-    switch (wallpaperService.wallpaperMode) {
-      case 'image':
-        return localizations.picture;
-      case 'video':
-        return localizedVideoSourceType(
-          localizations,
-          wallpaperService.videoSourceType,
-        );
-      case 'gradient':
-      default:
-        return localizations.gradient;
-    }
-  }
 }
 
 class _VideoLibraryDialog extends StatelessWidget {

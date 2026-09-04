@@ -206,8 +206,8 @@ public final class AppIndexStore {
         addSpecialSystemTarget(newIndex, "org.xbmc.kodi", "Kodi", new String[]{"kodi", "cô đi", "co di"});
         addSpecialSystemTarget(newIndex, "ar.tvplayer.tv", "TiviMate", new String[]{"tivimate", "tivi mate"});
 
-        appCache.clear();
         appCache.putAll(newIndex);
+        appCache.keySet().retainAll(newIndex.keySet());
         isInitialized = true;
 
         // Lưu vào SharedPreferences
@@ -266,15 +266,16 @@ public final class AppIndexStore {
         return aliases;
     }
 
-    public MatchResult findBestMatch(String rawQuery) {
-        if (TextUtils.isEmpty(rawQuery)) return null;
+    public MatchResult findBestMatch(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return null;
+        }
 
-        String query = rawQuery.trim().toLowerCase(Locale.ROOT);
         String queryNorm = stripAccents(query).trim();
 
-        // 1. Tầng 1: Khớp chính xác hoàn toàn Label hoặc Alias (Score = 1.0)
+        // 1. Tầng 1: Khớp chính xác (Score = 1.0)
         for (AppEntry app : appCache.values()) {
-            if (app.label.equalsIgnoreCase(query) || app.normalizedLabel.equals(queryNorm)) {
+            if (app.label.equalsIgnoreCase(query) || app.normalizedLabel.equalsIgnoreCase(queryNorm)) {
                 return new MatchResult(app, 1.0f, "exact_label");
             }
             for (String alias : app.aliases) {
@@ -289,20 +290,36 @@ public final class AppIndexStore {
         float bestContainScore = 0f;
 
         for (AppEntry app : appCache.values()) {
-            // Label chứa query hoặc query chứa label
-            if (queryNorm.contains(app.normalizedLabel) && app.normalizedLabel.length() >= 3) {
-                float score = (float) app.normalizedLabel.length() / queryNorm.length() * 0.90f;
-                if (score > bestContainScore) {
-                    bestContainScore = score;
-                    bestContainMatch = app;
-                }
-            }
-            for (String alias : app.aliases) {
-                if (queryNorm.contains(alias) && alias.length() >= 3) {
-                    float score = (float) alias.length() / queryNorm.length() * 0.92f;
+            String appNorm = app.normalizedLabel;
+            if (appNorm.length() >= 2) {
+                if (queryNorm.matches(".*\\b" + Pattern.quote(appNorm) + "\\b.*")) {
+                    float score = 0.95f;
                     if (score > bestContainScore) {
                         bestContainScore = score;
                         bestContainMatch = app;
+                    }
+                } else if (queryNorm.contains(appNorm)) {
+                    float score = Math.max(0.60f, (float) appNorm.length() / queryNorm.length() * 0.90f);
+                    if (score > bestContainScore) {
+                        bestContainScore = score;
+                        bestContainMatch = app;
+                    }
+                }
+            }
+            for (String alias : app.aliases) {
+                if (alias.length() >= 2) {
+                    if (queryNorm.matches(".*\\b" + Pattern.quote(alias) + "\\b.*")) {
+                        float score = 0.96f;
+                        if (score > bestContainScore) {
+                            bestContainScore = score;
+                            bestContainMatch = app;
+                        }
+                    } else if (queryNorm.contains(alias)) {
+                        float score = Math.max(0.60f, (float) alias.length() / queryNorm.length() * 0.92f);
+                        if (score > bestContainScore) {
+                            bestContainScore = score;
+                            bestContainMatch = app;
+                        }
                     }
                 }
             }
@@ -384,11 +401,13 @@ public final class AppIndexStore {
         return cost[len0 - 1];
     }
 
+    private static final Pattern DIACRITICAL_MARKS_PATTERN =
+            Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+
     public static String stripAccents(String s) {
         if (s == null) return "";
         String normalized = Normalizer.normalize(s, Normalizer.Form.NFD);
-        Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
-        return pattern.matcher(normalized).replaceAll("")
+        return DIACRITICAL_MARKS_PATTERN.matcher(normalized).replaceAll("")
                 .replaceAll("đ", "d")
                 .replaceAll("Đ", "D");
     }

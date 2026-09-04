@@ -16,6 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'dart:async';
+
 import 'package:flauncher/flauncher_channel.dart';
 import 'package:flutter/material.dart';
 
@@ -48,6 +50,7 @@ enum CellularNetworkType {
 
 class NetworkService extends ChangeNotifier {
   final FLauncherChannel _channel;
+  StreamSubscription<dynamic>? _networkSubscription;
 
   bool _hasInternetAccess;
   CellularNetworkType _cellularNetworkType;
@@ -59,7 +62,7 @@ class NetworkService extends ChangeNotifier {
         _cellularNetworkType = CellularNetworkType.Unknown,
         _networkType = NetworkType.Unknown,
         _wirelessNetworkSignalLevel = 0 {
-    _channel.addNetworkChangedListener(_onNetworkChanged);
+    _networkSubscription = _channel.addNetworkChangedListener(_onNetworkChanged);
 
     _channel.getActiveNetworkInformation().then((map) {
       if (map.isNotEmpty) {
@@ -115,5 +118,11 @@ class NetworkService extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _networkSubscription?.cancel();
+    super.dispose();
   }
 }

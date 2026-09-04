@@ -1,7 +1,6 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
-import 'package:flauncher/widgets/settings/settings_localized_values.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,7 +23,6 @@ class AccessibilityManagerPanelPage extends StatefulWidget {
 
 class _AccessibilityManagerPanelPageState
     extends State<AccessibilityManagerPanelPage> {
-  static const String _summaryDebugLabel = 'accessibility_summary_metrics';
   bool _showManagedApps = false;
   bool _loadingApps = false;
 
@@ -41,8 +39,6 @@ class _AccessibilityManagerPanelPageState
     final localizations = AppLocalizations.of(context)!;
     final bridgeService = context.read<SystemBridgeService>();
     final viewSize = MediaQuery.sizeOf(context);
-    final metricsMaxColumns =
-        viewSize.width >= 1180 && viewSize.height >= 760 ? 3 : 2;
     final actionsMaxColumns =
         viewSize.width >= 1460 && viewSize.height >= 860 ? 3 : 2;
 
@@ -63,37 +59,6 @@ class _AccessibilityManagerPanelPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SettingsSummarySection(
-                debugLabel: _summaryDebugLabel,
-                child: SettingsMetricsGrid(
-                  minChildWidth: 176,
-                  maxColumns: metricsMaxColumns,
-                  children: [
-                    SettingsMetricTile(
-                      label: localizations.wssLabel,
-                      value: localizedGrantedMissing(
-                        localizations,
-                        snapshot['writeSecureSettingsGranted'],
-                      ),
-                      icon: Icons.verified_user_outlined,
-                    ),
-                    SettingsMetricTile(
-                      label: localizations.masterSwitch,
-                      value: localizedOnOff(
-                        localizations,
-                        snapshot['accessibilityMasterEnabled'],
-                      ),
-                      icon: Icons.accessibility_new_outlined,
-                    ),
-                    SettingsMetricTile(
-                      label: localizations.managedApps,
-                      value: snapshot['managedPackageCount']?.toString() ?? '0',
-                      icon: Icons.manage_accounts_outlined,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
               SettingsSurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,18 +146,16 @@ class _AccessibilityManagerPanelPageState
                                 : localizations
                                     .showManagedAccessibilityAppsAction,
                           ),
-                        ].asMap().entries)
-                          _AccessibilityActionButton(
-                            key: entry.value.key,
-                            focusNode: entry.value.focusNode,
-                            onMoveUpAtBoundary: entry.key < actionsMaxColumns
-                                ? () => focusCurrentSettingsNodeByDebugLabel(
-                                      _summaryDebugLabel,
-                                    )
-                                : null,
-                            onPressed: entry.value.onPressed,
-                            icon: entry.value.icon,
-                            label: entry.value.label,
+                        ])
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 58.0),
+                            child: SettingsActionCard(
+                              key: entry.key,
+                              focusNode: entry.focusNode,
+                              onPressed: entry.onPressed,
+                              icon: entry.icon,
+                              title: entry.label,
+                            ),
                           ),
                       ],
                     ),
@@ -200,7 +163,7 @@ class _AccessibilityManagerPanelPageState
                 ),
               ),
               if (_loadingApps) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: TvDrawerTokens.surfaceSpacing),
                 const Center(
                   child: SizedBox(
                     width: 24,
@@ -212,7 +175,7 @@ class _AccessibilityManagerPanelPageState
                   ),
                 ),
               ] else if (_showManagedApps) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: TvDrawerTokens.surfaceSpacing),
                 SettingsSurfaceCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,13 +184,13 @@ class _AccessibilityManagerPanelPageState
                         localizations.managedApps,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: TvDrawerTokens.rowSpacing),
                       Column(
                         children: [
                           for (var index = 0;
                               index < apps.length;
                               index += 1) ...[
-                            if (index > 0) const SizedBox(height: 10),
+                            if (index > 0) const SizedBox(height: TvDrawerTokens.rowSpacing),
                             Builder(
                               builder: (context) {
                                 final app = apps[index];
@@ -341,38 +304,6 @@ class _AccessibilityManagerPanelPageState
       return false;
     }
     return focusCurrentSettingsNodeByDebugLabel(debugLabel);
-  }
-}
-
-class _AccessibilityActionButton extends StatelessWidget {
-  final FocusNode? focusNode;
-  final SettingsBoundaryMoveHandler? onMoveUpAtBoundary;
-  final Future<void> Function()? onPressed;
-  final IconData icon;
-  final String label;
-
-  const _AccessibilityActionButton({
-    super.key,
-    this.focusNode,
-    this.onMoveUpAtBoundary,
-    this.onPressed,
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 88,
-      child: SettingsActionCard(
-        focusNode: focusNode,
-        onMoveUpAtBoundary: onMoveUpAtBoundary,
-        title: label,
-        icon: icon,
-        focusEmphasis: 1.32,
-        onPressed: onPressed,
-      ),
-    );
   }
 }
 
@@ -497,8 +428,9 @@ class _ManagedAccessibilityAppTileState
             behavior: HitTestBehavior.opaque,
             onTap: canActivate ? () => widget.onPressed!.call() : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Icon(
                     widget.enabled
@@ -508,33 +440,16 @@ class _ManagedAccessibilityAppTileState
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontWeight: _focused
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                  ),
-                        ),
-                        if (widget.subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.white70),
-                          ),
-                        ],
-                      ],
+                    child: Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontWeight: _focused
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
                     ),
                   ),
                   const SizedBox(width: 12),

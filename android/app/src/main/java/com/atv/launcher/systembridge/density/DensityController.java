@@ -81,7 +81,20 @@ final class DensityController {
         );
     }
 
+    private static boolean isAllowedDensity(int density) {
+        return density == 240 || density == 280 || density == 320 || density == 360;
+    }
+
     static ActionResult applyDensity(Context context, int density) {
+        if (!isAllowedDensity(density)) {
+            return ActionResult.failure(
+                    String.format(
+                            Locale.US,
+                            "Density %d DPI khong hop le. Chi ho tro cac muc: 240, 280, 320, 360 DPI.",
+                            density
+                    )
+            );
+        }
         if (density < MIN_DENSITY || density > MAX_DENSITY) {
             return ActionResult.failure(
                     String.format(

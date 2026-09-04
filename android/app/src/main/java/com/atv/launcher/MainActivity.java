@@ -45,6 +45,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.hardware.display.DisplayManager;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -64,6 +65,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
 import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.KeyEvent;
 
 import androidx.annotation.NonNull;
@@ -97,6 +99,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -181,8 +184,18 @@ public class MainActivity extends FlutterActivity {
     private static final Object APPLICATIONS_CACHE_LOCK = new Object();
     private static final Object LITE_STATUS_CACHE_LOCK = new Object();
     private static final Handler SHARED_SYSTEM_EVENT_HANDLER = new Handler(Looper.getMainLooper());
-    private static final ExecutorService BACKGROUND_METHOD_EXECUTOR = Executors.newSingleThreadExecutor();
-    private static final ExecutorService APPLICATIONS_QUERY_EXECUTOR = Executors.newFixedThreadPool(4);
+    private static final ExecutorService BACKGROUND_METHOD_EXECUTOR =
+            Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "flauncher-bg-method");
+                thread.setDaemon(true);
+                return thread;
+            });
+    private static final ExecutorService APPLICATIONS_QUERY_EXECUTOR =
+            Executors.newFixedThreadPool(4, runnable -> {
+                Thread thread = new Thread(runnable, "flauncher-app-query");
+                thread.setDaemon(true);
+                return thread;
+            });
     private static final LinkedHashMap<String, byte[]> APP_IMAGE_CACHE = new LinkedHashMap<>(16, 0.75f, true);
     private static final LinkedHashMap<String, Boolean> APP_IMAGE_NEGATIVE_CACHE =
             new LinkedHashMap<>(16, 0.75f, true);
@@ -206,7 +219,6 @@ public class MainActivity extends FlutterActivity {
     private static long homeNavigationSequence;
     private static String lastNavigationReason = "";
     private static long lastWakeNavigationAtElapsedMs;
-    private static long lastForegroundWakeFallbackAtElapsedMs;
     private static boolean hasStartedAtLeastOnce;
     private static long benchmarkCommandSequence;
     private static String lastBenchmarkAction = "";
@@ -214,7 +226,43 @@ public class MainActivity extends FlutterActivity {
     private static String lastBenchmarkSessionId = "";
     private static boolean lastBenchmarkAutoFocusDetail;
     private static boolean lastBenchmarkBypassSettingsSecurity;
-    private static final long SILENT_AUTO_GRANT_COOLDOWN_MS = 120_000L;
+    private static final long OEM_ACTION_DEBOUNCE_MS = 2500L;
+    private static long lastOemWakeActionAtElapsedMs;
+    private static long lastOemSleepActionAtElapsedMs;
+
+    private static final Set<String> WHITELISTED_WAKE_SLEEP_ACTIONS = new HashSet<>(Arrays.asList(
+            Intent.ACTION_SCREEN_OFF,
+            Intent.ACTION_SCREEN_ON,
+            Intent.ACTION_USER_PRESENT,
+            Intent.ACTION_USER_UNLOCKED,
+            Intent.ACTION_DREAMING_STARTED,
+            Intent.ACTION_DREAMING_STOPPED,
+            "android.intent.action.SCREEN_ON",
+            "android.intent.action.SCREEN_OFF",
+            "android.intent.action.USER_PRESENT",
+            "com.xiaomi.mitv.ACTION_SCREEN_ON",
+            "com.xiaomi.tv.ACTION_OPEN_CLOSE_SCREEN_SAVER",
+            "mitv.action.STR_BOOT_COMPLETED",
+            "com.xiaomi.mitv.action.STR_BOOT_COMPLETED",
+            "com.tcl.tv.action.SCREEN_ON",
+            "com.tcl.tv.action.SCREEN_OFF",
+            "com.sony.dtv.intent.action.PANEL_ON",
+            "com.sony.dtv.intent.action.PANEL_OFF",
+            "com.hisense.tv.action.PANEL_ON",
+            "com.hisense.tv.action.PANEL_OFF",
+            "com.xiaomi.mitv.ACTION_SCREEN_OFF"
+    ));
+
+    private static boolean isOemAction(String action) {
+        if (action == null) return false;
+        return action.startsWith("com.xiaomi.")
+                || action.startsWith("mitv.")
+                || action.startsWith("com.tcl.")
+                || action.startsWith("com.sony.")
+                || action.startsWith("com.hisense.");
+    }
+
+    private static final long SILENT_AUTO_GRANT_COOLDOWN_MS = 5_000L;
     private static final int MAX_SILENT_AUTO_GRANT_ATTEMPTS = 3;
     private static long lastSilentAutoGrantAtElapsedMs;
     private static int silentAutoGrantAttemptCount;
@@ -248,8 +296,10 @@ public class MainActivity extends FlutterActivity {
     private MethodChannel.Result pendingMediaPermissionResult;
     private MethodChannel.Result pendingSpeechRecognizerResult;
     private BroadcastReceiver wallpaperWakeReceiver;
+    private DisplayManager.DisplayListener displayWakeListener;
     private boolean activityStarted;
     private boolean wakeRearmAllowedAfterStop;
+    private static long lastForegroundWakeFallbackAtElapsedMs;
     private String pendingWallpaperAssetKind = "mixed";
     private String pendingBackupExportContent = "";
     private String pendingBackupExportFileName = "atv-launcher-backup.json";
@@ -265,13 +315,12 @@ public class MainActivity extends FlutterActivity {
         if (recordBenchmarkCommand(getIntent())) {
             // Keep benchmark state so Flutter can consume it from the first lite snapshot.
         }
-        if (shouldRedirectNonHomeEntry(getIntent())
-                && moveExistingLauncherTaskToFront("onCreate")) {
-            finish();
-            return;
+        if (shouldRedirectNonHomeEntry(getIntent())) {
+            moveExistingLauncherTaskToFront("onCreate");
         }
         super.onCreate(savedInstanceState);
         registerWallpaperWakeReceiver();
+        registerDisplayWakeListener();
         com.atv.launcher.systembridge.shared.appindex.AppIndexStore.getInstance(this).syncAppsAsync();
     }
 
@@ -300,6 +349,8 @@ public class MainActivity extends FlutterActivity {
                         flutterEngine.getRenderer(),
                         this::emitWallpaperStatusDelta
                 );
+            } else {
+                sharedVideoWallpaperController.updateStatusCallback(this::emitWallpaperStatusDelta);
             }
             bindSharedFlutterChannels(flutterEngine);
             if (!sharedDartStarted && !flutterEngine.getDartExecutor().isExecutingDart()) {
@@ -366,7 +417,7 @@ public class MainActivity extends FlutterActivity {
         activityStarted = true;
         activeActivity = this;
         if (sharedVideoWallpaperController != null) {
-            sharedVideoWallpaperController.onStart();
+            sharedVideoWallpaperController.resumePlayback("activity_start");
         }
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_start");
         handleForegroundWakeFallback("activity_start", returningToForeground);
@@ -380,8 +431,7 @@ public class MainActivity extends FlutterActivity {
         activityStarted = true;
         activeActivity = this;
         if (sharedVideoWallpaperController != null) {
-            sharedVideoWallpaperController.onStart();
-            sharedVideoWallpaperController.resumePlaybackOnFocus("activity_resume");
+            sharedVideoWallpaperController.resumePlayback("activity_resume");
         }
         pruneBackgroundLauncherTasks("onResume");
         SystemBridgeCoordinator.startCore(getApplicationContext(), "activity_resume");
@@ -397,8 +447,7 @@ public class MainActivity extends FlutterActivity {
         if (hasFocus) {
             activityStarted = true;
             if (sharedVideoWallpaperController != null) {
-                sharedVideoWallpaperController.onStart();
-                sharedVideoWallpaperController.resumePlaybackOnFocus("window_focus_gained");
+                sharedVideoWallpaperController.resumePlayback("window_focus_gained");
             }
         }
     }
@@ -409,7 +458,7 @@ public class MainActivity extends FlutterActivity {
             com.atv.launcher.systembridge.shared.voice.VoiceFloatingOverlayManager.getInstance(this).dismissImmediate();
         } catch (Exception ignored) {}
         if (sharedVideoWallpaperController != null) {
-            sharedVideoWallpaperController.onPause();
+            sharedVideoWallpaperController.onPause(isDeviceInteractive());
         }
         super.onPause();
     }
@@ -429,7 +478,7 @@ public class MainActivity extends FlutterActivity {
         }
         SHARED_SYSTEM_EVENT_HANDLER.removeCallbacks(sharedSystemEventRunnable);
         if (sharedVideoWallpaperController != null) {
-            sharedVideoWallpaperController.onStop();
+            sharedVideoWallpaperController.onStop(isDeviceInteractive());
         }
         super.onStop();
     }
@@ -451,16 +500,73 @@ public class MainActivity extends FlutterActivity {
         }
         if (isHomeIntent(intent)) {
             recordHomeNavigation("home_reentry");
+            if (sharedVideoWallpaperController != null) {
+                sharedVideoWallpaperController.resumePlayback("home_reentry");
+            }
         }
     }
 
     @Override
     protected void onDestroy() {
+        cancelPendingMethodResults();
         unregisterWallpaperWakeReceiver();
+        unregisterDisplayWakeListener();
         if (activeActivity == this) {
             activeActivity = null;
         }
         super.onDestroy();
+    }
+
+    private void cancelPendingMethodResults() {
+        if (pendingWallpaperAssetResult != null) {
+            try {
+                pendingWallpaperAssetResult.success(buildCancelledResult());
+            } catch (Exception ignored) {
+            }
+            pendingWallpaperAssetResult = null;
+        }
+        if (pendingWallpaperFilesResult != null) {
+            try {
+                pendingWallpaperFilesResult.success(buildCancelledResult());
+            } catch (Exception ignored) {
+            }
+            pendingWallpaperFilesResult = null;
+        }
+        if (pendingWallpaperFolderResult != null) {
+            try {
+                pendingWallpaperFolderResult.success(buildCancelledResult());
+            } catch (Exception ignored) {
+            }
+            pendingWallpaperFolderResult = null;
+        }
+        if (pendingBackupExportResult != null) {
+            try {
+                pendingBackupExportResult.success(buildCancelledResult());
+            } catch (Exception ignored) {
+            }
+            pendingBackupExportResult = null;
+        }
+        if (pendingBackupImportResult != null) {
+            try {
+                pendingBackupImportResult.success(buildCancelledResult());
+            } catch (Exception ignored) {
+            }
+            pendingBackupImportResult = null;
+        }
+        if (pendingMediaPermissionResult != null) {
+            try {
+                pendingMediaPermissionResult.success(buildMediaPermissionResult(false));
+            } catch (Exception ignored) {
+            }
+            pendingMediaPermissionResult = null;
+        }
+        if (pendingSpeechRecognizerResult != null) {
+            try {
+                pendingSpeechRecognizerResult.success(buildCancelledResult());
+            } catch (Exception ignored) {
+            }
+            pendingSpeechRecognizerResult = null;
+        }
     }
 
     @Override
@@ -535,21 +641,44 @@ public class MainActivity extends FlutterActivity {
         wallpaperWakeReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                String action = intent != null ? intent.getAction() : "screen_wake";
-                if (isWallpaperSleepAction(action)) {
-                    wakeRearmAllowedAfterStop = wakeRearmAllowedAfterStop
-                            || activityStarted
-                            || isHomeIntent(getIntent());
+                String action = intent != null ? intent.getAction() : null;
+                if (action == null || !WHITELISTED_WAKE_SLEEP_ACTIONS.contains(action)) {
+                    Log.w(TAG, "Zero-Trust: Dropping non-whitelisted broadcast action: " + action);
+                    return;
+                }
+
+                boolean isSleep = isWallpaperSleepAction(action);
+                long now = SystemClock.elapsedRealtime();
+
+                if (isOemAction(action)) {
+                    if (isSleep) {
+                        if (now - lastOemSleepActionAtElapsedMs < OEM_ACTION_DEBOUNCE_MS) {
+                            Log.d(TAG, "Debouncing duplicate OEM sleep action: " + action);
+                            return;
+                        }
+                        lastOemSleepActionAtElapsedMs = now;
+                    } else {
+                        if (now - lastOemWakeActionAtElapsedMs < OEM_ACTION_DEBOUNCE_MS) {
+                            Log.d(TAG, "Debouncing duplicate OEM wake action: " + action);
+                            return;
+                        }
+                        lastOemWakeActionAtElapsedMs = now;
+                    }
+                }
+
+                if (isSleep) {
+                    if (sharedVideoWallpaperController != null) {
+                        sharedVideoWallpaperController.onPause(false);
+                    }
                     return;
                 }
                 VideoWallpaperController controller = sharedVideoWallpaperController;
-                wakeRearmAllowedAfterStop = false;
                 if (recordWakeHomeNavigation()) {
                     emitSystemSnapshot();
                 }
                 maybeTriggerSilentAutoGrant(action);
                 if (controller != null) {
-                    controller.onScreenWake(action, true);
+                    controller.resumePlayback(action);
                 }
             }
         };
@@ -573,6 +702,8 @@ public class MainActivity extends FlutterActivity {
         filter.addAction("com.sony.dtv.intent.action.PANEL_ON");
         filter.addAction("com.sony.dtv.intent.action.PANEL_OFF");
         filter.addAction("com.hisense.tv.action.PANEL_ON");
+        filter.addAction("com.hisense.tv.action.PANEL_OFF");
+        filter.addAction("com.xiaomi.mitv.ACTION_SCREEN_OFF");
         filter.setPriority(999999);
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(wallpaperWakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
@@ -592,6 +723,79 @@ public class MainActivity extends FlutterActivity {
         wallpaperWakeReceiver = null;
     }
 
+    private void registerDisplayWakeListener() {
+        if (displayWakeListener != null) {
+            return;
+        }
+        try {
+            DisplayManager dm = (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+            if (dm == null) {
+                return;
+            }
+            displayWakeListener = new DisplayManager.DisplayListener() {
+                @Override
+                public void onDisplayAdded(int displayId) {
+                }
+
+                @Override
+                public void onDisplayRemoved(int displayId) {
+                }
+
+                @Override
+                public void onDisplayChanged(int displayId) {
+                    if (displayId == Display.DEFAULT_DISPLAY) {
+                        try {
+                            Display display = dm.getDisplay(displayId);
+                            if (display != null && display.getState() == Display.STATE_ON) {
+                                if (recordWakeHomeNavigation()) {
+                                    emitSystemSnapshot();
+                                }
+                                maybeTriggerSilentAutoGrant("display_state_on");
+                                VideoWallpaperController controller = sharedVideoWallpaperController;
+                                if (controller != null) {
+                                    controller.resumePlayback("display_state_on");
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            };
+            dm.registerDisplayListener(displayWakeListener, new Handler(Looper.getMainLooper()));
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to register DisplayListener", e);
+        }
+    }
+
+    private void unregisterDisplayWakeListener() {
+        if (displayWakeListener == null) {
+            return;
+        }
+        try {
+            DisplayManager dm = (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+            if (dm != null) {
+                dm.unregisterDisplayListener(displayWakeListener);
+            }
+        } catch (Exception ignored) {
+        }
+        displayWakeListener = null;
+    }
+
+    private static boolean isWakeReason(String reason) {
+        if (TextUtils.isEmpty(reason)) {
+            return false;
+        }
+        String r = reason.toLowerCase(Locale.US);
+        return r.contains("screen_on")
+                || r.contains("activity_resume")
+                || r.contains("activity_start")
+                || r.contains("str_boot_completed")
+                || r.contains("panel_on")
+                || r.contains("display_state_on")
+                || r.contains("wake")
+                || r.contains("user_present");
+    }
+
     private static void scheduleSystemEventPollingIfActive() {
         if (sharedSystemEventSink == null || activeActivity == null || !activeActivity.activityStarted) {
             return;
@@ -602,7 +806,12 @@ public class MainActivity extends FlutterActivity {
 
     private boolean isWallpaperSleepAction(String action) {
         return TextUtils.equals(Intent.ACTION_SCREEN_OFF, action)
-                || TextUtils.equals(Intent.ACTION_DREAMING_STARTED, action);
+                || TextUtils.equals(Intent.ACTION_DREAMING_STARTED, action)
+                || TextUtils.equals("android.intent.action.SCREEN_OFF", action)
+                || TextUtils.equals("com.sony.dtv.intent.action.PANEL_OFF", action)
+                || TextUtils.equals("com.tcl.tv.action.SCREEN_OFF", action)
+                || TextUtils.equals("com.hisense.tv.action.PANEL_OFF", action)
+                || TextUtils.equals("com.xiaomi.mitv.ACTION_SCREEN_OFF", action);
     }
 
     private boolean recordWakeHomeNavigation() {
@@ -740,6 +949,8 @@ public class MainActivity extends FlutterActivity {
             case "launchMediaUri" -> result.success(launchMediaUri(call));
             case "startSpeechRecognizer" -> startSpeechRecognizer(result);
             case "dispatchVoiceCommand" -> result.success(dispatchVoiceCommand(call));
+            case "toggleMute" -> result.success(toggleMute());
+            case "sleepTv" -> result.success(sleepTv());
             case "setTtsEngine" -> result.success(setTtsEngine(call));
             case "getTtsEngine" -> result.success(getTtsEngine());
             case "testTtsVoice" -> {
@@ -767,7 +978,7 @@ public class MainActivity extends FlutterActivity {
             case "importSettingsBackup" -> importSettingsBackup(result, "import");
             case "previewBackup" -> importSettingsBackup(result, "preview");
             case "getLocalBackups" -> result.success(getLocalBackups());
-            case "readLocalBackup" -> result.success(readLocalBackup(call));
+            case "readLocalBackup" -> runMethodCallAsync(result, () -> readLocalBackup(call));
             case "deleteLocalBackup" -> result.success(deleteLocalBackup(call));
             case "recordBackupRestoreResult" -> result.success(recordBackupRestoreResult(call));
             case "getVideoWallpaperTextureId" -> result.success(
@@ -1791,27 +2002,42 @@ public class MainActivity extends FlutterActivity {
 
     private Map<String, Object> buildProvisioningChecklist() {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("packageName", getPackageName());
+        String pkg = getPackageName();
+        map.put("packageName", pkg);
         List<String> commands = new ArrayList<>();
         commands.add("adb install -r atv-launcher-armeabi-v7a.apk");
-        commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
-        commands.add("adb shell pm grant " + getPackageName() + " " + mediaReadPermissionName());
+        commands.add("adb shell pm grant " + pkg + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
+        commands.add("adb shell pm grant " + pkg + " " + mediaReadPermissionName());
         if (requiresNotificationRuntimePermission()) {
-            commands.add("adb shell pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
+            commands.add("adb shell pm grant " + pkg + " " + Manifest.permission.POST_NOTIFICATIONS);
         }
-        commands.add("adb shell appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow");
-        commands.add("adb shell appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
-        commands.add("adb shell appops set " + getPackageName() + " WRITE_SETTINGS allow");
+        commands.add("adb shell appops set " + pkg + " REQUEST_INSTALL_PACKAGES allow");
+        commands.add("adb shell appops set " + pkg + " SYSTEM_ALERT_WINDOW allow");
+        commands.add("adb shell appops set " + pkg + " WRITE_SETTINGS allow");
+        commands.add("adb shell appops set " + pkg + " GET_USAGE_STATS allow");
+        commands.add("adb shell dpm set-active-admin " + pkg + "/com.atv.launcher.systembridge.shared.admin.MapVoiceAdminReceiver");
+        commands.add("adb shell cmd package set-home-activity " + pkg + "/.MainActivity");
+        commands.add("adb shell dumpsys deviceidle whitelist +" + pkg);
+        commands.add("adb shell am set-standby-bucket " + pkg + " active");
+        commands.add("adb shell settings put secure enabled_accessibility_services " + SystemBridgeCoordinator.ownAccessibilityServiceId(this));
+        commands.add("adb shell settings put secure accessibility_enabled 1");
         commands.add("adb shell settings put global adb_enabled 1");
         commands.add("adb shell settings put global adb_wifi_enabled 1");
+        if (isXiaomiDevice()) {
+            commands.add("adb shell pm disable-user --user 0 com.xiaomi.mitv.upgrade");
+            commands.add("adb shell pm disable-user --user 0 com.xiaomi.mitv.tvpush.tvpushservice");
+            commands.add("adb shell pm disable-user --user 0 com.miui.analytics");
+        }
         map.put("commands", commands);
         map.put("recommendedPolicy", BridgeStateStore.ADB_POLICY_ADB_AND_WIFI);
         map.put("wizardSteps", Arrays.asList(
                 "Open developer options if ADB is disabled.",
                 "Grant WRITE_SECURE_SETTINGS using local ADB or PC ADB.",
+                "Set FLauncher as permanent default Home launcher.",
+                "Activate Device Admin for system protection.",
                 "Grant video library access so the launcher can browse TV storage directly.",
                 "Allow overlay and WRITE_SETTINGS if your firmware requires it.",
-                "Only whitelist battery optimization on Android boxes if background automation is unreliable.",
+                "Whitelist battery optimization and app standby bucket.",
                 "Select the long-term ADB automation policy."
         ));
         ProvisioningEvaluation evaluation = evaluateProvisioning();
@@ -2497,6 +2723,11 @@ public class MainActivity extends FlutterActivity {
         boolean presentationChanged = false;
         boolean lifecyclePolicyChanged = false;
 
+        String effectiveSourceType = !TextUtils.isEmpty(sourceType)
+                ? sourceType
+                : BridgeStateStore.getWallpaperVideoSourceType(this);
+        boolean isFolderMode = BridgeStateStore.WALLPAPER_SOURCE_FOLDER.equals(effectiveSourceType);
+
         if (!TextUtils.isEmpty(sourceType)) {
             topologyChanged |= !TextUtils.equals(
                     BridgeStateStore.getWallpaperVideoSourceType(this),
@@ -2504,7 +2735,7 @@ public class MainActivity extends FlutterActivity {
             );
             BridgeStateStore.setWallpaperVideoSourceType(this, sourceType);
         }
-        if (assetUris != null) {
+        if (assetUris != null && !isFolderMode) {
             List<String> nextAssetUris = new ArrayList<>(assetUris);
             topologyChanged |= !BridgeStateStore.getWallpaperVideoAssetUris(this).equals(nextAssetUris);
             BridgeStateStore.setWallpaperVideoAssetUris(this, nextAssetUris);
@@ -2518,26 +2749,28 @@ public class MainActivity extends FlutterActivity {
                 }
             }
         }
-        if (folderUri != null) {
-            topologyChanged |= !TextUtils.equals(
-                    BridgeStateStore.getWallpaperVideoFolderUri(this),
-                    folderUri
-            );
-            BridgeStateStore.setWallpaperVideoFolderUri(this, folderUri);
-        }
-        if (folderBucketId != null) {
-            topologyChanged |= !TextUtils.equals(
-                    BridgeStateStore.getWallpaperVideoFolderBucketId(this),
-                    folderBucketId
-            );
-            BridgeStateStore.setWallpaperVideoFolderBucketId(this, folderBucketId);
-        }
-        if (folderName != null) {
-            topologyChanged |= !TextUtils.equals(
-                    BridgeStateStore.getWallpaperVideoFolderName(this),
-                    folderName
-            );
-            BridgeStateStore.setWallpaperVideoFolderName(this, folderName);
+        if (isFolderMode) {
+            if (folderUri != null) {
+                topologyChanged |= !TextUtils.equals(
+                        BridgeStateStore.getWallpaperVideoFolderUri(this),
+                        folderUri
+                );
+                BridgeStateStore.setWallpaperVideoFolderUri(this, folderUri);
+            }
+            if (folderBucketId != null) {
+                topologyChanged |= !TextUtils.equals(
+                        BridgeStateStore.getWallpaperVideoFolderBucketId(this),
+                        folderBucketId
+                );
+                BridgeStateStore.setWallpaperVideoFolderBucketId(this, folderBucketId);
+            }
+            if (folderName != null) {
+                topologyChanged |= !TextUtils.equals(
+                        BridgeStateStore.getWallpaperVideoFolderName(this),
+                        folderName
+                );
+                BridgeStateStore.setWallpaperVideoFolderName(this, folderName);
+            }
         }
         if (!TextUtils.isEmpty(orderMode)) {
             topologyChanged |= !TextUtils.equals(
@@ -2969,6 +3202,51 @@ public class MainActivity extends FlutterActivity {
         return SmartVoiceDispatcher.dispatch(this, query);
     }
 
+    private Map<String, Object> toggleMute() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) {
+                boolean isMuted = false;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    isMuted = am.isStreamMute(android.media.AudioManager.STREAM_MUSIC);
+                    int direction = isMuted ? android.media.AudioManager.ADJUST_UNMUTE : android.media.AudioManager.ADJUST_MUTE;
+                    am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, direction, android.media.AudioManager.FLAG_SHOW_UI);
+                    result.put("isMuted", !isMuted);
+                } else {
+                    am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_TOGGLE_MUTE, android.media.AudioManager.FLAG_SHOW_UI);
+                    result.put("isMuted", false);
+                }
+                result.put("success", true);
+                return result;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "toggleMute failed", e);
+        }
+        result.put("success", false);
+        return result;
+    }
+
+    private Map<String, Object> sleepTv() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        try {
+            com.atv.launcher.systembridge.accessmanager.adb.LocalAdbBridge.tryExecuteRootShell("input keyevent 223");
+        } catch (Exception ignored) {}
+        try {
+            long now = SystemClock.uptimeMillis();
+            KeyEvent down = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_POWER, 0);
+            KeyEvent up = new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_POWER, 0);
+            dispatchKeyEvent(down);
+            dispatchKeyEvent(up);
+            result.put("success", true);
+            return result;
+        } catch (Exception e) {
+            Log.e(TAG, "sleepTv failed", e);
+        }
+        result.put("success", false);
+        return result;
+    }
+
     private Map<String, Object> setTtsEngine(MethodCall call) {
         String engine = call.argument("engine");
         com.atv.launcher.systembridge.shared.state.BridgeStateStore.setTtsEngine(this, engine);
@@ -3305,11 +3583,13 @@ public class MainActivity extends FlutterActivity {
             return;
         }
         try {
-            final int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
+            final int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
             getContentResolver().takePersistableUriPermission(uri, flags);
         } catch (Exception ignored) {
         }
     }
+
+    private static final int MAX_BACKUP_SIZE_BYTES = 5 * 1024 * 1024;
 
     private String readTextFromUri(Uri uri) throws Exception {
         try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
@@ -3318,8 +3598,13 @@ public class MainActivity extends FlutterActivity {
             }
             byte[] buffer = new byte[8192];
             StringBuilder builder = new StringBuilder();
+            int totalBytes = 0;
             int read;
             while ((read = inputStream.read(buffer)) > 0) {
+                totalBytes += read;
+                if (totalBytes > MAX_BACKUP_SIZE_BYTES) {
+                    throw new IllegalStateException("Backup file exceeds maximum allowed size (5MB).");
+                }
                 builder.append(new String(buffer, 0, read, StandardCharsets.UTF_8));
             }
             return builder.toString();
@@ -3371,22 +3656,69 @@ public class MainActivity extends FlutterActivity {
         return detail;
     }
 
+    private boolean isXiaomiDevice() {
+        String brand = ((Build.BRAND != null ? Build.BRAND : "") + " " + (Build.MANUFACTURER != null ? Build.MANUFACTURER : "")).toLowerCase(Locale.US);
+        return brand.contains("xiaomi") || brand.contains("redmi");
+    }
+
     private List<String> buildProvisioningGrantCommands() {
+        String pkg = getPackageName();
         List<String> commands = new ArrayList<>();
-        commands.add("pm grant " + getPackageName() + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
-        commands.add("pm grant " + getPackageName() + " " + Manifest.permission.RECORD_AUDIO);
-        commands.add("pm grant " + getPackageName() + " " + mediaReadPermissionName());
+        commands.add("pm grant " + pkg + " " + Manifest.permission.WRITE_SECURE_SETTINGS);
+        commands.add("pm grant " + pkg + " " + Manifest.permission.RECORD_AUDIO);
+        commands.add("pm grant " + pkg + " " + mediaReadPermissionName());
         if (requiresNotificationRuntimePermission()) {
-            commands.add("pm grant " + getPackageName() + " " + Manifest.permission.POST_NOTIFICATIONS);
+            commands.add("pm grant " + pkg + " " + Manifest.permission.POST_NOTIFICATIONS);
         }
-        commands.add("appops set " + getPackageName() + " REQUEST_INSTALL_PACKAGES allow");
-        commands.add("appops set " + getPackageName() + " SYSTEM_ALERT_WINDOW allow");
-        commands.add("appops set " + getPackageName() + " WRITE_SETTINGS allow");
-        commands.add("appops set " + getPackageName() + " GET_USAGE_STATS allow");
+        commands.add("appops set " + pkg + " REQUEST_INSTALL_PACKAGES allow");
+        commands.add("appops set " + pkg + " SYSTEM_ALERT_WINDOW allow");
+        commands.add("appops set " + pkg + " WRITE_SETTINGS allow");
+        commands.add("appops set " + pkg + " GET_USAGE_STATS allow");
+
+        // Advanced Admin & Home Lock privileges
+        ComponentName adminComponent = com.atv.launcher.systembridge.shared.admin.MapVoiceAdminReceiver.component(this);
+        android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        if (dpm == null || !dpm.isAdminActive(adminComponent)) {
+            commands.add("dpm set-active-admin " + adminComponent.flattenToShortString());
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            commands.add("cmd package set-home-activity " + pkg + "/.MainActivity");
+        }
+
+        commands.add("dumpsys deviceidle whitelist +" + pkg);
+        commands.add("am set-standby-bucket " + pkg + " active");
+
+        String ownService = SystemBridgeCoordinator.ownAccessibilityServiceId(this);
+        String currentServices = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (currentServices == null || !currentServices.contains(ownService)) {
+            String updatedServices = TextUtils.isEmpty(currentServices)
+                    ? ownService
+                    : currentServices + ":" + ownService;
+            commands.add("settings put secure " + Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES + " \"" + updatedServices + "\"");
+        }
+        commands.add("settings put secure " + Settings.Secure.ACCESSIBILITY_ENABLED + " 1");
+
+        if (isXiaomiDevice()) {
+            commands.add("pm disable-user --user 0 com.xiaomi.mitv.upgrade 2>/dev/null || true");
+            commands.add("pm disable-user --user 0 com.xiaomi.mitv.tvpush.tvpushservice 2>/dev/null || true");
+            commands.add("pm disable-user --user 0 com.miui.analytics 2>/dev/null || true");
+        }
+
         return commands;
     }
 
     private void maybeTriggerSilentAutoGrant(String reason) {
+        if (isWakeReason(reason)) {
+            try {
+                ProvisioningEvaluation eval = evaluateProvisioning();
+                if (hasActionableProvisioningGaps(eval)) {
+                    silentAutoGrantCompleted = false;
+                    silentAutoGrantAttemptCount = 0;
+                }
+            } catch (Exception ignored) {
+            }
+        }
         if (silentAutoGrantCompleted) {
             return;
         }
@@ -3428,8 +3760,8 @@ public class MainActivity extends FlutterActivity {
                         silentAutoGrantCompleted = true;
                         silentAutoGrantAttemptCount = 0;
                         Log.i(TAG, "Silent auto-grant succeeded and full permissions verified.");
-                        runOnUiThread(this::emitSystemSnapshot);
                     }
+                    runOnUiThread(this::emitSystemSnapshot);
                 } else {
                     Log.w(TAG, "Silent auto-grant attempt failed: " + (grantResult == null ? "null" : grantResult.detail));
                 }
@@ -3615,6 +3947,10 @@ public class MainActivity extends FlutterActivity {
 
         for (String[] component : installerComponents) {
             try {
+                grantUriPermission(component[0], apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception ignored) {
+            }
+            try {
                 Intent intent = new Intent(Intent.ACTION_VIEW)
                         .setClassName(component[0], component[1])
                         .setDataAndType(apkUri, "application/vnd.android.package-archive")
@@ -3648,9 +3984,6 @@ public class MainActivity extends FlutterActivity {
                 .putExtra(Intent.EXTRA_RETURN_RESULT, false)
                 .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        if (tryStartActivity(implicitInstallIntent)) {
-            return true;
-        }
 
         Intent implicitViewIntent = new Intent(Intent.ACTION_VIEW)
                 .setDataAndType(apkUri, "application/vnd.android.package-archive")
@@ -3658,6 +3991,22 @@ public class MainActivity extends FlutterActivity {
                 .putExtra(Intent.EXTRA_RETURN_RESULT, false)
                 .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, getPackageName())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        try {
+            List<ResolveInfo> resInfoList = getPackageManager().queryIntentActivities(
+                    implicitViewIntent, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo resolveInfo : resInfoList) {
+                if (resolveInfo.activityInfo != null && !TextUtils.isEmpty(resolveInfo.activityInfo.packageName)) {
+                    grantUriPermission(resolveInfo.activityInfo.packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (tryStartActivity(implicitInstallIntent)) {
+            return true;
+        }
+
         return tryStartActivity(implicitViewIntent);
     }
 
@@ -3673,10 +4022,18 @@ public class MainActivity extends FlutterActivity {
                     .setData(Uri.parse("package:" + getPackageName()));
             case "overlay" -> intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                     .setData(Uri.parse("package:" + getPackageName()));
-            case "install_unknown_apps" -> intent = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                    ? new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                    .setData(Uri.parse("package:" + getPackageName()))
-                    : new Intent(Settings.ACTION_SECURITY_SETTINGS);
+            case "install_unknown_apps" -> {
+                List<Intent> candidates = new ArrayList<>();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    candidates.add(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                            .setData(Uri.parse("package:" + getPackageName())));
+                    candidates.add(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES));
+                }
+                candidates.add(new Intent(Settings.ACTION_SECURITY_SETTINGS));
+                candidates.add(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData(Uri.parse("package:" + getPackageName())));
+                return tryStartActivityCandidates("install_unknown_apps", candidates);
+            }
             case "battery" -> intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
             case "app_details" -> intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     .setData(Uri.parse("package:" + getPackageName()));
@@ -4251,12 +4608,26 @@ public class MainActivity extends FlutterActivity {
 
     private String readLocalBackup(MethodCall call) {
         String fileName = call.argument("fileName");
+        if (TextUtils.isEmpty(fileName)) {
+            return "";
+        }
+        String sanitizedName = new File(fileName).getName();
+        if (!sanitizedName.endsWith(".json")) {
+            return "";
+        }
         File directory = getExternalFilesDir("backups");
         if (directory == null) {
             directory = new File(getFilesDir(), "backups");
         }
-        File file = new File(directory, fileName);
-        if (!file.exists()) {
+        File file = new File(directory, sanitizedName);
+        try {
+            if (!file.getCanonicalPath().startsWith(directory.getCanonicalPath() + File.separator)) {
+                return "";
+            }
+        } catch (Exception e) {
+            return "";
+        }
+        if (!file.exists() || !file.isFile()) {
             return "";
         }
         try {
@@ -4268,11 +4639,25 @@ public class MainActivity extends FlutterActivity {
 
     private boolean deleteLocalBackup(MethodCall call) {
         String fileName = call.argument("fileName");
+        if (TextUtils.isEmpty(fileName)) {
+            return false;
+        }
+        String sanitizedName = new File(fileName).getName();
+        if (!sanitizedName.endsWith(".json")) {
+            return false;
+        }
         File directory = getExternalFilesDir("backups");
         if (directory == null) {
             directory = new File(getFilesDir(), "backups");
         }
-        File file = new File(directory, fileName);
+        File file = new File(directory, sanitizedName);
+        try {
+            if (!file.getCanonicalPath().startsWith(directory.getCanonicalPath() + File.separator)) {
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
         return file.exists() && file.delete();
     }
 

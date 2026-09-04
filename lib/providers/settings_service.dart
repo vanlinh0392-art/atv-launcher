@@ -19,6 +19,7 @@
 import 'dart:async';
 
 import 'package:flauncher/widgets/settings/back_button_actions.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,6 +30,7 @@ const _appKeyClickEnabledKey = "app_key_click_enabled";
 const _autoHideAppBar = "auto_hide_app_bar";
 const _gradientUuidKey = "gradient_uuid";
 const _backButtonAction = "back_button_action";
+const _backButtonLongPressAction = "back_button_long_press_action";
 const _dateFormat = "date_format";
 const _homeDockRowsPreset = "home_dock_rows_preset";
 const _homeDockCollapsedRowsPreset = "home_dock_collapsed_rows_preset";
@@ -43,6 +45,7 @@ const _appLocaleMode = "app_locale_mode";
 const _showCategoryTitles = "show_category_titles";
 const _showDateInStatusBar = "show_date_in_status_bar";
 const _showRamInStatusBar = "show_ram_in_status_bar";
+const _showWeatherInStatusBar = "show_weather_in_status_bar";
 const _statusBarClockScalePercent = "status_bar_clock_scale_percent";
 const _settingsUiTransparencyPercent = "settings_ui_transparency_percent";
 const _showTimeInStatusBar = "show_time_in_status_bar";
@@ -79,10 +82,28 @@ const _backupLastRestoreSummary = "backup_last_restore_summary";
 const _backupLastRestoreAt = "backup_last_restore_at";
 const _backupLastAutoAt = "backup_last_auto_at";
 const _adbLocalOnboardingHandled = "adb_local_onboarding_handled";
+const _useSideSheetSettings = "launcher_pref_use_side_sheet_settings";
+const _statusBarDateStyleKey = "status_bar_date_style";
 
 class SettingsService extends ChangeNotifier {
   static const String defaultDateFormat = "E d/M";
   static const String defaultTimeFormat = "H:mm";
+  static const String dateStyleStandard = 'standard';
+  static const String dateStyleBold = 'bold';
+  static const String dateStyleMonospace = 'monospace';
+  static const String defaultDateStyle = dateStyleStandard;
+  static const List<String> standardDatePresets = [
+    "Thứ 5 ngày d/M/y",
+    "Thứ 5 ngày d-M-y",
+    "E d/M",
+    "d/M/y",
+    "dd-MM-yyyy",
+  ];
+  static const List<String> standardTimePresets = [
+    "H:mm",
+    "h:mm a",
+    "H:mm:ss",
+  ];
   static const String appLocaleSystem = "system";
   static const String appLocaleEnglish = "en";
   static const String appLocaleVietnamese = "vi";
@@ -115,6 +136,7 @@ class SettingsService extends ChangeNotifier {
   static const int settingsUiTransparencyMax = 90;
   static const int settingsUiTransparencyDefault = 20;
   static const int settingsUiTransparencyStep = 5;
+  static const _settingsBackdropThemeKey = "settings_backdrop_theme";
   static const int homeDockGlassIntensityMin = 0;
   static const int homeDockGlassIntensityMax = 100;
   static const int homeDockGlassIntensityDefault = 20;
@@ -170,6 +192,9 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.getBool(_showRamInStatusBar) ??
       showRamInStatusBarDefault;
 
+  bool get showWeatherInStatusBar =>
+      _sharedPreferences.getBool(_showWeatherInStatusBar) ?? true;
+
   int get statusBarClockScalePercent => _normalizeStatusBarClockScale(
       _sharedPreferences.getInt(_statusBarClockScalePercent) ??
           statusBarClockScaleDefault);
@@ -177,6 +202,14 @@ class SettingsService extends ChangeNotifier {
   int get settingsUiTransparencyPercent => _normalizeSettingsUiTransparency(
       _sharedPreferences.getInt(_settingsUiTransparencyPercent) ??
           settingsUiTransparencyDefault);
+
+  TvSettingsBackdropTheme get settingsBackdropTheme =>
+      _sanitizeSettingsBackdropTheme(
+        _sharedPreferences.getString(_settingsBackdropThemeKey),
+      );
+
+  bool get useSideSheetSettings =>
+      _sharedPreferences.getBool(_useSideSheetSettings) ?? true;
 
   bool get showTimeInStatusBar =>
       _sharedPreferences.getBool(_showTimeInStatusBar) ?? true;
@@ -187,8 +220,15 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.getString(_backButtonAction) ??
       BACK_BUTTON_ACTION_NOTHING;
 
+  String get backButtonLongPressAction =>
+      _sharedPreferences.getString(_backButtonLongPressAction) ??
+      BACK_BUTTON_ACTION_TOGGLE_MUTE;
+
   String get dateFormat =>
       _sharedPreferences.getString(_dateFormat) ?? defaultDateFormat;
+
+  String get statusBarDateStyle =>
+      _sharedPreferences.getString(_statusBarDateStyleKey) ?? defaultDateStyle;
 
   int get homeDockRowsPreset =>
       (_sharedPreferences.getInt(_homeDockRowsPreset) ?? homeDockRowsDefault)
@@ -337,7 +377,18 @@ class SettingsService extends ChangeNotifier {
   bool get adbLocalOnboardingHandled =>
       _sharedPreferences.getBool(_adbLocalOnboardingHandled) ?? false;
 
-  SettingsService(this._sharedPreferences);
+  SettingsService(this._sharedPreferences) {
+    _migrateLegacyPreferences();
+  }
+
+  void _migrateLegacyPreferences() {
+    final currentLocale = _sharedPreferences.getString(_appLocaleMode);
+    if (currentLocale == null || currentLocale == appLocaleSystem) {
+      unawaited(
+        _sharedPreferences.setString(_appLocaleMode, appLocaleVietnamese),
+      );
+    }
+  }
 
   Future<void> set(String key, bool value) async {
     await _sharedPreferences.setBool(key, value);
@@ -374,12 +425,37 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setBackButtonLongPressAction(String value) async {
+    await _sharedPreferences.setString(_backButtonLongPressAction, value);
+    notifyListeners();
+  }
+
   Future<void> setDateTimeFormat(
       String dateFormatString, String timeFormatString) async {
     await Future.wait([
       _sharedPreferences.setString(_dateFormat, dateFormatString),
       _sharedPreferences.setString(_timeFormat, timeFormatString),
     ]);
+    notifyListeners();
+  }
+
+  Future<void> setDateFormat(String dateFormatString) async {
+    final trimmed = dateFormatString.trim();
+    if (trimmed.isEmpty || trimmed == dateFormat) return;
+    await _sharedPreferences.setString(_dateFormat, trimmed);
+    notifyListeners();
+  }
+
+  Future<void> setTimeFormat(String timeFormatString) async {
+    final trimmed = timeFormatString.trim();
+    if (trimmed.isEmpty || trimmed == timeFormat) return;
+    await _sharedPreferences.setString(_timeFormat, trimmed);
+    notifyListeners();
+  }
+
+  Future<void> setStatusBarDateStyle(String style) async {
+    if (statusBarDateStyle == style) return;
+    await _sharedPreferences.setString(_statusBarDateStyleKey, style);
     notifyListeners();
   }
 
@@ -457,6 +533,9 @@ class SettingsService extends ChangeNotifier {
     return set(_showRamInStatusBar, show);
   }
 
+  Future<void> setShowWeatherInStatusBar(bool show) =>
+      set(_showWeatherInStatusBar, show);
+
   Future<void> setStatusBarClockScalePercent(int value) async {
     await _sharedPreferences.setInt(
       _statusBarClockScalePercent,
@@ -470,6 +549,20 @@ class SettingsService extends ChangeNotifier {
       _settingsUiTransparencyPercent,
       _normalizeSettingsUiTransparency(value),
     );
+    notifyListeners();
+  }
+
+  Future<void> setSettingsBackdropTheme(TvSettingsBackdropTheme theme) async {
+    if (settingsBackdropTheme == theme) return;
+    await _sharedPreferences.setString(
+      _settingsBackdropThemeKey,
+      theme.key,
+    );
+    notifyListeners();
+  }
+
+  Future<void> setUseSideSheetSettings(bool value) async {
+    await _sharedPreferences.setBool(_useSideSheetSettings, value);
     notifyListeners();
   }
 
@@ -654,7 +747,9 @@ class SettingsService extends ChangeNotifier {
       'autoHideAppBarEnabled': autoHideAppBarEnabled,
       'gradientUuid': gradientUuid,
       'backButtonAction': backButtonAction,
+      'backButtonLongPressAction': backButtonLongPressAction,
       'dateFormat': dateFormat,
+      'statusBarDateStyle': statusBarDateStyle,
       'homeDockRowsPreset': homeDockRowsPreset,
       'homeDockCollapsedRowsPreset': homeDockCollapsedRowsPreset,
       'homeDockAutoCollapseEnabled': homeDockAutoCollapseEnabled,
@@ -666,6 +761,8 @@ class SettingsService extends ChangeNotifier {
       'appLocaleMode': appLocaleMode,
       'statusBarClockScalePercent': statusBarClockScalePercent,
       'settingsUiTransparencyPercent': settingsUiTransparencyPercent,
+      'settingsBackdropTheme': settingsBackdropTheme.key,
+      'useSideSheetSettings': useSideSheetSettings,
       'timeFormat': timeFormat,
       'appCardCornerRadius': appCardCornerRadius,
       'appCardLayoutScalePercent': appCardLayoutScalePercent,
@@ -673,6 +770,7 @@ class SettingsService extends ChangeNotifier {
       'showCategoryTitles': showCategoryTitles,
       'showDateInStatusBar': showDateInStatusBar,
       'showRamInStatusBar': showRamInStatusBar,
+      'showWeatherInStatusBar': showWeatherInStatusBar,
       'showTimeInStatusBar': showTimeInStatusBar,
       'wallpaperMode': wallpaperMode,
       'wallpaperAssetUri': wallpaperAssetUri,
@@ -696,6 +794,11 @@ class SettingsService extends ChangeNotifier {
       'videoWallpaperAutoResume': videoWallpaperAutoResume,
     };
   }
+
+  Map<String, dynamic> exportSettings() => toBackupMap();
+
+  Future<void> importSettings(Map<String, dynamic> data) =>
+      applyBackupMap(data);
 
   Future<void> applyBackupMap(Map<String, dynamic> data) async {
     await Future.wait([
@@ -731,8 +834,16 @@ class SettingsService extends ChangeNotifier {
         _readString(data, 'backButtonAction', backButtonAction),
       ),
       _sharedPreferences.setString(
+        _backButtonLongPressAction,
+        _readString(data, 'backButtonLongPressAction', backButtonLongPressAction),
+      ),
+      _sharedPreferences.setString(
         _dateFormat,
         _readString(data, 'dateFormat', defaultDateFormat),
+      ),
+      _sharedPreferences.setString(
+        _statusBarDateStyleKey,
+        _readString(data, 'statusBarDateStyle', defaultDateStyle),
       ),
       _sharedPreferences.setInt(
         _homeDockRowsPreset,
@@ -823,6 +934,20 @@ class SettingsService extends ChangeNotifier {
         ),
       ),
       _sharedPreferences.setString(
+        _settingsBackdropThemeKey,
+        _sanitizeSettingsBackdropTheme(
+          _readString(
+            data,
+            'settingsBackdropTheme',
+            TvSettingsBackdropTheme.deepSlate.key,
+          ),
+        ).key,
+      ),
+      _sharedPreferences.setBool(
+        _useSideSheetSettings,
+        _readBool(data, 'useSideSheetSettings', true),
+      ),
+      _sharedPreferences.setString(
         _timeFormat,
         _readString(data, 'timeFormat', defaultTimeFormat),
       ),
@@ -865,6 +990,10 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.setBool(
         _showRamInStatusBar,
         _readBool(data, 'showRamInStatusBar', showRamInStatusBarDefault),
+      ),
+      _sharedPreferences.setBool(
+        _showWeatherInStatusBar,
+        _readBool(data, 'showWeatherInStatusBar', showWeatherInStatusBar),
       ),
       _sharedPreferences.setBool(
         _showTimeInStatusBar,
@@ -997,12 +1126,12 @@ class SettingsService extends ChangeNotifier {
   }
 
   static String _sanitizeAppLocaleMode(String value) {
-    switch (value) {
+    switch (value.trim().toLowerCase()) {
       case appLocaleEnglish:
+        return appLocaleEnglish;
       case appLocaleVietnamese:
-        return value;
       default:
-        return appLocaleSystem;
+        return appLocaleVietnamese;
     }
   }
 
@@ -1062,6 +1191,17 @@ class SettingsService extends ChangeNotifier {
     final snappedStep = (offset / settingsUiTransparencyStep).round();
     return settingsUiTransparencyMin +
         (snappedStep * settingsUiTransparencyStep);
+  }
+
+  static TvSettingsBackdropTheme _sanitizeSettingsBackdropTheme(
+      Object? rawValue) {
+    if (rawValue is TvSettingsBackdropTheme) {
+      return rawValue;
+    }
+    if (rawValue is String) {
+      return TvSettingsBackdropTheme.fromKey(rawValue);
+    }
+    return TvSettingsBackdropTheme.deepSlate;
   }
 
   static int _normalizeHomeDockGlassIntensity(int value) {

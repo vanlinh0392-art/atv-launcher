@@ -31,6 +31,20 @@ class DateTimeWidget extends StatefulWidget {
       {super.key, this.updateInterval, this.textStyle})
       : _dateTimeFormatString = dateTimeFormatString;
 
+  static bool isVietnameseCustomFormat(String pattern) {
+    final lower = pattern.toLowerCase();
+    return lower.contains('thứ 5') ||
+        lower.contains('thứ') ||
+        lower.contains('ngày') ||
+        lower.startsWith('vn_full');
+  }
+
+  static String formatVietnameseDate(DateTime dt, String pattern) {
+    final w = dt.weekday == 7 ? 'Chủ nhật' : 'Thứ ${dt.weekday + 1}';
+    final sep = pattern.contains('-') ? '-' : '/';
+    return '$w ngày ${dt.day}$sep${dt.month}$sep${dt.year}';
+  }
+
   @override
   State<DateTimeWidget> createState() => _DateTimeWidgetState();
 }
@@ -44,6 +58,29 @@ class _DateTimeWidgetState extends State<DateTimeWidget>
   late String _localeName;
   late String _formatPattern;
 
+  String _formatDateTime(DateTime dt) {
+    if (DateTimeWidget.isVietnameseCustomFormat(_formatPattern)) {
+      return DateTimeWidget.formatVietnameseDate(dt, _formatPattern);
+    }
+    try {
+      return _dateFormat.format(dt);
+    } catch (_) {
+      return DateFormat('E d/M', _localeName).format(dt);
+    }
+  }
+
+  void _initDateFormatSafe() {
+    if (DateTimeWidget.isVietnameseCustomFormat(_formatPattern)) {
+      _dateFormat = DateFormat('d/M/y', _localeName);
+    } else {
+      try {
+        _dateFormat = DateFormat(_formatPattern, _localeName);
+      } catch (_) {
+        _dateFormat = DateFormat('E d/M', _localeName);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -52,8 +89,8 @@ class _DateTimeWidgetState extends State<DateTimeWidget>
     _now = DateTime.now();
     _localeName = Platform.localeName;
     _formatPattern = widget._dateTimeFormatString;
-    _dateFormat = DateFormat(_formatPattern, _localeName);
-    _formattedNow = _dateFormat.format(_now);
+    _initDateFormatSafe();
+    _formattedNow = _formatDateTime(_now);
     _scheduleNextRefresh();
   }
 
@@ -75,7 +112,7 @@ class _DateTimeWidgetState extends State<DateTimeWidget>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final now = DateTime.now();
-      final formattedNow = _dateFormat.format(now);
+      final formattedNow = _formatDateTime(now);
       if (mounted) {
         setState(() {
           _now = now;
@@ -102,7 +139,7 @@ class _DateTimeWidgetState extends State<DateTimeWidget>
 
   void _refreshTime() {
     final now = DateTime.now();
-    final formattedNow = _dateFormat.format(now);
+    final formattedNow = _formatDateTime(now);
     if (formattedNow == _formattedNow) {
       _now = now;
       _scheduleNextRefresh();
@@ -132,8 +169,8 @@ class _DateTimeWidgetState extends State<DateTimeWidget>
     _localeName = localeName;
     _formatPattern = formatPattern;
     _now = DateTime.now();
-    _dateFormat = DateFormat(_formatPattern, _localeName);
-    _formattedNow = _dateFormat.format(_now);
+    _initDateFormatSafe();
+    _formattedNow = _formatDateTime(_now);
     _scheduleNextRefresh();
   }
 

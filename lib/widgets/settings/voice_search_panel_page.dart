@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 
 class VoiceSearchPanelPage extends StatefulWidget {
   static const String routeName = "voice_search_panel";
-  static const String _summaryDebugLabel = 'voice_search_summary_metrics';
   final FocusNode? primaryFocusNode;
 
   const VoiceSearchPanelPage({
@@ -94,45 +93,12 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
       builder: (context, bridgeService, searchService, _) {
         final status = bridgeService.voiceStatus;
         final mode = (status['mode'] as num?)?.toInt() ?? 2;
-        final keyCode = status['keyCode']?.toString() ?? '0';
         final interceptEnabled = status['interceptEnabled'] == true;
 
         return ListView(
           key: const PageStorageKey<String>(VoiceSearchPanelPage.routeName),
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
-            // ==========================================
-            // HEADER: TỔNG QUAN & SỨC KHỎE VOICE AI
-            // ==========================================
-            SettingsSummarySection(
-              debugLabel: VoiceSearchPanelPage._summaryDebugLabel,
-              child: SettingsMetricsGrid(
-                minChildWidth: 160,
-                maxColumns: 3,
-                children: [
-                  SettingsMetricTile(
-                    label: 'Chế độ kích hoạt',
-                    value: localizedVoiceMode(localizations, mode),
-                    icon: Icons.mic_none_outlined,
-                  ),
-                  SettingsMetricTile(
-                    label: 'Mã phím Remote',
-                    value: keyCode,
-                    icon: Icons.keyboard_outlined,
-                  ),
-                  SettingsMetricTile(
-                    label: 'Cầu nối Trợ năng',
-                    value: localizedBridgeHealth(
-                      localizations,
-                      status['health']?.toString() ?? '',
-                    ),
-                    icon: Icons.health_and_safety_outlined,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // ==========================================
             // SECTION 1: KÍCH HOẠT & PHÍM REMOTE
             // ==========================================
@@ -143,14 +109,9 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 children: [
                   SettingsChoiceCard<int>(
                     focusNode: widget.primaryFocusNode,
-                    onMoveUpAtBoundary: () =>
-                        focusCurrentSettingsNodeByDebugLabel(
-                      VoiceSearchPanelPage._summaryDebugLabel,
-                    ),
                     selectorKey: const Key('voice_search_mode_selector'),
                     optionKeyPrefix: 'voice_search_mode_option',
                     title: 'Thao tác bấm phím',
-                    subtitle: 'Cách bấm remote để gọi Trợ lý Voice',
                     icon: Icons.tune,
                     value: mode,
                     options: <SettingsChoiceOption<int>>[
@@ -177,12 +138,11 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       await bridgeService.setVoiceMode(mode: value);
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TvDrawerTokens.rowSpacing),
                   SettingsChoiceCard<int>(
                     selectorKey: const Key('voice_search_key_selector'),
                     optionKeyPrefix: 'voice_search_key_option',
                     title: 'Phím gọi Trợ lý Voice',
-                    subtitle: 'Gán phím vật lý trên remote TV',
                     icon: Icons.keyboard_outlined,
                     value: (status['keyCode'] as num?)?.toInt() ?? 0,
                     options: const <SettingsChoiceOption<int>>[
@@ -279,7 +239,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       await bridgeService.setVoiceMode(keyCode: value);
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TvDrawerTokens.rowSpacing),
                   RoundedSwitchListTile(
                     value: interceptEnabled,
                     onChanged: bridgeService.setVoiceInterceptEnabled,
@@ -289,7 +249,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     ),
                     secondary: const Icon(Icons.hearing_outlined),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TvDrawerTokens.rowSpacing),
                   SettingsAdaptiveGrid(
                     spacing: 12,
                     runSpacing: 12,
@@ -298,7 +258,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     children: [
                       actionCard(
                         title: 'Học phím Remote',
-                        subtitle: 'Gán phím bất kỳ trên điều khiển',
                         icon: Icons.sensors_outlined,
                         onPressed: () async {
                           await bridgeService.startKeyLearning();
@@ -366,7 +325,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       ),
                       actionCard(
                         title: 'Đặt lại phím mặc định',
-                        subtitle: 'Khôi phục cấu hình gốc',
                         icon: Icons.restart_alt,
                         onPressed: () async {
                           await bridgeService.resetVoiceMapping();
@@ -381,7 +339,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: TvDrawerTokens.surfaceSpacing),
 
             // ==========================================
             // SECTION 2: TRÍ TUỆ AI & GIỌNG ĐỌC TTS
@@ -395,7 +353,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     selectorKey: const Key('voice_tts_engine_selector'),
                     optionKeyPrefix: 'voice_tts_engine_option',
                     title: 'Giọng đọc Tiếng Việt',
-                    subtitle: 'Âm sắc phản hồi của Trợ lý',
                     icon: Icons.spatial_audio_off_outlined,
                     value: _ttsEngine,
                     options: const <SettingsChoiceOption<String>>[
@@ -424,7 +381,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       await bridgeService.testTtsVoice(sample);
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TvDrawerTokens.rowSpacing),
                   SettingsAdaptiveGrid(
                     spacing: 12,
                     runSpacing: 12,
@@ -433,7 +390,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     children: [
                       actionCard(
                         title: 'Cập nhật Model AI',
-                        subtitle: 'Quét và làm mới danh sách AI',
                         icon: Icons.refresh_outlined,
                         onPressed: () async {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -452,7 +408,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       ),
                       actionCard(
                         title: 'Thử nghiệm Micro',
-                        subtitle: 'Kiểm tra độ nhạy thu âm',
                         icon: Icons.mic_none_outlined,
                         onPressed: () async {
                           final result = await searchService.startSpeechRecognizer();
@@ -468,7 +423,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       ),
                       actionCard(
                         title: 'Thử giọng đọc TV',
-                        subtitle: 'Phát âm thanh mẫu qua loa',
                         icon: Icons.volume_up_outlined,
                         onPressed: () async {
                           await bridgeService.testTtsVoice('Xin chào! Trợ lý FLauncher TV đã sẵn sàng phục vụ bạn.');
@@ -483,7 +437,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: TvDrawerTokens.surfaceSpacing),
 
             // ==========================================
             // SECTION 3: GIAO DIỆN & PHỤ ĐỀ
@@ -497,7 +451,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                     selectorKey: const Key('voice_subtitle_size_selector'),
                     optionKeyPrefix: 'voice_subtitle_size_option',
                     title: 'Cỡ chữ phụ đề',
-                    subtitle: 'Độ lớn văn bản phản hồi',
                     icon: Icons.format_size,
                     value: _subtitleSize,
                     options: const <SettingsChoiceOption<int>>[
@@ -512,20 +465,39 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       await bridgeService.setVoiceSubtitleConfig(size: value);
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TvDrawerTokens.rowSpacing),
                   SettingsChoiceCard<int>(
                     selectorKey: const Key('voice_subtitle_color_selector'),
                     optionKeyPrefix: 'voice_subtitle_color_option',
                     title: 'Màu sắc phụ đề',
-                    subtitle: 'Màu chữ hiển thị',
                     icon: Icons.palette_outlined,
                     value: _subtitleColor,
                     options: const <SettingsChoiceOption<int>>[
-                      SettingsChoiceOption<int>(value: 0xFF00E5FF, label: 'Xanh Cyan (Mặc định)'),
-                      SettingsChoiceOption<int>(value: 0xFFFFFFFF, label: 'Trắng'),
-                      SettingsChoiceOption<int>(value: 0xFF00E676, label: 'Xanh Lục'),
-                      SettingsChoiceOption<int>(value: 0xFFFFD700, label: 'Vàng'),
-                      SettingsChoiceOption<int>(value: 0xFFF472B6, label: 'Hồng'),
+                      SettingsChoiceOption<int>(
+                        value: 0xFF00E5FF,
+                        label: 'Xanh Cyan',
+                        swatchColor: Color(0xFF00E5FF),
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 0xFFFFFFFF,
+                        label: 'Trắng',
+                        swatchColor: Color(0xFFFFFFFF),
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 0xFF00E676,
+                        label: 'Xanh Lục',
+                        swatchColor: Color(0xFF00E676),
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 0xFFFFD700,
+                        label: 'Vàng',
+                        swatchColor: Color(0xFFFFD700),
+                      ),
+                      SettingsChoiceOption<int>(
+                        value: 0xFFF472B6,
+                        label: 'Hồng',
+                        swatchColor: Color(0xFFF472B6),
+                      ),
                     ],
                     valueLabelBuilder: (value) {
                       switch (value) {
@@ -546,7 +518,8 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                       await bridgeService.setVoiceSubtitleConfig(color: value);
                     },
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: TvDrawerTokens.rowSpacing),
+
                   // Live Preview Box
                   Container(
                     width: double.infinity,
@@ -589,7 +562,7 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: TvDrawerTokens.surfaceSpacing),
 
             // ==========================================
             // SECTION 4: CHẨN ĐOÁN & CÔNG CỤ
@@ -604,7 +577,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                 children: [
                   actionCard(
                     title: 'Mở thử Voice Overlay',
-                    subtitle: 'Kiểm tra sóng âm',
                     icon: Icons.play_circle_outline,
                     onPressed: () async => _showResult(
                       context,
@@ -613,7 +585,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   ),
                   actionCard(
                     title: 'Sửa quyền Trợ năng',
-                    subtitle: 'Khôi phục dịch vụ nền',
                     icon: Icons.build_circle_outlined,
                     onPressed: () async => _showResult(
                       context,
@@ -622,7 +593,6 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
                   ),
                   actionCard(
                     title: 'Cài đặt Trợ năng Android',
-                    subtitle: 'Mở thiết lập hệ thống',
                     icon: Icons.settings_accessibility,
                     onPressed: () async {
                       bridgeService.openAccessibilitySettings();
@@ -647,3 +617,4 @@ class _VoiceSearchPanelPageState extends State<VoiceSearchPanelPage> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 }
+

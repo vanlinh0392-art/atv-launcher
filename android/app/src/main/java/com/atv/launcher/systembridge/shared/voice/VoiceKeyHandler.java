@@ -33,13 +33,28 @@ public final class VoiceKeyHandler {
     }
 
     public boolean handle(Context context, KeyEvent event) {
+        if (context == null || event == null) {
+            return false;
+        }
         int keyCode = event.getKeyCode();
         int action = event.getAction();
         int repeatCount = event.getRepeatCount();
 
         if (BridgeStateStore.isLearningMode(context)) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                BridgeStateStore.setLearningMode(context, false);
+                try {
+                    VoiceFloatingOverlayManager.getInstance(context).dismissImmediate();
+                } catch (Exception ignored) {}
+                return true;
+            }
             if (action != KeyEvent.ACTION_DOWN || repeatCount != 0) {
                 return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                    || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_HOME) {
+                return false;
             }
             Log.i(tag, source + " learned_key code=" + keyCode);
             BridgeStateStore.setKeyCode(context, keyCode);

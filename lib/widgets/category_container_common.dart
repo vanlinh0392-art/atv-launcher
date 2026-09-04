@@ -1,11 +1,18 @@
+import 'package:flauncher/providers/profile_security_service.dart';
 import 'package:flauncher/widgets/settings/launcher_sections_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
 
 import 'ensure_visible.dart';
 
-Widget categoryContainerEmptyState(BuildContext context) {
+Widget categoryContainerEmptyState(
+  BuildContext context, {
+  bool autofocus = false,
+  FocusNode? focusNode,
+  ValueChanged<bool>? onFocusChange,
+}) {
   AppLocalizations localizations = AppLocalizations.of(context)!;
 
   return SizedBox(
@@ -19,7 +26,7 @@ Widget categoryContainerEmptyState(BuildContext context) {
       // I don't know
       alignment: 0.5,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Align(
           alignment: Alignment.centerLeft,
           child: AspectRatio(
@@ -29,17 +36,36 @@ Widget categoryContainerEmptyState(BuildContext context) {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
               child: InkWell(
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (_) => SettingsPanel(
-                      initialRoute: LauncherSectionsPanelPage.routeName),
-                ),
+                autofocus: autofocus,
+                focusNode: focusNode,
+                onFocusChange: onFocusChange,
+                onTap: () async {
+                  final security = context.read<ProfileSecurityService>();
+                  if (await security.ensureSecurityAccess(context)) {
+                    if (!context.mounted) return;
+                    await showDialog<void>(
+                      context: context,
+                      builder: (_) => const SettingsPanel(
+                        initialRoute: LauncherSectionsPanelPage.routeName,
+                      ),
+                    );
+                    if (context.mounted &&
+                        focusNode != null &&
+                        focusNode.canRequestFocus) {
+                      focusNode.requestFocus();
+                    }
+                  }
+                },
                 child: Padding(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   child: Center(
-                    child: Text(
-                      localizations.textEmptyCategory,
-                      textAlign: TextAlign.center,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        localizations.textEmptyCategory,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                      ),
                     ),
                   ),
                 ),

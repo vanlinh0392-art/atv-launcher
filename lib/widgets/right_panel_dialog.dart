@@ -23,66 +23,76 @@ import 'package:flutter/material.dart';
 class RightPanelDialog extends StatelessWidget {
   final Widget child;
   final double width;
+  final BorderRadiusGeometry? borderRadius;
 
   const RightPanelDialog({
     super.key,
     required this.child,
-    this.width = 960,
+    this.width = TvDrawerTokens.drawerWidth,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
     final chromeSpec = SettingsChromeSpec.of(context);
-    final viewport = MediaQuery.of(context).size;
-    final dialogWidth = width.clamp(720, viewport.width - 48).toDouble();
-    return SafeArea(
-      minimum: const EdgeInsets.symmetric(vertical: 18),
-      child: Padding(
-        padding: EdgeInsets.only(
-          left:
-              (viewport.width - dialogWidth).clamp(24, viewport.width).toDouble(),
-          right: 24,
-        ),
+    final viewport = MediaQuery.sizeOf(context);
+    final dialogWidth = (viewport.width * 0.38).clamp(380.0, 740.0);
+    final effectiveBorderRadius = borderRadius ??
+        BorderRadius.circular(
+          dialogWidth <= 600 ? TvDrawerTokens.drawerRadius : 28.0,
+        );
+
+    return RepaintBoundary(
+      child: SafeArea(
+        minimum: const EdgeInsets.symmetric(vertical: 18),
         child: Align(
           alignment: Alignment.centerRight,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(36),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[
-                  const Color(0xFF0D2036)
-                      .withOpacity(chromeSpec.dialogGradientOpacity),
-                  const Color(0xFF112845)
-                      .withOpacity(chromeSpec.dialogGradientOpacity - 0.03),
-                  const Color(0xFF091523)
-                      .withOpacity(chromeSpec.dialogGradientOpacity - 0.06),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withOpacity(chromeSpec.dialogBorderOpacity),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      Colors.black.withOpacity(chromeSpec.dialogShadowOpacity),
-                  blurRadius: 24,
-                  offset: const Offset(-8, 12),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(36),
-              child: SizedBox(
-                width: dialogWidth,
-                child: Actions(
-                  actions: {BackIntent: BackAction(context)},
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: child,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 24.0),
+            child: SizedBox(
+              width: dialogWidth,
+              child: Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: effectiveBorderRadius,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: chromeSpec.dialogGradientColors,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(
+                              chromeSpec.dialogBorderOpacity,
+                            ),
+                            width: 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(
+                                chromeSpec.dialogShadowOpacity,
+                              ),
+                              blurRadius: 14,
+                              offset: const Offset(-4, 0),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  RepaintBoundary(
+                    child: Actions(
+                      actions: {BackIntent: BackAction(context)},
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: child,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

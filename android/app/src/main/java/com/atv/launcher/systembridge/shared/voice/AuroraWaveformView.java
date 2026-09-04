@@ -71,11 +71,28 @@ public class AuroraWaveformView extends View {
         init();
     }
 
+    private float cachedBarWidth;
+    private float cachedSpacing;
+    private float cachedCornerRadius;
+    private float cachedMinHeight;
+    private float cachedMaxHeight;
+
     private void init() {
         paint.setStyle(Paint.Style.FILL);
         for (int i = 0; i < BAR_COUNT; i++) {
             currentFactors[i] = 0.25f;
         }
+        cachedBarWidth = dpToPx(7);
+        cachedSpacing = dpToPx(5);
+        cachedCornerRadius = dpToPx(10);
+        cachedMinHeight = dpToPx(8);
+        cachedMaxHeight = dpToPx(28);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        stopAnimation();
+        super.onDetachedFromWindow();
     }
 
     public void startAnimation() {
@@ -122,25 +139,19 @@ public class AuroraWaveformView extends View {
         int height = getHeight();
         if (width <= 0 || height <= 0) return;
 
-        float barWidth = dpToPx(7);
-        float spacing = dpToPx(5);
-        float totalWidth = (BAR_COUNT * barWidth) + ((BAR_COUNT - 1) * spacing);
+        float totalWidth = (BAR_COUNT * cachedBarWidth) + ((BAR_COUNT - 1) * cachedSpacing);
         float startX = (width - totalWidth) / 2.0f;
-        float cornerRadius = dpToPx(10);
-
-        float minHeight = dpToPx(8);
-        float maxHeight = dpToPx(28);
 
         for (int i = 0; i < BAR_COUNT; i++) {
             paint.setColor(COLORS[i]);
-            float barH = minHeight + (maxHeight - minHeight) * currentFactors[i];
-            float left = startX + i * (barWidth + spacing);
+            float barH = cachedMinHeight + (cachedMaxHeight - cachedMinHeight) * currentFactors[i];
+            float left = startX + i * (cachedBarWidth + cachedSpacing);
             float top = (height - barH) / 2.0f;
-            float right = left + barWidth;
+            float right = left + cachedBarWidth;
             float bottom = top + barH;
 
             rect.set(left, top, right, bottom);
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint);
+            canvas.drawRoundRect(rect, cachedCornerRadius, cachedCornerRadius, paint);
         }
     }
 

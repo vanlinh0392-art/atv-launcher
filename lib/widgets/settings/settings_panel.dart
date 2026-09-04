@@ -30,6 +30,7 @@ import 'package:flauncher/widgets/settings/launcher_section_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
 import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
 import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
+import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_perf_probe.dart';
@@ -41,6 +42,7 @@ import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flauncher/widgets/settings/update_panel_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 class SettingsPanel extends StatefulWidget {
@@ -115,6 +117,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
     if (_settingsPlaybackSuppressed) {
       _wallpaperService?.setSettingsPlaybackSuppressed(false);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PaintingBinding.instance.imageCache.clear();
+    });
     super.dispose();
   }
 
@@ -132,7 +137,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
             return;
           }
           final handledByInnerNavigator =
-              await _navigatorKey.currentState!.maybePop();
+              await (_navigatorKey.currentState?.maybePop() ?? Future.value(false));
           if (!handledByInnerNavigator && mounted) {
             Navigator.of(context).pop();
           }
@@ -141,6 +146,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
           backgroundColor: Colors.transparent,
           body: Builder(
             builder: (context) {
+              final localizations = AppLocalizations.of(context)!;
+              final settingsService = context.watch<SettingsService?>();
+              final useSideSheet =
+                  settingsService?.useSideSheetSettings ?? true;
+              final panelWidth =
+                  useSideSheet ? TvDrawerTokens.drawerWidth : 1360.0;
               final theme = Theme.of(context);
               final settingsTheme = theme.copyWith(
                 textButtonTheme: TextButtonThemeData(
@@ -162,77 +173,137 @@ class _SettingsPanelState extends State<SettingsPanel> {
               return Theme(
                 data: settingsTheme,
                 child: RightPanelDialog(
-                  width: 1360,
+                  width: panelWidth,
                   child: Navigator(
                     key: _navigatorKey,
-                    initialRoute: widget.selectedRouteOnShell != null
-                        ? SettingsPanelPage.routeName
-                        : (widget.initialRoute ?? SettingsPanelPage.routeName),
+                    initialRoute: SettingsPanelPage.routeName,
+                    onGenerateInitialRoutes: (navigator, initialRoute) {
+                      final targetRoute =
+                          widget.selectedRouteOnShell ?? widget.initialRoute;
+                      final rootRoute = navigator.widget.onGenerateRoute!(
+                        const RouteSettings(name: SettingsPanelPage.routeName),
+                      )!;
+                      if (targetRoute != null &&
+                          targetRoute != SettingsPanelPage.routeName) {
+                        final detailRoute = navigator.widget.onGenerateRoute!(
+                          RouteSettings(name: targetRoute),
+                        )!;
+                        return [rootRoute, detailRoute];
+                      }
+                      return [rootRoute];
+                    },
                     onGenerateRoute: (settings) {
                       switch (settings.name) {
                         case SettingsPanelPage.routeName:
                           return MaterialPageRoute(
                             builder: (_) => SettingsPanelPage(
-                              initialSelectedRoute: widget.selectedRouteOnShell,
-                              autoFocusDetailOnOpen:
-                                  widget.autoFocusDetailOnOpen,
+                              initialSelectedRoute:
+                                  widget.selectedRouteOnShell ?? widget.initialRoute,
                               onBenchmarkReady: _perfProbe == null
                                   ? null
                                   : _perfProbe!.markReady,
-                              onBenchmarkDpadSample: _perfProbe == null
-                                  ? null
-                                  : _perfProbe!.recordDpadSample,
                             ),
                           );
                         case HomeLayoutPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => HomeLayoutPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationHomeTitle,
+                            useSideSheet: useSideSheet,
+                            child: HomeLayoutPanelPage(),
+                          );
                         case WallpaperPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => WallpaperPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationWallpaperTitle,
+                            useSideSheet: useSideSheet,
+                            child: WallpaperPanelPage(),
+                          );
                         case VoiceSearchPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => VoiceSearchPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationVoiceTitle,
+                            useSideSheet: useSideSheet,
+                            child: VoiceSearchPanelPage(),
+                          );
                         case ProfilesSecurityPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => ProfilesSecurityPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationProfilesTitle,
+                            useSideSheet: useSideSheet,
+                            child: ProfilesSecurityPanelPage(),
+                          );
                         case AccessibilityManagerPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => AccessibilityManagerPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationAccessibilityTitle,
+                            useSideSheet: useSideSheet,
+                            child: AccessibilityManagerPanelPage(),
+                          );
                         case SystemCorePanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => SystemCorePanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationSystemCoreTitle,
+                            useSideSheet: useSideSheet,
+                            child: SystemCorePanelPage(),
+                          );
                         case DensityPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => DensityPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationDensityTitle,
+                            useSideSheet: useSideSheet,
+                            child: DensityPanelPage(),
+                          );
                         case PrivateDnsPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => PrivateDnsPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationPrivateDnsTitle,
+                            useSideSheet: useSideSheet,
+                            child: PrivateDnsPanelPage(),
+                          );
                         case PermissionsPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => PermissionsPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationPermissionsTitle,
+                            useSideSheet: useSideSheet,
+                            child: PermissionsPanelPage(),
+                          );
                         case BackupRestorePanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => BackupRestorePanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationBackupTitle,
+                            useSideSheet: useSideSheet,
+                            child: BackupRestorePanelPage(),
+                          );
                         case UpdatePanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => UpdatePanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.settingsDestinationUpdatesTitle,
+                            useSideSheet: useSideSheet,
+                            child: UpdatePanelPage(),
+                          );
                         case StatusBarPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => StatusBarPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.statusBar,
+                            useSideSheet: useSideSheet,
+                            child: StatusBarPanelPage(),
+                          );
                         case GradientPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => GradientPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.gradient,
+                            useSideSheet: useSideSheet,
+                            child: GradientPanelPage(),
+                          );
                         case ApplicationsPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => ApplicationsPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.tvApplications,
+                            useSideSheet: useSideSheet,
+                            child: ApplicationsPanelPage(),
+                          );
                         case LauncherSectionsPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => LauncherSectionsPanelPage());
+                          return _buildSubPanelRoute(
+                            title: localizations.launcherSections,
+                            useSideSheet: useSideSheet,
+                            child: LauncherSectionsPanelPage(),
+                          );
                         case LauncherSectionPanelPage.routeName:
-                          return MaterialPageRoute(
-                              builder: (_) => LauncherSectionPanelPage(
-                                  sectionIndex: settings.arguments as int?));
+                          return _buildSubPanelRoute(
+                            title: (settings.arguments as int?) == null
+                                ? localizations.newSection
+                                : localizations.modifySection,
+                            useSideSheet: useSideSheet,
+                            child: LauncherSectionPanelPage(
+                              sectionIndex: settings.arguments as int?,
+                            ),
+                          );
                         default:
                           throw ArgumentError.value(
                             settings.name,
@@ -248,6 +319,26 @@ class _SettingsPanelState extends State<SettingsPanel> {
           ),
         ),
       );
+
+  MaterialPageRoute _buildSubPanelRoute({
+    required String title,
+    required Widget child,
+    required bool useSideSheet,
+  }) {
+    return MaterialPageRoute(
+      builder: (_) {
+        if (!useSideSheet) {
+          return child;
+        }
+        return SettingsContentView(
+          title: title,
+          showBackButton: true,
+          onBack: () => _navigatorKey.currentState?.maybePop(),
+          child: child,
+        );
+      },
+    );
+  }
 
   void _logPerf(String marker) {
     if (!kDebugMode) {

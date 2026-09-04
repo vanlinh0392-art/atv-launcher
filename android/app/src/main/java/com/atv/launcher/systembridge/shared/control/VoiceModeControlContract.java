@@ -4,8 +4,10 @@ public final class VoiceModeControlContract {
     public static final String CORE_PACKAGE = "com.atv.systembridge.core";
     public static final String RECEIVER_CLASS =
             "com.atv.systembridge.shared.control.VoiceModeControlReceiver";
-    public static final String ACTION_GET_MODE = "com.atv.systembridge.control.GET_MODE";
-    public static final String ACTION_SET_MODE = "com.atv.systembridge.control.SET_MODE";
+    public static final String ACTION_GET_MODE = "com.atv.launcher.control.GET_MODE";
+    public static final String ACTION_SET_MODE = "com.atv.launcher.control.SET_MODE";
+    public static final String LEGACY_ACTION_GET_MODE = "com.atv.systembridge.control.GET_MODE";
+    public static final String LEGACY_ACTION_SET_MODE = "com.atv.systembridge.control.SET_MODE";
     public static final String EXTRA_MODE = "mode";
     public static final String EXTRA_KEY_CODE = "key_code";
     public static final String EXTRA_LEARNING_MODE = "learning_mode";

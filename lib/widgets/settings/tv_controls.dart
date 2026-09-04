@@ -51,15 +51,12 @@ class SettingsActionCard extends StatefulWidget {
     this.autofocus = false,
     this.focusEmphasis = 1.3,
     this.onMoveUpAtBoundary,
-    this.contentPadding = const EdgeInsets.symmetric(
-      horizontal: 16,
-      vertical: 14,
-    ),
+    this.contentPadding = TvDrawerTokens.cardPadding,
     this.titleMaxLines = 2,
     this.subtitleMaxLines = 2,
     this.titleSubtitleSpacing = 3,
-    this.iconSize = 24,
-    this.trailingIconSize = 24,
+    this.iconSize = 22,
+    this.trailingIconSize = 20,
   });
 
   @override
@@ -150,11 +147,20 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
           }
           return KeyEventResult.ignored;
         },
-        child: SettingsFocusFrame(
-          padding: EdgeInsets.zero,
-          variant: SettingsFocusFrameVariant.rowOnly,
-          focusEmphasis: widget.focusEmphasis,
-          focused: _focused,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: widget.subtitle == null
+                ? TvDrawerTokens.cardMinHeight
+                : TvDrawerTokens.cardMinHeightWithSubtitle,
+          ),
+          child: SettingsFocusFrame(
+            padding: EdgeInsets.zero,
+            borderRadius: const BorderRadius.all(
+              Radius.circular(TvDrawerTokens.radiusCard),
+            ),
+            variant: SettingsFocusFrameVariant.rowOnly,
+            focusEmphasis: widget.focusEmphasis,
+            focused: _focused,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: enabled ? () => widget.onPressed!.call() : null,
@@ -216,7 +222,8 @@ class _SettingsActionCardState extends State<SettingsActionCard> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _configureFocusNode() {
@@ -233,7 +240,7 @@ class SettingsChoiceCard<T> extends StatefulWidget {
   final String? optionKeyPrefix;
   final FocusNode? focusNode;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final IconData icon;
   final T value;
   final List<SettingsChoiceOption<T>> options;
@@ -247,7 +254,7 @@ class SettingsChoiceCard<T> extends StatefulWidget {
     this.optionKeyPrefix,
     this.focusNode,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.icon,
     required this.value,
     required this.options,
@@ -302,7 +309,11 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
   }
 
   @override
-  Widget build(BuildContext context) => EnsureVisible(
+  Widget build(BuildContext context) {
+    final selectedOption = widget.options
+        .cast<SettingsChoiceOption<T>?>()
+        .firstWhere((o) => o?.value == widget.value, orElse: () => null);
+    return EnsureVisible(
         alignment: EnsureVisible.settingsAlignment,
         settleFrameCount: 1,
         preferImmediate: true,
@@ -321,6 +332,10 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
             child: SettingsFocusFrame(
               key: widget.selectorKey,
               variant: SettingsFocusFrameVariant.rowOnly,
+              borderRadius: const BorderRadius.all(
+                Radius.circular(TvDrawerTokens.radiusCard),
+              ),
+              padding: TvDrawerTokens.cardPadding,
               focused: _hasFocus,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 120),
@@ -330,7 +345,9 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: widget.subtitle != null
+                          ? CrossAxisAlignment.start
+                          : CrossAxisAlignment.center,
                       children: [
                         Icon(
                           widget.icon,
@@ -353,38 +370,61 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                                           ? Colors.white38
                                           : Colors.white,
                                       fontWeight: _hasFocus
-                                          ? FontWeight.w600
+                                          ? FontWeight.w700
                                           : FontWeight.w500,
                                     ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.subtitle,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: widget.onChanged == null
-                                          ? Colors.white38
-                                          : Colors.white70,
-                                    ),
-                              ),
+                              if (widget.subtitle != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.subtitle!,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: widget.onChanged == null
+                                            ? Colors.white38
+                                            : Colors.white70,
+                                      ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          widget.valueLabelBuilder(widget.value),
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: widget.onChanged == null
-                                        ? Colors.white38
-                                        : (_hasFocus
-                                            ? Colors.white
-                                            : Colors.white.withOpacity(0.92)),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
+                        if (selectedOption?.swatchColor != null)
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: selectedOption!.swatchColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.5),
+                                width: 1.5,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x40000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Text(
+                            widget.valueLabelBuilder(widget.value),
+                            style:
+                                Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: widget.onChanged == null
+                                          ? Colors.white38
+                                          : (_hasFocus
+                                              ? Colors.white
+                                              : Colors.white.withOpacity(0.92)),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                          ),
                       ],
                     ),
                     if (_hasFocus)
@@ -397,11 +437,14 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                             widget.options.length,
                             (index) {
                               final option = widget.options[index];
+                              final isSelected = option.value == widget.value;
                               final buttonKeyPrefix = widget.optionKeyPrefix;
                               final button = SettingsControlButton(
                                 focusNode: _optionFocusNodes[index],
-                                selected: option.value == widget.value,
+                                selected: isSelected,
                                 enabled: widget.onChanged != null,
+                                isCircle: option.swatchColor != null,
+                                swatchColor: option.swatchColor,
                                 onPressed: widget.onChanged == null
                                     ? null
                                     : () => widget.onChanged!(option.value),
@@ -418,7 +461,10 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
                                         ? () => _optionFocusNodes[index + 1]
                                             .requestFocus()
                                         : null,
-                                child: _ChoiceOptionContent(option: option),
+                                child: _ChoiceOptionContent(
+                                  option: option,
+                                  selected: isSelected,
+                                ),
                               );
                               if (buttonKeyPrefix == null) {
                                 return button;
@@ -440,6 +486,7 @@ class _SettingsChoiceCardState<T> extends State<SettingsChoiceCard<T>> {
           ),
         ),
       );
+  }
 
   List<FocusNode> _buildOptionFocusNodes() => List<FocusNode>.generate(
         widget.options.length,
@@ -563,7 +610,7 @@ class SettingsStepperCard extends StatefulWidget {
   final String? buttonKeyPrefix;
   final FocusNode? focusNode;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final IconData icon;
   final int value;
   final int minimum;
@@ -579,7 +626,7 @@ class SettingsStepperCard extends StatefulWidget {
     this.buttonKeyPrefix,
     this.focusNode,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.icon,
     required this.value,
     required this.minimum,
@@ -648,6 +695,10 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
           child: SettingsFocusFrame(
             key: widget.selectorKey,
             variant: SettingsFocusFrameVariant.rowOnly,
+            borderRadius: const BorderRadius.all(
+              Radius.circular(TvDrawerTokens.radiusCard),
+            ),
+            padding: TvDrawerTokens.cardPadding,
             focused: _hasFocus,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 120),
@@ -656,7 +707,9 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: widget.subtitle != null
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.center,
                     children: [
                       Icon(
                         widget.icon,
@@ -679,22 +732,24 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                                         ? Colors.white38
                                         : Colors.white,
                                     fontWeight: _hasFocus
-                                        ? FontWeight.w600
+                                        ? FontWeight.w700
                                         : FontWeight.w500,
                                   ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.subtitle,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: widget.onChanged == null
-                                        ? Colors.white38
-                                        : Colors.white70,
-                                  ),
-                            ),
+                            if (widget.subtitle != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.subtitle!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: widget.onChanged == null
+                                          ? Colors.white38
+                                          : Colors.white70,
+                                    ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -737,13 +792,12 @@ class _SettingsStepperCardState extends State<SettingsStepperCard> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
+                              padding: TvDrawerTokens.cardPadding,
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(
+                                  TvDrawerTokens.radiusCard,
+                                ),
                                 border: Border.all(
                                   color: Colors.white.withOpacity(0.06),
                                 ),
@@ -1049,34 +1103,35 @@ bool _moveVerticalFocusOutsideCluster({
 
 class _ChoiceOptionContent<T> extends StatelessWidget {
   final SettingsChoiceOption<T> option;
+  final bool selected;
 
   const _ChoiceOptionContent({
     required this.option,
+    this.selected = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (option.swatchColor == null) {
+    final swatchColor = option.swatchColor;
+    if (swatchColor == null) {
       return Text(option.label);
     }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            color: option.swatchColor,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.75),
-              width: 1.2,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(child: Text(option.label)),
-      ],
+    final iconColor =
+        ThemeData.estimateBrightnessForColor(swatchColor) == Brightness.light
+            ? Colors.black87
+            : Colors.white;
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: selected
+          ? Center(
+              child: Icon(
+                Icons.check_rounded,
+                size: 20,
+                color: iconColor,
+              ),
+            )
+          : null,
     );
   }
 }
@@ -1086,6 +1141,8 @@ class SettingsControlButton extends StatefulWidget {
   final Widget child;
   final bool selected;
   final bool enabled;
+  final bool isCircle;
+  final Color? swatchColor;
   final VoidCallback? onPressed;
   final VoidCallback? onMovePreviousOnLeft;
   final VoidCallback? onMoveBackOnLeft;
@@ -1098,6 +1155,8 @@ class SettingsControlButton extends StatefulWidget {
     required this.child,
     required this.selected,
     this.enabled = true,
+    this.isCircle = false,
+    this.swatchColor,
     this.onPressed,
     this.onMovePreviousOnLeft,
     this.onMoveBackOnLeft,
@@ -1117,6 +1176,110 @@ class _SettingsControlButtonState extends State<SettingsControlButton> {
     final chromeSpec = SettingsChromeSpec.of(context);
     final selected = widget.selected;
     final enabled = widget.enabled;
+    final isSwatch = widget.isCircle || widget.swatchColor != null;
+
+    if (isSwatch) {
+      final swatchColor = widget.swatchColor ?? Colors.transparent;
+      return Focus(
+        focusNode: widget.focusNode,
+        canRequestFocus: enabled,
+        onFocusChange: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+          if (value) {
+            widget.onFocused?.call();
+          }
+        },
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+              widget.onMovePreviousOnLeft != null) {
+            widget.onMovePreviousOnLeft!.call();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+              widget.onMoveBackOnLeft != null) {
+            widget.onMoveBackOnLeft!.call();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+              widget.onMoveNextOnRight != null) {
+            widget.onMoveNextOnRight!.call();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            return KeyEventResult.handled;
+          }
+          if (isSettingsActivateKey(event.logicalKey) && enabled) {
+            widget.onPressed?.call();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? widget.onPressed : null,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 110),
+                curve: Curves.easeOutCubic,
+                scale: _focused ? 1.15 : 1.0,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 110),
+                  curve: Curves.easeOutCubic,
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: swatchColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _focused
+                          ? const Color(0xFF00E5FF)
+                          : (selected
+                              ? Colors.white.withOpacity(0.9)
+                              : Colors.white.withOpacity(0.25)),
+                      width: _focused ? 2.0 : (selected ? 2.0 : 1.2),
+                    ),
+                    boxShadow: _focused
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x9900E5FF),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : (selected
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.35),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null),
+                  ),
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 110),
+                    opacity: enabled ? 1.0 : 0.42,
+                    child: widget.child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final visuals = SettingsButtonStyles.resolveControlVisuals(
       chromeSpec,
       variant: selected

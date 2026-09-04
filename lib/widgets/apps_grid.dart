@@ -63,7 +63,15 @@ class AppsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget categoryContent;
     if (applications.isEmpty) {
-      categoryContent = categoryContainerEmptyState(context);
+      categoryContent = categoryContainerEmptyState(
+        context,
+        autofocus: autofocusFirstItem,
+        onFocusChange: (hasFocus) {
+          if (hasFocus) {
+            onApplicationFocused?.call(category.name, context, 0);
+          }
+        },
+      );
     } else {
       categoryContent = LayoutBuilder(
         builder: (context, constraints) {

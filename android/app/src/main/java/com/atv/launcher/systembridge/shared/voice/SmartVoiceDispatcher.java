@@ -46,7 +46,7 @@ public final class SmartVoiceDispatcher {
     public static final String TYPE_ASSISTANT_FALLBACK = "assistant_fallback";
 
     private static final Pattern CHANNEL_PATTERN = Pattern.compile(
-            "^(?:mở|bật|xem|chuyển\\s*(?:sang)?|kênh)?\\s*(?:kênh|kenh)?\\s*(vtv\\s*\\d+|vtv\\s*cần\\s*thơ|vtv\\s*can\\s*tho|thvl\\s*\\d+|htv\\s*\\d+|vtc\\s*\\d+|sctv\\s*\\d+|antv|qpvn|bóng\\s*đá|thể\\s*thao|k\\+\\s*\\w+)",
+            "^(?:mở|bật|xem|chuyển\\s*(?:sang|qua)?|bật\\s*cho\\s*tôi|mở\\s*(?:hộ|giúp|dùm))?\\s*(?:kênh|kenh)?\\s*(vtv\\s*\\d+|vtv\\s*cần\\s*thơ|vtv\\s*can\\s*tho|thvl\\s*\\d+|htv\\s*\\d+|vtc\\s*\\d+|sctv\\s*\\d+|antv|qpvn|bóng\\s*đá|bong\\s*da|thể\\s*thao|the\\s*thao|k\\+\\s*\\w+)",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -100,7 +100,7 @@ public final class SmartVoiceDispatcher {
 
     public static Map<String, Object> dispatch(Context context, String rawQuery) {
         Map<String, Object> result = new LinkedHashMap<>();
-        if (context == null || TextUtils.isEmpty(rawQuery)) {
+        if (context == null || TextUtils.isEmpty(rawQuery) || TextUtils.isEmpty(rawQuery.trim())) {
             result.put("success", false);
             result.put("type", "none");
             result.put("message", "Query is empty");

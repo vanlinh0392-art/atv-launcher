@@ -5,6 +5,31 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-09-04 - Official release 2026.09.004 — Tùy biến Nút Quay lại (Nhấn 1 lần & Nhấn giữ), Tinh gọn Giao diện Cài đặt & Tối ưu Wake Focus
+
+### 1. Tùy Biến Hành Động Nút Quay Lại (Single Press & Long Press)
+- **Tách Biệt 2 Cấu Hình Độc Lập**: Cho phép gán hành động riêng biệt cho sự kiện "Nhấn 1 lần" và "Nhấn giữ" (giữ phím Back ~500ms) ngay trong Cài đặt Giao diện trang chủ.
+- **Hệ Thống 8 Hành Động Tiện Ích Đa Dạng**:
+  1. *Không làm gì* (`NOTHING`)
+  2. *Bật / Tắt tiếng TV (Mute)* (`TOGGLE_MUTE`): Điều khiển âm lượng phần cứng TV qua AudioManager Native.
+  3. *Ẩn / Hiện đồng hồ* (`CLOCK`): Tắt/bật widget đồng hồ tức thì.
+  4. *Mở trình bảo vệ màn hình* (`SCREENSAVER`): Kích hoạt screensaver hệ thống Android TV.
+  5. *Mở Cài đặt TV* (`TV_SETTINGS`): Vào cài đặt gốc của tivi.
+  6. *Mở Cài đặt FLauncher* (`FLAUNCHER_SETTINGS`): Mở nhanh bảng cài đặt launcher.
+  7. *Mở danh sách ứng dụng* (`APP_DRAWER`): Mở ngăn kéo toàn bộ ứng dụng.
+  8. *Tắt màn hình TV / Chế độ ngủ* (`SLEEP`): Đưa TV về chế độ chờ/ngủ an toàn.
+- **Điều Hướng Thông Minh Chuẩn Android TV UX**:
+  + Khi đang mở menu con, dialog hoặc bảng cài đặt (`canPop() == true`): Phím Back đóng menu tức thì (0ms latency), không có độ trễ phân biệt giữ phím.
+  + Khi đang ở màn hình Home: Bộ đếm thời gian phân định chính xác nhấn đơn vs nhấn giữ, triệt tiêu key repeat và chống kích hoạt nhầm khi nhả phím.
+
+### 2. Tinh Gọn Giao Diện Bảng Cài Đặt (Compact UI / UX Pro Max)
+- **Ảnh Chụp System Core Tối Giản**: Tinh giản thẻ thông tin System Core chỉ hiển thị 2-3 thông số trọng yếu nhất (Trạng thái Core, Bộ nhớ/Uptime), không kéo dài danh sách gây vướng mắt.
+- **Hộp Thoại Cập Nhật Gọn Gàng**: Tối ưu khối kiểm tra phiên bản mới, hiển thị súc tích thông tin bản phát hành, dung lượng và trạng thái tải.
+
+### 3. Tối Ưu Phục Hồi Focus Khi Đánh Thức Từ Chế Độ Ngủ Sâu
+- **Cơ Chế Phục Hồi Dpad Focus Đa Tầng**: Tự động phục hồi focus vào ứng dụng đầu tiên hoặc vị trí trước đó khi TV thức dậy từ trạng thái Deep Sleep / Standby Wake.
+- **Cấp Quyền Tự Động Qua Local ADB Bridge**: Hoàn thiện pipeline tự cấp quyền an toàn và khởi động dịch vụ bảo vệ nền mượt mà.
+
 ## 2026-08-28 - Official release 2026.08.025 — Instant Video Wallpaper On Home & Sleep Wake With Self-Healing Surface Architecture
 
 ### 1. Phát Video Nền Tức Thì 0-Delay Khi Về Home & Thức Dậy Từ Chế Độ Ngủ

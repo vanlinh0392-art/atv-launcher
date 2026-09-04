@@ -26,6 +26,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public final class AiVoiceAssistantClient {
     private static final String TAG = "AiVoiceAssistant";
@@ -164,7 +167,11 @@ public final class AiVoiceAssistantClient {
         return TV_SYSTEM_PROMPT;
     }
 
-    private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private static final ExecutorService executor = new ThreadPoolExecutor(
+            2, 4, 30L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(20),
+            new ThreadPoolExecutor.DiscardOldestPolicy()
+    );
 
     public static class ModelTarget {
         public final String provider;
@@ -523,6 +530,9 @@ public final class AiVoiceAssistantClient {
         String text = raw;
         if (text.contains("</think>")) {
             text = text.substring(text.lastIndexOf("</think>") + 8).trim();
+        } else if (text.contains("<think>")) {
+            int thinkStart = text.indexOf("<think>");
+            text = text.substring(0, thinkStart).trim();
         }
         if (text.startsWith("Here's a thinking process") || text.startsWith("Here is a thinking process")) {
             int doubleNewline = text.indexOf("\n\n");
@@ -530,6 +540,7 @@ public final class AiVoiceAssistantClient {
                 text = text.substring(doubleNewline + 2).trim();
             }
         }
+        text = text.replaceAll("```[a-zA-Z]*", "").replaceAll("```", "");
         return text.replaceAll("(\\*\\*|\\*|###|##|#|`|_)", "").trim();
     }
 

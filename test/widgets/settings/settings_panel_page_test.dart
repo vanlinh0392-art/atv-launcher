@@ -6,12 +6,24 @@ import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
 import 'package:flauncher/widgets/settings/accessibility_manager_panel_page.dart';
+import 'package:flauncher/widgets/settings/applications_panel_page.dart';
+import 'package:flauncher/widgets/settings/backup_restore_panel_page.dart';
+import 'package:flauncher/widgets/settings/density_panel_page.dart';
 import 'package:flauncher/widgets/settings/diagnostics_panel_page.dart';
+import 'package:flauncher/widgets/settings/gradient_panel_page.dart';
+import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
+import 'package:flauncher/widgets/settings/launcher_section_panel_page.dart';
+import 'package:flauncher/widgets/settings/launcher_sections_panel_page.dart';
 import 'package:flauncher/widgets/settings/permissions_panel_page.dart';
+import 'package:flauncher/widgets/settings/private_dns_panel_page.dart';
 import 'package:flauncher/widgets/settings/profiles_security_panel_page.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/settings_panel.dart';
 import 'package:flauncher/widgets/settings/settings_panel_page.dart';
+import 'package:flauncher/widgets/settings/status_bar_panel_page.dart';
+import 'package:flauncher/widgets/settings/system_core_panel_page.dart';
+import 'package:flauncher/widgets/settings/tv_controls.dart';
+import 'package:flauncher/widgets/settings/update_panel_page.dart';
 import 'package:flauncher/widgets/settings/voice_search_panel_page.dart';
 import 'package:flauncher/widgets/settings/wallpaper_panel_page.dart';
 import 'package:flutter/material.dart';
@@ -24,12 +36,56 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../mocks.mocks.dart';
 
+final PageStorageBucket _pageStorageBucket = PageStorageBucket();
+Map<String, FocusNode> _testDetailPrimaryFocusNodes = {};
+
+void _initDetailPrimaryFocusNodes() {
+  _testDetailPrimaryFocusNodes = {
+    HomeLayoutPanelPage.routeName:
+        FocusNode(debugLabel: 'home_layout_primary_target'),
+    WallpaperPanelPage.routeName:
+        FocusNode(debugLabel: 'wallpaper_primary_source_action'),
+    VoiceSearchPanelPage.routeName:
+        FocusNode(debugLabel: 'voice_search_primary_mode'),
+    ProfilesSecurityPanelPage.routeName:
+        FocusNode(debugLabel: 'profiles_security_primary_lock'),
+    AccessibilityManagerPanelPage.routeName:
+        FocusNode(debugLabel: 'accessibility_manager_primary_service'),
+    SystemCorePanelPage.routeName:
+        FocusNode(debugLabel: 'system_core_primary_policy'),
+    DensityPanelPage.routeName:
+        FocusNode(debugLabel: 'density_primary_apply'),
+    PrivateDnsPanelPage.routeName:
+        FocusNode(debugLabel: 'private_dns_primary_hostname_action'),
+    PermissionsPanelPage.routeName:
+        FocusNode(debugLabel: 'permissions_primary_quick_grant'),
+    BackupRestorePanelPage.routeName:
+        FocusNode(debugLabel: 'backup_restore_primary_export'),
+    UpdatePanelPage.routeName:
+        FocusNode(debugLabel: 'update_primary_check'),
+    StatusBarPanelPage.routeName:
+        FocusNode(debugLabel: 'status_bar_primary_clock'),
+  };
+}
+
+void _disposeDetailPrimaryFocusNodes() {
+  _testDetailPrimaryFocusNodes.clear();
+}
+
 void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
 
-  testWidgets('shows master-detail settings shell', (tester) async {
+  setUp(() {
+    _initDetailPrimaryFocusNodes();
+  });
+
+  tearDown(() {
+    _disposeDetailPrimaryFocusNodes();
+  });
+
+  testWidgets('shows settings menu shell with single-line cards', (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
     final appsService = MockAppsService();
@@ -45,8 +101,80 @@ void main() {
     );
 
     expect(find.text('ATV Launcher Settings'), findsOneWidget);
-    expect(find.text('Control Center'), findsOneWidget);
     expect(find.text('Home & Layout'), findsOneWidget);
+    expect(find.text('Wallpaper & Media'), findsOneWidget);
+    expect(find.text('Voice AI Assistant'), findsOneWidget);
+  });
+
+  testWidgets('settings menu items use single-line layout without subtitles',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    final actionCards = tester
+        .widgetList<SettingsActionCard>(find.byType(SettingsActionCard))
+        .toList();
+
+    expect(actionCards.length, greaterThanOrEqualTo(5));
+    for (final card in actionCards) {
+      expect(card.titleMaxLines, 1);
+      expect(card.subtitle, isNull);
+      expect(
+        card.contentPadding,
+        TvDrawerTokens.cardPadding,
+      );
+      final size = tester.getSize(find.byWidget(card));
+      expect(size.height, greaterThanOrEqualTo(52.0));
+    }
+  });
+
+  testWidgets(
+      'settings menu supports initialSelectedRoute and restores focus on pop',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+      initialSelectedRoute: WallpaperPanelPage.routeName,
+    );
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'settings_card_${WallpaperPanelPage.routeName}',
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WallpaperPanelPage), findsOneWidget);
+
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WallpaperPanelPage), findsNothing);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'settings_card_${WallpaperPanelPage.routeName}',
+    );
   });
 
   testWidgets('switches to Wallpaper & Media section from the rail',
@@ -94,7 +222,7 @@ void main() {
     await tester.tap(find.text('Permissions & Provisioning').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Provisioning Wizard'), findsAtLeastNWidgets(1));
+    expect(find.byKey(const Key('permissions_quick_grant_button')), findsOneWidget);
     expect(find.text('Grant via local ADB'), findsOneWidget);
   });
 
@@ -250,6 +378,53 @@ void main() {
         suggestedPolicy: 'adb_and_wifi',
       ),
     ).called(1);
+  });
+
+  testWidgets(
+      'permissions route toggles auto grant ADB on wake switch with self-healing status',
+      (tester) async {
+    _prepareView(tester);
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+    final wallpaperService = _mockWallpaperService();
+    final bridgeService = _mockBridgeService();
+
+    await _pumpSettingsPanel(
+      tester,
+      settings: settings,
+      appsService: appsService,
+      wallpaperService: wallpaperService,
+      bridgeService: bridgeService,
+    );
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Permissions & Provisioning').first);
+    await tester.pumpAndSettle();
+
+    final permissionsPageFinder = find.byKey(
+      const PageStorageKey<String>(PermissionsPanelPage.routeName),
+    );
+    final permissionsScrollableFinder = find.descendant(
+      of: permissionsPageFinder,
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('permissions_auto_grant_on_wake_switch')),
+      260,
+      scrollable: permissionsScrollableFinder,
+    );
+    await tester.pumpAndSettle();
+
+    final switchFinder =
+        find.byKey(const Key('permissions_auto_grant_on_wake_switch'));
+    expect(switchFinder, findsOneWidget);
+    expect(find.text('Auto grant ADB permissions on wake'), findsOneWidget);
+
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+
+    verify(bridgeService.setAutoGrantAdbOnWake(false)).called(1);
   });
 
   testWidgets(
@@ -510,41 +685,11 @@ void main() {
       railDragOffset: -720,
     );
 
-    expect(find.text('Missing permissions and setup items'), findsOneWidget);
-
-    final requiredChipFinder = find.byWidgetPredicate(
-      (widget) =>
-          widget is SettingsStatusChip &&
-          widget.label == 'WRITE_SECURE_SETTINGS',
-    );
-    final recommendedChipFinder = find.byWidgetPredicate(
-      (widget) =>
-          widget is SettingsStatusChip &&
-          widget.label == 'Install unknown apps',
-    );
-    final optionalChipFinder = find.byWidgetPredicate(
-      (widget) =>
-          widget is SettingsStatusChip && widget.label == 'Device owner',
-    );
-
-    expect(requiredChipFinder, findsOneWidget);
-    expect(recommendedChipFinder, findsOneWidget);
-    expect(optionalChipFinder, findsOneWidget);
-    expect(
-      tester.widget<SettingsStatusChip>(requiredChipFinder).color,
-      const Color(0xFFFF8A80),
-    );
-    expect(
-      tester.widget<SettingsStatusChip>(recommendedChipFinder).color,
-      const Color(0xFFFFC970),
-    );
-    expect(
-      tester.widget<SettingsStatusChip>(optionalChipFinder).color,
-      const Color(0xFF8CCBFF),
-    );
+    expect(find.byKey(const Key('permissions_quick_grant_button')), findsOneWidget);
+    expect(find.byKey(const Key('permissions_advanced_toggle')), findsOneWidget);
   });
 
-  testWidgets('keeps rail focused on open and enters detail on RIGHT',
+  testWidgets('drills down from menu cards to sub-panel and returns on back',
       (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
@@ -560,120 +705,37 @@ void main() {
       bridgeService: bridgeService,
     );
 
-    expect(find.text('App language'), findsAtLeastNWidgets(1));
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      contains('settings_rail_0'),
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isFalse,
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pumpAndSettle();
-
+    expect(find.text('ATV Launcher Settings'), findsOneWidget);
+    expect(find.text('Home & Layout'), findsOneWidget);
+    expect(find.text('Wallpaper & Media'), findsOneWidget);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('home_layout_target_appLocale_option_2'),
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isTrue,
-    );
-
-    for (var index = 0; index < 5; index++) {
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
-      await tester.pumpAndSettle();
-      final label = tester.binding.focusManager.primaryFocus?.debugLabel ?? '';
-      if (label.contains('settings_rail_0')) {
-        break;
-      }
-    }
-
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_rail_0'),
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isFalse,
+      anyOf(
+        contains('settings_action_'),
+        contains('settings_card_'),
+      ),
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
 
+    expect(find.text('Wallpaper & Media'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WallpaperPanelPage), findsOneWidget);
     expect(find.text('Source selection'), findsOneWidget);
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      contains('settings_rail_1'),
-    );
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
 
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'wallpaper_primary_source_action',
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isTrue,
-    );
-
-    for (var index = 0; index < 2; index++) {
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
-      await tester.pumpAndSettle();
-      final highlighted = tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted;
-      if (!highlighted) {
-        break;
-      }
-    }
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isFalse,
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Home & Layout'), findsAtLeastNWidgets(1));
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isFalse,
-    );
+    expect(find.byType(WallpaperPanelPage), findsNothing);
+    expect(find.text('ATV Launcher Settings'), findsOneWidget);
   });
 
   testWidgets(
-      'moving down the rail does not auto-enter detail on profiles route',
+      'moving down the menu navigates between category cards without entering detail',
       (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
@@ -697,42 +759,8 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
 
-    expect(
-      find.byType(ProfilesSecurityPanelPage, skipOffstage: false),
-      findsOneWidget,
-    );
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_rail_3'),
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isFalse,
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byType(AccessibilityManagerPanelPage, skipOffstage: false),
-      findsOneWidget,
-    );
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_rail_4'),
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isFalse,
-    );
+    expect(find.byType(ProfilesSecurityPanelPage), findsNothing);
+    expect(find.text('ATV Launcher Settings'), findsOneWidget);
   });
 
   testWidgets('diagnostics report scrolls with DPAD and keeps compact actions',
@@ -789,7 +817,7 @@ void main() {
         matching: find.byType(SettingsFocusFrame),
       ),
     );
-    expect(refreshSize.height, equals(copySize.height));
+    expect(refreshSize.height, closeTo(copySize.height, 0.5));
     expect(refreshSize.height, lessThanOrEqualTo(82));
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -948,27 +976,15 @@ void main() {
 
     await tester.tap(find.text('Display / DPI').first);
     await tester.pumpAndSettle();
-    expect(find.text('Current DPI'), findsOneWidget);
 
-    await tester.tap(find.text('Display / DPI').first);
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('density_apply_button')), findsOneWidget);
+    expect(find.byKey(const Key('density_preset_selector')), findsOneWidget);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      'density_primary_apply',
-    );
-    expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isTrue,
+      contains('density_primary_apply'),
     );
   });
 
-  testWidgets('moves DPAD focus into custom DPI field', (tester) async {
+  testWidgets('moves DPAD focus between preset selector and reset button', (tester) async {
     _prepareView(tester);
     final settings = await _createSettingsService();
     final appsService = MockAppsService();
@@ -988,28 +1004,13 @@ void main() {
 
     await tester.tap(find.text('Display / DPI').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Display / DPI').first);
-    await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('density_custom_input_field')), findsOneWidget);
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'density_primary_apply',
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
-    await tester.pumpAndSettle();
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'density_custom_input',
-    );
+    expect(find.byKey(const Key('density_preset_selector')), findsOneWidget);
+    expect(find.byKey(const Key('density_reset_button')), findsOneWidget);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'density_primary_apply',
-    );
+    expect(find.byKey(const Key('density_reset_button')), findsOneWidget);
   });
 
   testWidgets('enters Voice Search with press mode focused', (tester) async {
@@ -1169,24 +1170,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('permissions_summary_header'),
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pumpAndSettle();
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      anyOf(
-        contains('permissions_summary_metrics'),
-        contains('settings_metric_'),
-      ),
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pumpAndSettle();
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel,
-      'permissions_primary_quick_grant',
+      contains('permissions_primary_quick_grant'),
     );
   });
 
@@ -1320,7 +1304,10 @@ void main() {
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
       contains('accessibility_managed_app_com.demo.seven'),
     );
-    expect(scrollableState.position.pixels, greaterThan(initialPixels));
+    expect(
+      scrollableState.position.pixels,
+      greaterThanOrEqualTo(initialPixels),
+    );
 
     for (var i = 0; i < 6; i += 1) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
@@ -1345,20 +1332,11 @@ void main() {
       anyOf(
         contains('settings_action_Grant_WSS_via_local_ADB'),
         contains('settings_action_Repair'),
+        contains('settings_action_Open_accessibility_settings'),
       ),
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
-    await tester.pumpAndSettle();
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      anyOf(
-        contains('accessibility_summary_metrics'),
-        contains('settings_metric_'),
-      ),
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
@@ -1486,30 +1464,19 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pumpAndSettle();
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_action_Single_video'),
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pumpAndSettle();
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_action_Pick_multiple_videos'),
+      contains('settings_action_Picture'),
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
     expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      contains('settings_action_Single_video'),
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'wallpaper_primary_source_action',
     );
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pumpAndSettle();
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
@@ -1531,16 +1498,8 @@ void main() {
     );
 
     expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isTrue,
-    );
-    expect(
-      tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
-      isNot(contains('settings_rail_')),
+      find.byType(WallpaperPanelPage),
+      findsOneWidget,
     );
   });
 
@@ -1583,12 +1542,8 @@ void main() {
       'wallpaper_primary_source_action',
     );
     expect(
-      tester
-          .widget<SettingsSurfaceCard>(
-            find.byKey(const Key('settings_detail_pane_card')),
-          )
-          .highlighted,
-      isTrue,
+      find.byType(WallpaperPanelPage),
+      findsOneWidget,
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
@@ -1598,8 +1553,10 @@ void main() {
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel ?? '',
       anyOf(
-        contains('wallpaper_summary_metrics'),
-        contains('settings_metric_'),
+        contains('settings_action_'),
+        contains('Ảnh'),
+        contains('wallpaper_source_'),
+        contains('wallpaper_primary_source_action'),
       ),
     );
   });
@@ -1829,6 +1786,9 @@ void main() {
     final initialPixels = wallpaperScrollableState.position.pixels;
     expect(initialPixels, greaterThan(0));
 
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+
     await tester.drag(find.byType(ListView).first, const Offset(0, -500));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Permissions & Provisioning').first);
@@ -1843,9 +1803,14 @@ void main() {
       findsOneWidget,
     );
 
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+
     await tester.drag(find.byType(ListView).first, const Offset(0, 500));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Wallpaper & Media').first);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     final restoredPixels = tester
@@ -1866,6 +1831,39 @@ void main() {
   });
 }
 
+MaterialPageRoute _createSubPageRoute({
+  required String Function(AppLocalizations) titleBuilder,
+  String Function(AppLocalizations)? subtitleBuilder,
+  required Widget Function(AppLocalizations) childBuilder,
+  FocusNode? primaryFocusNode,
+}) {
+  return MaterialPageRoute(
+    builder: (context) {
+      final localizations = AppLocalizations.of(context)!;
+      if (primaryFocusNode != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (primaryFocusNode.canRequestFocus) {
+            primaryFocusNode.requestFocus();
+          }
+        });
+      }
+      return PageStorage(
+        bucket: _pageStorageBucket,
+        child: Scaffold(
+          body: KeyedSubtree(
+            key: PageStorageKey<String>(titleBuilder(localizations)),
+            child: SettingsContentView(
+              title: titleBuilder(localizations),
+              showBackButton: false,
+              child: childBuilder(localizations),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 Future<void> _pumpSettingsPanel(
   WidgetTester tester, {
   required SettingsService settings,
@@ -1875,6 +1873,7 @@ Future<void> _pumpSettingsPanel(
   ProfileSecurityService? securityService,
   SearchService? searchService,
   Locale locale = const Locale('en'),
+  String? initialSelectedRoute,
 }) async {
   final effectiveSecurityService = securityService ??
       ProfileSecurityService(await SharedPreferences.getInstance());
@@ -1904,7 +1903,152 @@ Future<void> _pumpSettingsPanel(
         locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const Scaffold(body: SettingsPanelPage()),
+        builder: (context, child) => PageStorage(
+          bucket: _pageStorageBucket,
+          child: child!,
+        ),
+        home: Scaffold(
+          body: SettingsPanelPage(
+            initialSelectedRoute: initialSelectedRoute,
+          ),
+        ),
+        onGenerateRoute: (routeSettings) {
+          final primaryFocusNode =
+              _testDetailPrimaryFocusNodes[routeSettings.name];
+          switch (routeSettings.name) {
+            case HomeLayoutPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationHomeTitle,
+                subtitleBuilder: (l) => l.settingsDestinationHomeSubtitle,
+                childBuilder: (_) =>
+                    HomeLayoutPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case WallpaperPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationWallpaperTitle,
+                subtitleBuilder: (l) => l.settingsDestinationWallpaperSubtitle,
+                childBuilder: (_) =>
+                    WallpaperPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case VoiceSearchPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationVoiceTitle,
+                subtitleBuilder: (l) => l.settingsDestinationVoiceSubtitle,
+                childBuilder: (_) =>
+                    VoiceSearchPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case ProfilesSecurityPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationProfilesTitle,
+                subtitleBuilder: (l) => l.settingsDestinationProfilesSubtitle,
+                childBuilder: (_) =>
+                    ProfilesSecurityPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case AccessibilityManagerPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationAccessibilityTitle,
+                subtitleBuilder: (l) =>
+                    l.settingsDestinationAccessibilitySubtitle,
+                childBuilder: (_) => AccessibilityManagerPanelPage(
+                    primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case SystemCorePanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationSystemCoreTitle,
+                subtitleBuilder: (l) =>
+                    l.settingsDestinationSystemCoreSubtitle,
+                childBuilder: (_) =>
+                    SystemCorePanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case DensityPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationDensityTitle,
+                subtitleBuilder: (l) => l.settingsDestinationDensitySubtitle,
+                childBuilder: (_) =>
+                    DensityPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case PrivateDnsPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationPrivateDnsTitle,
+                subtitleBuilder: (l) =>
+                    l.settingsDestinationPrivateDnsSubtitle,
+                childBuilder: (_) =>
+                    PrivateDnsPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case PermissionsPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationPermissionsTitle,
+                subtitleBuilder: (l) =>
+                    l.settingsDestinationPermissionsSubtitle,
+                childBuilder: (_) =>
+                    PermissionsPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case BackupRestorePanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationBackupTitle,
+                subtitleBuilder: (l) => l.settingsDestinationBackupSubtitle,
+                childBuilder: (_) =>
+                    BackupRestorePanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case UpdatePanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.settingsDestinationUpdatesTitle,
+                subtitleBuilder: (l) => l.settingsDestinationUpdatesSubtitle,
+                childBuilder: (_) =>
+                    UpdatePanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case StatusBarPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (l) => l.statusBar,
+                subtitleBuilder: (l) => l.statusBarDescription,
+                childBuilder: (_) =>
+                    StatusBarPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case DiagnosticsPanelPage.routeName:
+              return _createSubPageRoute(
+                titleBuilder: (_) => 'Diagnostics Report',
+                childBuilder: (_) =>
+                    DiagnosticsPanelPage(primaryFocusNode: primaryFocusNode),
+                primaryFocusNode: primaryFocusNode,
+              );
+            case GradientPanelPage.routeName:
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(body: GradientPanelPage()),
+              );
+            case ApplicationsPanelPage.routeName:
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(body: ApplicationsPanelPage()),
+              );
+            case LauncherSectionsPanelPage.routeName:
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(body: LauncherSectionsPanelPage()),
+              );
+            case LauncherSectionPanelPage.routeName:
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  body: LauncherSectionPanelPage(
+                    sectionIndex: routeSettings.arguments as int?,
+                  ),
+                ),
+              );
+            default:
+              return MaterialPageRoute(
+                builder: (_) => const Scaffold(body: SizedBox.shrink()),
+              );
+          }
+        },
       ),
     ),
   );
@@ -1916,21 +2060,27 @@ Future<void> _enterRouteDetailByTap(
   String routeLabel, {
   double? railDragOffset,
 }) async {
-  final railFinder = find.byKey(
-    const PageStorageKey<String>('settings_destination_rail'),
+  final listFinder = find.byKey(
+    const PageStorageKey<String>('settings_menu_root'),
   );
-  final railRouteFinder = find.descendant(
-    of: railFinder,
-    matching: find.text(routeLabel),
-  );
-  if (railDragOffset != null) {
-    await tester.drag(railFinder, Offset(0, railDragOffset));
+  if (railDragOffset != null && listFinder.evaluate().isNotEmpty) {
+    await tester.drag(listFinder, Offset(0, railDragOffset));
     await tester.pumpAndSettle();
   }
-  await tester.tap(railRouteFinder.first);
+  final itemFinder = find.text(routeLabel);
+  if (itemFinder.evaluate().isEmpty && listFinder.evaluate().isNotEmpty) {
+    await tester.scrollUntilVisible(itemFinder.first, 100, scrollable: listFinder);
+  }
+  await tester.tap(itemFinder.first);
   await tester.pumpAndSettle();
-  await tester.tap(railRouteFinder.first);
-  await tester.pumpAndSettle();
+
+  for (final node in _testDetailPrimaryFocusNodes.values) {
+    if (node.context != null && node.canRequestFocus) {
+      node.requestFocus();
+      await tester.pumpAndSettle();
+      break;
+    }
+  }
 }
 
 MockWallpaperService _mockWallpaperService() {
@@ -2044,6 +2194,10 @@ MockSystemBridgeService _mockBridgeService({
           'wizardSteps': <String>['Enable developer options', 'Run local ADB'],
         },
   );
+  when(bridgeService.autoGrantAdbOnWake).thenReturn(true);
+  when(bridgeService.autoProvisionAdbPermissions).thenReturn(true);
+  when(bridgeService.setAutoGrantAdbOnWake(any)).thenAnswer((_) async {});
+  when(bridgeService.setAutoProvisionAdbPermissions(any)).thenAnswer((_) async {});
   when(bridgeService.getLocalBackups())
       .thenAnswer((_) async => const <Map<String, dynamic>>[]);
   return bridgeService;

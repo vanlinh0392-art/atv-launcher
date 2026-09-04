@@ -36,18 +36,10 @@ void main() {
     expect(smooth.appCardFocusedScale,
         greaterThanOrEqualTo(off.appCardFocusedScale));
 
-    expect(
-      quality.wallpaperVideoWarmUpDelay,
-      lessThan(balanced.wallpaperVideoWarmUpDelay),
-    );
-    expect(
-      balanced.wallpaperVideoWarmUpDelay,
-      lessThan(smooth.wallpaperVideoWarmUpDelay),
-    );
-    expect(
-      smooth.wallpaperVideoWarmUpDelay,
-      lessThan(off.wallpaperVideoWarmUpDelay),
-    );
+    expect(quality.wallpaperVideoWarmUpDelay, Duration.zero);
+    expect(balanced.wallpaperVideoWarmUpDelay, Duration.zero);
+    expect(smooth.wallpaperVideoWarmUpDelay, Duration.zero);
+    expect(off.wallpaperVideoWarmUpDelay, Duration.zero);
     expect(quality.dockBackdropBlurEnabled, isTrue);
     expect(balanced.dockBackdropBlurEnabled, isFalse);
     expect(smooth.dockBackdropBlurEnabled, isFalse);
@@ -79,16 +71,49 @@ void main() {
     expect(quality.releasePlayerOnBackground, isFalse);
     expect(quality.allowVideoWallpaper, isTrue);
     expect(quality.disableAudioRendererWhenMuted, isTrue);
-    expect(balanced.startVideoAfterHomeSettles, isTrue);
+    expect(balanced.startVideoAfterHomeSettles, isFalse);
     expect(balanced.releasePlayerOnBackground, isFalse);
     expect(balanced.allowVideoWallpaper, isTrue);
     expect(balanced.disableAudioRendererWhenMuted, isTrue);
-    expect(smooth.startVideoAfterHomeSettles, isTrue);
+    expect(smooth.startVideoAfterHomeSettles, isFalse);
+    expect(smooth.releasePlayerOnBackground, isFalse);
     expect(smooth.allowVideoWallpaper, isTrue);
     expect(smooth.disableAudioRendererWhenMuted, isTrue);
-    expect(off.startVideoAfterHomeSettles, isTrue);
-    expect(off.allowVideoWallpaper, isFalse);
+    expect(off.startVideoAfterHomeSettles, isFalse);
+    expect(off.releasePlayerOnBackground, isFalse);
+    expect(off.allowVideoWallpaper, isTrue);
     expect(off.disableAudioRendererWhenMuted, isTrue);
+  });
+
+  test('all four performance profiles allow video wallpaper', () {
+    for (final mode in [
+      SettingsService.homeDockPerformanceModeQuality,
+      SettingsService.homeDockPerformanceModeBalanced,
+      SettingsService.homeDockPerformanceModeSmooth,
+      SettingsService.homeDockPerformanceModeOff,
+    ]) {
+      final profile = HomePerformanceProfile.resolve(mode);
+      expect(
+        profile.allowVideoWallpaper,
+        isTrue,
+        reason: 'Mode $mode should allow video wallpaper',
+      );
+    }
+  });
+
+  test('smooth and off modes clamp video blur sigma cap to zero and retain player on background', () {
+    final smooth = HomePerformanceProfile.resolve(
+      SettingsService.homeDockPerformanceModeSmooth,
+    );
+    final off = HomePerformanceProfile.resolve(
+      SettingsService.homeDockPerformanceModeOff,
+    );
+
+    expect(smooth.wallpaperVideoBlurSigmaCap, 0.0);
+    expect(smooth.releasePlayerOnBackground, isFalse);
+
+    expect(off.wallpaperVideoBlurSigmaCap, 0.0);
+    expect(off.releasePlayerOnBackground, isFalse);
   });
 
   test('smooth mode keeps light sampling while sharpening app cards', () {

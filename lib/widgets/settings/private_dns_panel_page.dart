@@ -1,6 +1,5 @@
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
-import 'package:flauncher/widgets/settings/settings_localized_values.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -20,7 +19,6 @@ class PrivateDnsPanelPage extends StatefulWidget {
 }
 
 class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
-  static const String _summaryDebugLabel = 'private_dns_summary_metrics';
   late final TextEditingController _controller;
 
   @override
@@ -44,66 +42,26 @@ class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     final bridgeService = context.read<SystemBridgeService>();
-    final status = context.select<SystemBridgeService, Map<String, dynamic>>(
-      (service) => service.privateDnsStatus,
-    );
     return ListView(
       key: const PageStorageKey<String>(PrivateDnsPanelPage.routeName),
       children: [
-        SettingsSummarySection(
-          debugLabel: _summaryDebugLabel,
-          child: SettingsMetricsGrid(
-            minChildWidth: 176,
-            maxColumns: 3,
-            children: [
-              SettingsMetricTile(
-                label: localizations.modeSettingLabel,
-                value: localizedPrivateDnsMode(
-                  localizations,
-                  status['effectiveMode']?.toString() ?? '',
-                ),
-                icon: Icons.router_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.hostnameLabel,
-                value: status['specifier']?.toString() ?? '-',
-                icon: Icons.dns_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.accessPathLabel,
-                value: status['hasWriteSecureSettings'] == true
-                    ? localizations.wssLabel
-                    : localizations.localAdbLabel,
-                icon: Icons.security_outlined,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
         SettingsSurfaceCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SettingsActionCard(
                 focusNode: widget.primaryFocusNode,
-                onMoveUpAtBoundary: () => focusCurrentSettingsNodeByDebugLabel(
-                  _summaryDebugLabel,
-                ),
                 title: localizations.privateDnsHostname,
-                subtitle: _controller.text.trim().isEmpty
-                    ? localizations.privateDnsHostname
-                    : _controller.text.trim(),
                 icon: Icons.edit_note_outlined,
                 onPressed: () => _editHostname(context),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: TvDrawerTokens.rowSpacing),
               SettingsAdaptiveGrid(
                 minChildWidth: 220,
                 maxColumns: 3,
                 children: [
                   SettingsActionCard(
                     title: localizations.applyHost,
-                    subtitle: _controller.text.trim(),
                     icon: Icons.check_circle_outline,
                     onPressed: () async => _showMessage(
                       context,
@@ -117,10 +75,6 @@ class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
                   ),
                   SettingsActionCard(
                     title: localizations.turnOff,
-                    subtitle: localizedPrivateDnsMode(
-                      localizations,
-                      'off',
-                    ),
                     icon: Icons.block_outlined,
                     onPressed: () async => _showMessage(
                       context,
@@ -132,7 +86,6 @@ class _PrivateDnsPanelPageState extends State<PrivateDnsPanelPage> {
                   ),
                   SettingsActionCard(
                     title: localizations.reset,
-                    subtitle: localizations.privateDnsReset,
                     icon: Icons.restart_alt,
                     onPressed: () async => _showMessage(
                       context,

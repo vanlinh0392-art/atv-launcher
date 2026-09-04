@@ -611,6 +611,7 @@ void main() {
     when(channel.addAppsChangedListener(any)).thenAnswer((invocation) {
       appsChangedListener =
           invocation.positionalArguments.single as void Function(Map<String, dynamic>);
+      return null;
     });
 
     final database = FLauncherDatabase.inMemory();

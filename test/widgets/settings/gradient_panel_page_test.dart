@@ -35,6 +35,7 @@ void main() {
   testWidgets("Selecting a gradient calls WallpaperService", (tester) async {
     _prepareView(tester);
     final wallpaperService = MockWallpaperService();
+    when(wallpaperService.gradient).thenReturn(FLauncherGradients.greatWhale);
 
     await _pumpWidgetWithProviders(tester, wallpaperService);
 

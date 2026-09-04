@@ -1,6 +1,7 @@
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/widgets/settings/home_layout_panel_page.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,6 +37,7 @@ void main() {
     expect(find.text('Dock glass intensity'), findsAtLeastNWidgets(1));
     expect(find.text('Home performance mode'), findsAtLeastNWidgets(1));
     expect(find.text('Settings transparency'), findsAtLeastNWidgets(1));
+    expect(find.text('Settings backdrop theme'), findsAtLeastNWidgets(1));
     expect(find.text('Collapsed dock rows'), findsAtLeastNWidgets(1));
     expect(find.text('Row spacing'), findsAtLeastNWidgets(1));
     expect(find.text('Auto collapse dock'), findsAtLeastNWidgets(1));
@@ -60,6 +62,8 @@ void main() {
     expect(find.byKey(const Key('home_dock_performance_mode_selector')),
         findsOneWidget);
     expect(find.byKey(const Key('settings_ui_transparency_stepper')),
+        findsOneWidget);
+    expect(find.byKey(const Key('settings_background_color_selector')),
         findsOneWidget);
     expect(
         find.byKey(const Key('home_dock_row_spacing_stepper')), findsOneWidget);
@@ -234,9 +238,28 @@ void main() {
       appsService: appsService,
     );
 
+    // Verify only 2 language options exist: Vietnamese (option_0) and English (option_1)
+    expect(
+      find.byKey(const ValueKey<String>('app_locale_mode_option_system')),
+      findsNothing,
+    );
+    expect(find.text('System'), findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('app_locale_mode_option_vi')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('app_locale_mode_option_en')),
+      findsOneWidget,
+    );
+
     expect(
       FocusManager.instance.primaryFocus?.debugLabel,
-      contains('home_layout_target_appLocale_option_2'),
+      contains('home_layout_target_appLocale_option_0'),
+    );
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      isNot(contains('home_layout_target_appLocale_option_2')),
     );
     expect(settings.appLocaleMode, SettingsService.appLocaleVietnamese);
 
@@ -254,10 +277,11 @@ void main() {
     expect(settings.appLocaleMode, SettingsService.appLocaleVietnamese);
     expect(
       FocusManager.instance.primaryFocus?.debugLabel,
-      contains('home_layout_target_appLocale_option_2'),
+      contains('home_layout_target_appLocale_option_0'),
     );
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    // D-pad Right from option_0 (vi) to option_1 (en)
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
 
     expect(settings.appLocaleMode, SettingsService.appLocaleVietnamese);
@@ -266,6 +290,7 @@ void main() {
       contains('home_layout_target_appLocale_option_1'),
     );
 
+    // Activate option_1 (en)
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
@@ -275,6 +300,7 @@ void main() {
       contains('home_layout_target_appLocale_option_1'),
     );
 
+    // D-pad Left from option_1 (en) back to option_0 (vi)
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
 
@@ -284,11 +310,13 @@ void main() {
       contains('home_layout_target_appLocale_option_0'),
     );
 
+    // Activate option_0 (vi)
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
-    expect(settings.appLocaleMode, SettingsService.appLocaleSystem);
+    expect(settings.appLocaleMode, SettingsService.appLocaleVietnamese);
 
+    // D-pad Left from option_0 moves focus to the row card container
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
 
@@ -398,6 +426,146 @@ void main() {
     expect(
       focusedRowRect.bottom,
       lessThan(scrollableRect.bottom - 20),
+    );
+  });
+
+  testWidgets(
+      'settings backdrop theme selector displays swatches, supports D-Pad navigation, and updates on Enter/Select',
+      (tester) async {
+    final settings = await _createSettingsService();
+    final appsService = MockAppsService();
+
+    await _pumpPage(
+      tester,
+      settings: settings,
+      appsService: appsService,
+    );
+
+    final selectorFinder =
+        find.byKey(const Key('settings_background_color_selector'));
+    expect(selectorFinder, findsOneWidget);
+    await _scrollToFinder(tester, selectorFinder);
+
+    await _focusControl(
+      tester,
+      const Key('settings_background_color_selector'),
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>(
+        'settings_backdrop_theme_option_TvSettingsBackdropTheme.deepSlate',
+      )),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>(
+        'settings_backdrop_theme_option_TvSettingsBackdropTheme.obsidianOled',
+      )),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>(
+        'settings_backdrop_theme_option_TvSettingsBackdropTheme.oceanNavy',
+      )),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>(
+        'settings_backdrop_theme_option_TvSettingsBackdropTheme.smokyAmethyst',
+      )),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>(
+        'settings_backdrop_theme_option_TvSettingsBackdropTheme.forestMoss',
+      )),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>(
+        'settings_backdrop_theme_option_TvSettingsBackdropTheme.warmEspresso',
+      )),
+      findsOneWidget,
+    );
+
+    expect(settings.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('home_layout_target_settingsBackdropTheme_option_0'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('home_layout_target_settingsBackdropTheme_option_1'),
+    );
+    expect(settings.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('home_layout_target_settingsBackdropTheme_option_2'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('home_layout_target_settingsBackdropTheme_option_1'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(settings.settingsBackdropTheme, TvSettingsBackdropTheme.obsidianOled);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('home_layout_target_settingsBackdropTheme_option_4'),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(settings.settingsBackdropTheme, TvSettingsBackdropTheme.forestMoss);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      anyOf(
+        contains('cardSize'),
+        contains('app_card_layout_scale'),
+      ),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('settingsBackdropTheme'),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      anyOf(
+        contains('settingsTransparency'),
+        contains('settings_ui_transparency'),
+      ),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      contains('settingsBackdropTheme'),
     );
   });
 }

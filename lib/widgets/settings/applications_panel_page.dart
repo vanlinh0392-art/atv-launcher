@@ -1,4 +1,4 @@
-﻿/*
+/*
  * FLauncher
  * Copyright (C) 2021  Etienne Fesser
  *
@@ -104,10 +104,9 @@ class _TVTab extends StatelessWidget {
         selector: (_, appsService) => appsService.applications
             .where((app) => !app.sideloaded && !app.hidden)
             .toList(),
-        builder: (context, applications, _) => ListView(
-          children: applications
-              .map((application) => _AppListItem(application))
-              .toList(),
+        builder: (context, applications, _) => ListView.builder(
+          itemCount: applications.length,
+          itemBuilder: (context, index) => _AppListItem(applications[index]),
         ),
       );
 }
@@ -118,10 +117,9 @@ class _SideloadedTab extends StatelessWidget {
         selector: (_, appsService) => appsService.applications
             .where((app) => app.sideloaded && !app.hidden)
             .toList(),
-        builder: (context, applications, _) => ListView(
-          children: applications
-              .map((application) => _AppListItem(application))
-              .toList(),
+        builder: (context, applications, _) => ListView.builder(
+          itemCount: applications.length,
+          itemBuilder: (context, index) => _AppListItem(applications[index]),
         ),
       );
 }
@@ -131,10 +129,9 @@ class _HiddenTab extends StatelessWidget {
   Widget build(BuildContext context) => Selector<AppsService, List<App>>(
         selector: (_, appsService) =>
             appsService.applications.where((app) => app.hidden).toList(),
-        builder: (context, applications, _) => ListView(
-          children: applications
-              .map((application) => _AppListItem(application))
-              .toList(),
+        builder: (context, applications, _) => ListView.builder(
+          itemCount: applications.length,
+          itemBuilder: (context, index) => _AppListItem(applications[index]),
         ),
       );
 }
@@ -180,8 +177,8 @@ class _AppListItemState extends State<_AppListItem> {
     }
   }
 
-  void _showAppInfo() {
-    showDialog(
+  void _showAppInfo() async {
+    await showDialog<void>(
       context: context,
       builder: (context) => ApplicationInfoPanel(
         category: null,
@@ -189,6 +186,9 @@ class _AppListItemState extends State<_AppListItem> {
         applicationIcon: _resolvedIcon,
       ),
     );
+    if (mounted && _infoFocusNode.canRequestFocus) {
+      _infoFocusNode.requestFocus();
+    }
   }
 
   @override

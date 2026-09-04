@@ -28,7 +28,6 @@ class BackupRestorePanelPage extends StatefulWidget {
 }
 
 class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
-  static const String _summaryDebugLabel = 'backup_restore_summary_metrics';
   Map<String, dynamic>? _preview;
   String _previewName = '';
   String _lastMessage = '';
@@ -58,45 +57,10 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsService>();
 
     return ListView(
       key: const PageStorageKey<String>(BackupRestorePanelPage.routeName),
       children: [
-        SettingsSummarySection(
-          debugLabel: _summaryDebugLabel,
-          child: SettingsMetricsGrid(
-            minChildWidth: 188,
-            maxColumns: 3,
-            children: [
-              SettingsMetricTile(
-                label: localizations.lastExport,
-                value: settings.backupLastExportName.isEmpty
-                    ? '-'
-                    : settings.backupLastExportName,
-                icon: Icons.upload_file_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.lastImport,
-                value: settings.backupLastImportName.isEmpty
-                    ? '-'
-                    : settings.backupLastImportName,
-                icon: Icons.download_for_offline_outlined,
-              ),
-              SettingsMetricTile(
-                label: localizations.lastRestore,
-                value: settings.backupLastRestoreAt <= 0
-                    ? '-'
-                    : DateTime.fromMillisecondsSinceEpoch(
-                            settings.backupLastRestoreAt)
-                        .toLocal()
-                        .toString(),
-                icon: Icons.history_outlined,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
         SettingsSurfaceCard(
           child: SettingsAdaptiveGrid(
             minChildWidth: 230,
@@ -105,24 +69,17 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
             children: [
               SettingsActionCard(
                 focusNode: widget.primaryFocusNode,
-                onMoveUpAtBoundary: () =>
-                    focusCurrentSettingsNodeByDebugLabel(_summaryDebugLabel),
                 title: localizations.exportBackup,
-                subtitle: localizations.lastExport,
                 icon: Icons.save_alt,
                 onPressed: _busy ? null : () => _exportBackup(context),
               ),
               SettingsActionCard(
-                onMoveUpAtBoundary: () =>
-                    focusCurrentSettingsNodeByDebugLabel(_summaryDebugLabel),
                 title: localizations.previewBackup,
-                subtitle: localizations.selectedBackup,
                 icon: Icons.preview_outlined,
                 onPressed: _busy ? null : () => _previewBackup(context),
               ),
               SettingsActionCard(
                 title: localizations.restoreLauncherOnly,
-                subtitle: localizations.lastRestore,
                 icon: Icons.restore_page_outlined,
                 onPressed: _busy || _preview == null
                     ? null
@@ -130,7 +87,6 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
               ),
               SettingsActionCard(
                 title: localizations.restoreWithSystemSettings,
-                subtitle: localizations.lastImport,
                 icon: Icons.settings_backup_restore_outlined,
                 onPressed: _busy || _preview == null
                     ? null
@@ -140,17 +96,17 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
           ),
         ),
         if (_lastMessage.isNotEmpty) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: TvDrawerTokens.rowSpacing),
           Text(_lastMessage, style: Theme.of(context).textTheme.bodyMedium),
         ],
-        const SizedBox(height: 18),
+        const SizedBox(height: TvDrawerTokens.surfaceSpacing),
         Text(
           "Bản sao lưu cục bộ",
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: TvDrawerTokens.rowSpacing),
         SettingsSurfaceCard(
-          padding: const EdgeInsets.all(10),
+          padding: TvDrawerTokens.surfacePadding,
           child: _localBackups.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 14),
@@ -189,7 +145,7 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
                   },
                 ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: TvDrawerTokens.surfaceSpacing),
         SettingsSurfaceCard(
           child: _preview == null
               ? Text(localizations.backupPreviewEmptyState)
@@ -927,6 +883,8 @@ class _BackupItemTileState extends State<_BackupItemTile> {
           ),
           title: Text(
             widget.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: widget.isSelected ? Colors.cyanAccent : Colors.white,
               fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.normal,
@@ -934,6 +892,8 @@ class _BackupItemTileState extends State<_BackupItemTile> {
           ),
           subtitle: Text(
             "${widget.date}  -  ${widget.size} KB ${widget.isAuto ? '(Tự động)' : '(Thủ công)'}",
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white54),
           ),
           trailing: Row(

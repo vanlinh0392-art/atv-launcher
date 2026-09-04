@@ -32,6 +32,110 @@ enum SettingsFocusFrameVariant {
   optionButton,
 }
 
+enum TvSettingsBackdropTheme {
+  deepSlate(
+    key: 'deep_slate',
+    labelVi: 'Đá phiến biển',
+    labelEn: 'Dark Slate',
+    swatchColor: Color(0xFF0D1926),
+    primaryTop: Color(0xFF0D1926),
+    gradientMid: Color(0xFF102032),
+    gradientEnd: Color(0xFF071018),
+    surfaceCardColor: Color(0xFF132235),
+  ),
+  obsidianOled(
+    key: 'obsidian_oled',
+    labelVi: 'Than chì OLED',
+    labelEn: 'Obsidian OLED',
+    swatchColor: Color(0xFF0F1115),
+    primaryTop: Color(0xFF0F1115),
+    gradientMid: Color(0xFF0A0C0F),
+    gradientEnd: Color(0xFF050608),
+    surfaceCardColor: Color(0xFF181B22),
+  ),
+  oceanNavy(
+    key: 'ocean_navy',
+    labelVi: 'Biển đêm sâu',
+    labelEn: 'Ocean Navy',
+    swatchColor: Color(0xFF0A1628),
+    primaryTop: Color(0xFF0A1628),
+    gradientMid: Color(0xFF070F1E),
+    gradientEnd: Color(0xFF040B14),
+    surfaceCardColor: Color(0xFF10223D),
+  ),
+  smokyAmethyst(
+    key: 'smoky_amethyst',
+    labelVi: 'Tím thạch anh',
+    labelEn: 'Smoky Amethyst',
+    swatchColor: Color(0xFF1A1224),
+    primaryTop: Color(0xFF1A1224),
+    gradientMid: Color(0xFF120B1B),
+    gradientEnd: Color(0xFF0B0711),
+    surfaceCardColor: Color(0xFF241B33),
+  ),
+  forestMoss(
+    key: 'forest_moss',
+    labelVi: 'Rêu rừng sương',
+    labelEn: 'Forest Moss',
+    swatchColor: Color(0xFF0E1A16),
+    primaryTop: Color(0xFF0E1A16),
+    gradientMid: Color(0xFF091310),
+    gradientEnd: Color(0xFF050D0A),
+    surfaceCardColor: Color(0xFF142721),
+  ),
+  warmEspresso(
+    key: 'warm_espresso',
+    labelVi: 'Ca cao ấm áp',
+    labelEn: 'Warm Espresso',
+    swatchColor: Color(0xFF1E1512),
+    primaryTop: Color(0xFF1E1512),
+    gradientMid: Color(0xFF150D0A),
+    gradientEnd: Color(0xFF0E0907),
+    surfaceCardColor: Color(0xFF2B1F1A),
+  );
+
+  final String key;
+  final String labelVi;
+  final String labelEn;
+  final Color swatchColor;
+  final Color primaryTop;
+  final Color gradientMid;
+  final Color gradientEnd;
+  final Color surfaceCardColor;
+
+  const TvSettingsBackdropTheme({
+    required this.key,
+    required this.labelVi,
+    required this.labelEn,
+    required this.swatchColor,
+    required this.primaryTop,
+    required this.gradientMid,
+    required this.gradientEnd,
+    required this.surfaceCardColor,
+  });
+
+  static TvSettingsBackdropTheme fromKey(String? key) {
+    if (key == null || key.isEmpty) {
+      return TvSettingsBackdropTheme.deepSlate;
+    }
+    for (final theme in TvSettingsBackdropTheme.values) {
+      if (theme.key == key) {
+        return theme;
+      }
+    }
+    return TvSettingsBackdropTheme.deepSlate;
+  }
+
+  String localizedLabel(String locale) {
+    if (locale == 'vi' ||
+        locale.startsWith('vi_') ||
+        locale.startsWith('vi-')) {
+      return labelVi;
+    }
+    return labelEn;
+  }
+}
+
 class SettingsFocusFrameVisuals {
   final Color fillColor;
   final Color borderColor;
@@ -61,18 +165,27 @@ class SettingsFocusFrameVisuals {
 class SettingsChromeSpec {
   final double transparencyFraction;
   final double effectiveTransparencyFraction;
+  final TvSettingsBackdropTheme backdropTheme;
 
   const SettingsChromeSpec._(
     this.transparencyFraction,
-    this.effectiveTransparencyFraction,
-  );
+    this.effectiveTransparencyFraction, {
+    this.backdropTheme = TvSettingsBackdropTheme.deepSlate,
+  });
 
-  factory SettingsChromeSpec.fromTransparencyPercent(int transparencyPercent) {
+  factory SettingsChromeSpec.fromTransparencyPercent(
+    int transparencyPercent, {
+    TvSettingsBackdropTheme backdropTheme = TvSettingsBackdropTheme.deepSlate,
+  }) {
     final rawFraction = (transparencyPercent / 100).clamp(0.0, 1.0);
     // Make low TV-facing steps like 5/10/15% visually meaningful instead of
     // feeling almost identical to 0%.
     final effectiveFraction = Curves.easeOutCubic.transform(rawFraction);
-    return SettingsChromeSpec._(rawFraction, effectiveFraction);
+    return SettingsChromeSpec._(
+      rawFraction,
+      effectiveFraction,
+      backdropTheme: backdropTheme,
+    );
   }
 
   factory SettingsChromeSpec.of(BuildContext context) {
@@ -83,7 +196,12 @@ class SettingsChromeSpec {
     final transparencyPercent =
         settingsService?.settingsUiTransparencyPercent ??
             SettingsService.settingsUiTransparencyDefault;
-    return SettingsChromeSpec.fromTransparencyPercent(transparencyPercent);
+    final backdropTheme = settingsService?.settingsBackdropTheme ??
+        TvSettingsBackdropTheme.deepSlate;
+    return SettingsChromeSpec.fromTransparencyPercent(
+      transparencyPercent,
+      backdropTheme: backdropTheme,
+    );
   }
 
   double get panelSurfaceOpacity =>
@@ -109,6 +227,14 @@ class SettingsChromeSpec {
 
   double get dialogGradientOpacity =>
       _lerpOpacity(0.92, 0.08, effectiveTransparencyFraction);
+
+  List<Color> get dialogGradientColors => [
+        backdropTheme.primaryTop.withOpacity(dialogGradientOpacity),
+        backdropTheme.gradientMid
+            .withOpacity((dialogGradientOpacity - 0.02).clamp(0.0, 1.0)),
+        backdropTheme.gradientEnd
+            .withOpacity((dialogGradientOpacity - 0.05).clamp(0.0, 1.0)),
+      ];
 
   double get dialogBorderOpacity =>
       _lerpOpacity(0.1, 0.018, effectiveTransparencyFraction);
@@ -212,7 +338,7 @@ class SettingsChromeSpec {
         idleShadowOffset = const Offset(0, 4);
         break;
       case SettingsFocusFrameVariant.rowOnly:
-        accent = const Color(0xFF7ABFE8);
+        accent = TvDrawerTokens.focusBorderColor;
         focusFillOpacity =
             (rowOnlyFocusFillOpacity * (1 + (emphasisBoost * 1.1)))
                 .clamp(0.0, 1.0)
@@ -292,32 +418,86 @@ class SettingsChromeSpec {
   }
 }
 
+class TvDrawerTokens {
+  static const Color surfaceDarkSlate = Color(0xFF0D1926);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFCBD5E1);
+  static const Color focusBorderColor = Color(0xFF00E5FF);
+  static const double drawerWidth = 520.0;
+  static const double drawerRadius = 18.0;
+  static const double cardMinHeight = 52.0;
+  static const double cardMinHeightWithSubtitle = 64.0;
+  static const EdgeInsets cardPadding =
+      EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0);
+  static const EdgeInsets surfacePadding = EdgeInsets.all(12.0);
+  static const double radiusSurface = 18.0;
+  static const double radiusCard = 14.0;
+  static const double radiusControl = 10.0;
+  static const double rowSpacing = 10.0;
+  static const double surfaceSpacing = 14.0;
+
+  static const List<BoxShadow> focusGlowShadows = [
+    BoxShadow(
+      color: Color(0x6600E5FF),
+      blurRadius: 14,
+      spreadRadius: 1,
+      offset: Offset(0, 2),
+    ),
+    BoxShadow(
+      color: Color(0x3300E5FF),
+      blurRadius: 24,
+      spreadRadius: 2,
+      offset: Offset(0, 4),
+    ),
+  ];
+}
+
 class SettingsContentView extends StatelessWidget {
   final String title;
-  final String? subtitle;
   final Widget child;
+  final VoidCallback? onBack;
+  final bool showBackButton;
 
   const SettingsContentView({
     super.key,
     required this.title,
-    this.subtitle,
     required this.child,
+    this.onBack,
+    this.showBackButton = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasBackButton = showBackButton || onBack != null;
+
+    final headerText = Text(
+      title,
+      style: theme.textTheme.headlineSmall?.copyWith(
+        color: TvDrawerTokens.textPrimary,
+        fontWeight: FontWeight.w700,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: theme.textTheme.headlineSmall),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            subtitle!,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
-          ),
-        ],
+        if (hasBackButton)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: headerText),
+            ],
+          )
+        else
+          headerText,
         const SizedBox(height: 12),
         Expanded(child: child),
       ],
@@ -333,7 +513,7 @@ class SettingsSurfaceCard extends StatelessWidget {
   const SettingsSurfaceCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(14),
+    this.padding = TvDrawerTokens.surfacePadding,
     this.highlighted = false,
   });
 
@@ -511,7 +691,9 @@ class SettingsFocusFrame extends StatefulWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.borderRadius = const BorderRadius.all(Radius.circular(22)),
+    this.borderRadius = const BorderRadius.all(
+      Radius.circular(TvDrawerTokens.radiusCard),
+    ),
     this.baseColor = const Color(0x07FFFFFF),
     this.focusEmphasis = 1.0,
     this.variant = SettingsFocusFrameVariant.detailPane,
@@ -715,7 +897,7 @@ class _SettingsMetricTileState extends State<SettingsMetricTile> {
           width: widget.width,
           child: SettingsFocusFrame(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(TvDrawerTokens.radiusCard),
             baseColor: baseColor,
             focusEmphasis: 1.08,
             variant: SettingsFocusFrameVariant.rowOnly,
@@ -854,7 +1036,7 @@ class _SettingsSummarySectionState extends State<SettingsSummarySection> {
         },
         child: SettingsFocusFrame(
           padding: const EdgeInsets.all(8),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(TvDrawerTokens.radiusCard),
           baseColor: Colors.transparent,
           focusEmphasis: widget.focusEmphasis,
           variant: SettingsFocusFrameVariant.rowOnly,

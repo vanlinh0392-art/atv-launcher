@@ -307,6 +307,68 @@ void main() {
         tester.widget<SettingsFocusFrame>(find.byType(SettingsFocusFrame));
     expect(frame.variant, SettingsFocusFrameVariant.rowOnly);
   });
+
+  group('TvSettingsBackdropTheme & SettingsChromeSpec dialogGradientColors', () {
+    test('defines 6 backdrop themes with non-null colors and distinct keys', () {
+      expect(TvSettingsBackdropTheme.values.length, 6);
+
+      final keys = <String>{};
+      for (final theme in TvSettingsBackdropTheme.values) {
+        expect(keys.add(theme.key), isTrue, reason: 'Duplicate key: ${theme.key}');
+        expect(theme.labelVi.isNotEmpty, isTrue);
+        expect(theme.labelEn.isNotEmpty, isTrue);
+        expect(theme.swatchColor.alpha, 255);
+        expect(theme.primaryTop.alpha, 255);
+        expect(theme.gradientMid.alpha, 255);
+        expect(theme.gradientEnd.alpha, 255);
+        expect(theme.surfaceCardColor.alpha, 255);
+      }
+    });
+
+    test('TvSettingsBackdropTheme localizedLabel returns appropriate language', () {
+      final theme = TvSettingsBackdropTheme.deepSlate;
+      expect(theme.localizedLabel('vi'), theme.labelVi);
+      expect(theme.localizedLabel('vi_VN'), theme.labelVi);
+      expect(theme.localizedLabel('vi-VN'), theme.labelVi);
+      expect(theme.localizedLabel('en'), theme.labelEn);
+      expect(theme.localizedLabel('fr'), theme.labelEn);
+    });
+
+    test('TvSettingsBackdropTheme.fromKey safely looks up and falls back to deepSlate', () {
+      expect(TvSettingsBackdropTheme.fromKey('deep_slate'), TvSettingsBackdropTheme.deepSlate);
+      expect(TvSettingsBackdropTheme.fromKey('obsidian_oled'), TvSettingsBackdropTheme.obsidianOled);
+      expect(TvSettingsBackdropTheme.fromKey('ocean_navy'), TvSettingsBackdropTheme.oceanNavy);
+      expect(TvSettingsBackdropTheme.fromKey('smoky_amethyst'), TvSettingsBackdropTheme.smokyAmethyst);
+      expect(TvSettingsBackdropTheme.fromKey('forest_moss'), TvSettingsBackdropTheme.forestMoss);
+      expect(TvSettingsBackdropTheme.fromKey('warm_espresso'), TvSettingsBackdropTheme.warmEspresso);
+      expect(TvSettingsBackdropTheme.fromKey(null), TvSettingsBackdropTheme.deepSlate);
+      expect(TvSettingsBackdropTheme.fromKey(''), TvSettingsBackdropTheme.deepSlate);
+      expect(TvSettingsBackdropTheme.fromKey('random_invalid_key'), TvSettingsBackdropTheme.deepSlate);
+    });
+
+    test('dialogGradientColors builds 3-stop gradient matching backdropTheme and opacity', () {
+      for (final theme in TvSettingsBackdropTheme.values) {
+        final spec = SettingsChromeSpec.fromTransparencyPercent(
+          20,
+          backdropTheme: theme,
+        );
+        final colors = spec.dialogGradientColors;
+        expect(colors.length, 3);
+        expect(colors[0].red, theme.primaryTop.red);
+        expect(colors[0].green, theme.primaryTop.green);
+        expect(colors[0].blue, theme.primaryTop.blue);
+        expect(colors[0].opacity, closeTo(spec.dialogGradientOpacity, 0.001));
+
+        expect(colors[1].red, theme.gradientMid.red);
+        expect(colors[1].green, theme.gradientMid.green);
+        expect(colors[1].blue, theme.gradientMid.blue);
+
+        expect(colors[2].red, theme.gradientEnd.red);
+        expect(colors[2].green, theme.gradientEnd.green);
+        expect(colors[2].blue, theme.gradientEnd.blue);
+      }
+    });
+  });
 }
 
 Widget _settingsHarness(Widget child) => MaterialApp(

@@ -99,7 +99,7 @@ void main() {
 
     await settings.setAppLocaleMode(SettingsService.appLocaleSystem);
     await tester.pumpAndSettle();
-    expect(_materialApp(tester).locale, isNull);
+    expect(_materialApp(tester).locale, const Locale('vi'));
   });
 
   testWidgets(

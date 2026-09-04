@@ -43,11 +43,11 @@ public class NetworkEventStreamHandler implements EventChannel.StreamHandler
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                _networkCallback = new NetworkCallbackImplApi31(events, null);
+                _networkCallback = new NetworkCallbackImplApi31(events, _handler);
                 _connectivityManager.registerDefaultNetworkCallback(_networkCallback, _handler);
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                _networkCallback = new NetworkCallbackImpl(events, null);
+            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                _networkCallback = new NetworkCallbackImpl(events, _handler);
                 _connectivityManager.registerDefaultNetworkCallback(_networkCallback, _handler);
             }
             else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -65,12 +65,29 @@ public class NetworkEventStreamHandler implements EventChannel.StreamHandler
 
     @Override
     public void onCancel(Object arguments) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            _connectivityManager.unregisterNetworkCallback(_networkCallback);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                if (_networkCallback != null) {
+                    _connectivityManager.unregisterNetworkCallback(_networkCallback);
+                    _networkCallback = null;
+                }
+            }
+            else {
+                if (_networkChangeReceiver != null) {
+                    _context.unregisterReceiver(_networkChangeReceiver);
+                    _networkChangeReceiver = null;
+                }
+            }
+            if (_phoneStateListener != null) {
+                TelephonyManager manager = (TelephonyManager) _context.getSystemService(Context.TELEPHONY_SERVICE);
+                if (manager != null) {
+                    //noinspection deprecation
+                    manager.listen(_phoneStateListener, PhoneStateListener.LISTEN_NONE);
+                }
+                _phoneStateListener = null;
+            }
         }
-        else {
-            _context.unregisterReceiver(_networkChangeReceiver);
-        }
+        catch (Exception ignored) { }
     }
 
     private class NetworkCallbackImpl extends ConnectivityManager.NetworkCallback

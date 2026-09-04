@@ -92,15 +92,7 @@ void main() {
     );
     await _pumpUi(tester);
 
-    final permissionTile = tester.widget<SettingsMetricTile>(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is SettingsMetricTile &&
-            widget.label == 'Install permission',
-      ),
-    );
-    expect(permissionTile.value, 'Needs approval');
-    expect(permissionTile.accentColor, const Color(0xFFFFC970));
+    expect(find.text('Check latest official release'), findsOneWidget);
 
     await tester.tap(find.text('Check latest official release'));
     await _pumpUi(tester);
@@ -110,6 +102,14 @@ void main() {
           skipOffstage: false,
         ),
         findsOneWidget);
+    final permissionChip = tester.widget<SettingsStatusChip>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SettingsStatusChip &&
+            widget.label == 'Needs approval',
+      ),
+    );
+    expect(permissionChip.color, const Color(0xFFFFC970));
     expect(find.text('4/29/2026 21:30', skipOffstage: false), findsOneWidget);
     expect(find.text('12 MB', skipOffstage: false), findsWidgets);
     expect(FocusManager.instance.primaryFocus?.debugLabel,
@@ -402,7 +402,6 @@ void main() {
             widget.title == 'Download latest official APK',
       ),
     );
-    expect(downloadCard.subtitle, startsWith('13 MB |'));
     expect(downloadCard.onPressed, isNotNull);
     expect(
       find.textContaining('atv-launcher-arm64-v8a-release.apk'),
@@ -496,7 +495,7 @@ void main() {
             widget.title == 'Download latest official APK',
       ),
     );
-    expect(downloadCard.subtitle, startsWith('12 MB |'));
+    expect(downloadCard.onPressed, isNotNull);
     expect(
       find.textContaining('atv-launcher-armeabi-v7a-release.apk'),
       findsOneWidget,
@@ -583,7 +582,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     await _pumpUi(tester);
 
-    expect(find.text('ABI fallback', skipOffstage: false), findsWidgets);
     expect(
       find.textContaining('generic APK fallback', skipOffstage: false),
       findsOneWidget,
@@ -744,15 +742,12 @@ void main() {
 
     final checkSize = sizeForTitle('Kiểm tra bản chính thức mới nhất');
     final downloadSize = sizeForTitle('Tải APK chính thức mới nhất');
-    final installSize = sizeForTitle('Cài APK đã tải');
-    final cleanupSize = sizeForTitle('Dọn APK đã tải');
 
     expect(checkSize.width, equals(downloadSize.width));
-    expect(checkSize.width, equals(installSize.width));
-    expect(checkSize.width, equals(cleanupSize.width));
     expect(checkSize.height, equals(downloadSize.height));
-    expect(checkSize.height, equals(installSize.height));
-    expect(checkSize.height, equals(cleanupSize.height));
+    expect(find.text('Cấp quyền cài qua local ADB'), findsNothing);
+    expect(find.text('Cho phép cài ứng dụng'), findsNothing);
+    expect(find.text('Dọn APK đã tải'), findsNothing);
   });
 
   testWidgets(
@@ -849,6 +844,110 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+      'downloading update automatically triggers installDownloadedApk on completion',
+      (tester) async {
+    _prepareView(tester);
+    final tempDirectory =
+        await _createTempTestDirectory('update-auto-install');
+    addTearDown(() {
+      if (tempDirectory.existsSync()) {
+        tempDirectory.deleteSync(recursive: true);
+      }
+    });
+    _installFakeTempPath(tempDirectory.path);
+    PackageInfo.setMockInitialValues(
+      appName: 'ATV Launcher',
+      packageName: 'com.atv.launcher',
+      version: '2024.11.001',
+      buildNumber: '15',
+      buildSignature: 'debug',
+      installerStore: 'adb',
+    );
+
+    final channel = _FakeFLauncherChannel(
+      liteStatus: const <String, dynamic>{
+        'updates': <String, dynamic>{
+          'canRequestPackageInstalls': true,
+          'adbEnabled': true,
+        },
+      },
+      supportedAbis: const ['armeabi-v7a'],
+      installResult: const <String, dynamic>{
+        'success': true,
+        'message': 'Installer launched',
+      },
+    );
+    final bridgeService = _createBridgeService(
+      canRequestPackageInstalls: true,
+      adbEnabled: true,
+      channel: channel,
+    );
+    addTearDown(bridgeService.dispose);
+
+    final release = LauncherUpdateRelease(
+      tagName: 'v2026.04.12-release',
+      name: 'ATV Launcher Release',
+      htmlUrl: 'https://example.com/release',
+      publishedAt: DateTime(2026, 4, 29, 20, 0),
+      body: '',
+      isDraft: false,
+      isPrerelease: false,
+      assets: [
+        LauncherUpdateAsset(
+          name: 'atv-launcher-release.apk',
+          browserDownloadUrl: 'https://example.com/atv-launcher-release.apk',
+          sizeBytes: 12582912,
+          downloadCount: 42,
+          contentType: 'application/vnd.android.package-archive',
+          uploadedAt: DateTime(2026, 4, 29, 21, 30),
+        ),
+      ],
+    );
+
+    final session = LauncherUpdateSession(
+      updateClient: _FakeLauncherUpdateClient(release: release),
+      launcherChannel: channel,
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SystemBridgeService>.value(
+        value: bridgeService,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UpdatePanelPage(updateSession: session),
+          ),
+        ),
+      ),
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Check latest official release'));
+    await _pumpUi(tester);
+
+    final downloadFinder = find.text('Download latest official APK');
+    expect(downloadFinder, findsOneWidget);
+    await tester.ensureVisible(downloadFinder);
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      await tester.tap(downloadFinder);
+      for (var i = 0; i < 50 && session.busy; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    });
+    await _pumpUi(tester);
+
+    expect(
+      channel.installedApkPaths,
+      contains(predicate<String>((path) => path.endsWith('atv-launcher-release.apk'))),
+    );
+  });
 }
 
 class _FakeLauncherUpdateClient extends LauncherUpdateClient {
@@ -918,25 +1017,30 @@ class _SequencedFakeLauncherUpdateClient extends LauncherUpdateClient {
 SystemBridgeService _createBridgeService({
   required bool canRequestPackageInstalls,
   required bool adbEnabled,
+  _FakeFLauncherChannel? channel,
 }) {
-  final channel = _FakeFLauncherChannel(
-    liteStatus: <String, dynamic>{
-      'updates': <String, dynamic>{
-        'canRequestPackageInstalls': canRequestPackageInstalls,
-        'adbEnabled': adbEnabled,
-      },
-    },
-  );
-  return SystemBridgeService(channel);
+  final fakeChannel = channel ??
+      _FakeFLauncherChannel(
+        liteStatus: <String, dynamic>{
+          'updates': <String, dynamic>{
+            'canRequestPackageInstalls': canRequestPackageInstalls,
+            'adbEnabled': adbEnabled,
+          },
+        },
+      );
+  return SystemBridgeService(fakeChannel);
 }
 
 class _FakeFLauncherChannel extends FLauncherChannel {
   final Map<String, dynamic> liteStatus;
   final List<String> supportedAbis;
+  final List<String> installedApkPaths = <String>[];
+  final Map<String, dynamic> installResult;
 
   _FakeFLauncherChannel({
     required this.liteStatus,
     this.supportedAbis = const <String>[],
+    this.installResult = const <String, dynamic>{'success': true},
   });
 
   @override
@@ -944,6 +1048,12 @@ class _FakeFLauncherChannel extends FLauncherChannel {
 
   @override
   Future<List<String>> getSupportedAbis() async => supportedAbis;
+
+  @override
+  Future<Map<String, dynamic>> installDownloadedApk(String filePath) async {
+    installedApkPaths.add(filePath);
+    return installResult;
+  }
 
   @override
   StreamSubscription<dynamic> addSystemChangedListener(

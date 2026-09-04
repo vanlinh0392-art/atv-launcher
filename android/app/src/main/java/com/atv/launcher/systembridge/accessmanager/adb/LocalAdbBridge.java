@@ -30,7 +30,10 @@ import java.security.spec.EncodedKeySpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -46,7 +49,13 @@ public final class LocalAdbBridge {
     private static final int LOCAL_ADB_PORT = 5555;
     private static final int CONNECT_TIMEOUT_MS = 2000;
     private static final int SOCKET_TIMEOUT_MS = 15000;
+    private static final int[] RETRY_BACKOFF_MS = {500, 1500, 3000};
+    private static final int MAX_CONNECT_RETRIES = 3;
     private static final AdbBase64 ADB_BASE64 = data -> Base64.encodeToString(data, Base64.NO_WRAP);
+    private static final Object KEY_GEN_LOCK = new Object();
+    private static final int MAX_ADB_PAYLOAD = 64 * 1024;
+    private static final java.util.concurrent.locks.ReentrantLock ADB_LOCK = new java.util.concurrent.locks.ReentrantLock();
+    private static volatile AdbCrypto sCachedCrypto = null;
 
     private LocalAdbBridge() {
     }
@@ -86,7 +95,57 @@ public final class LocalAdbBridge {
         return null;
     }
 
+    public static boolean isTransientAdbError(String detail) {
+        if (TextUtils.isEmpty(detail)) {
+            return false;
+        }
+        String lower = detail.toLowerCase(Locale.US);
+        return lower.contains("connection refused")
+                || lower.contains("connect timed out")
+                || lower.contains("connection failed")
+                || lower.contains("stream closed")
+                || lower.contains("socket closed")
+                || lower.contains("reset by peer")
+                || lower.contains("econnrefused")
+                || lower.contains("127.0.0.1:5555 is not responding");
+    }
+
+    private static AdbCrypto getOrCreateCrypto(Context context, AtomicBoolean outGeneratedNewKey)
+            throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+        AdbCrypto crypto = sCachedCrypto;
+        if (crypto != null) {
+            return crypto;
+        }
+        synchronized (KEY_GEN_LOCK) {
+            crypto = sCachedCrypto;
+            if (crypto != null) {
+                return crypto;
+            }
+            File keyDir = new File(context.getFilesDir(), KEY_DIRECTORY_NAME);
+            File privateKey = new File(keyDir, PRIVATE_KEY_FILE_NAME);
+            File publicKey = new File(keyDir, PUBLIC_KEY_FILE_NAME);
+            if (privateKey.isFile() && publicKey.isFile()) {
+                crypto = AdbCrypto.loadAdbKeyPair(ADB_BASE64, privateKey, publicKey);
+            } else {
+                if (!keyDir.isDirectory() && !keyDir.mkdirs()) {
+                    throw new IOException("Could not create the local ADB key directory.");
+                }
+                crypto = AdbCrypto.generateAdbKeyPair(ADB_BASE64);
+                crypto.saveAdbKeyPair(privateKey, publicKey);
+                if (outGeneratedNewKey != null) {
+                    outGeneratedNewKey.set(true);
+                }
+            }
+            sCachedCrypto = crypto;
+            return crypto;
+        }
+    }
+
     public static Result executeShell(Context context, String shellCommand) {
+        if (context == null || TextUtils.isEmpty(shellCommand)) {
+            return Result.failure("Invalid context or command.");
+        }
+
         if (isRootAvailable()) {
             Result rootResult = tryExecuteRootShell(shellCommand);
             if (rootResult != null && rootResult.success) {
@@ -94,26 +153,83 @@ public final class LocalAdbBridge {
             }
         }
 
-        File keyDir = new File(context.getFilesDir(), KEY_DIRECTORY_NAME);
-        File privateKey = new File(keyDir, PRIVATE_KEY_FILE_NAME);
-        File publicKey = new File(keyDir, PUBLIC_KEY_FILE_NAME);
-        boolean generatedNewKey = false;
+        AtomicBoolean generatedNewKey = new AtomicBoolean(false);
+        AdbCrypto crypto;
         try {
-            AdbCrypto crypto;
-            if (privateKey.isFile() && publicKey.isFile()) {
-                crypto = AdbCrypto.loadAdbKeyPair(ADB_BASE64, privateKey, publicKey);
-            } else {
-                if (!keyDir.isDirectory() && !keyDir.mkdirs()) {
-                    return Result.failure("Could not create the local ADB key directory.");
-                }
-                crypto = AdbCrypto.generateAdbKeyPair(ADB_BASE64);
-                crypto.saveAdbKeyPair(privateKey, publicKey);
-                generatedNewKey = true;
-            }
-            return runShellCommand(shellCommand, crypto, generatedNewKey);
+            crypto = getOrCreateCrypto(context, generatedNewKey);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException exception) {
             return Result.failure(exception.toString());
         }
+
+        Result lastResult = null;
+        for (int attempt = 0; attempt <= MAX_CONNECT_RETRIES; attempt++) {
+            try {
+                if (!ADB_LOCK.tryLock(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                    return Result.failure("Local ADB bridge is busy.");
+                }
+                try {
+                    lastResult = runShellCommand(shellCommand, crypto, generatedNewKey.get());
+                } finally {
+                    ADB_LOCK.unlock();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Result.failure("Local ADB execution interrupted.");
+            }
+
+            if (lastResult != null && lastResult.success) {
+                return lastResult;
+            }
+
+            if (attempt < MAX_CONNECT_RETRIES && lastResult != null && isTransientAdbError(lastResult.detail)) {
+                int backoffMs = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)];
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return lastResult;
+                }
+                continue;
+            }
+
+            break;
+        }
+
+        return lastResult != null ? lastResult : Result.failure("Unknown local ADB failure");
+    }
+
+    public static Result executeBatch(Context context, List<String> shellCommands) {
+        if (context == null || shellCommands == null || shellCommands.isEmpty()) {
+            return Result.failure("Invalid context or command list.");
+        }
+
+        List<String> validCommands = new ArrayList<>();
+        for (String cmd : shellCommands) {
+            if (cmd != null && !cmd.trim().isEmpty()) {
+                validCommands.add(cmd.trim());
+            }
+        }
+        if (validCommands.isEmpty()) {
+            return Result.failure("No valid commands to execute.");
+        }
+
+        String compoundCommand = TextUtils.join(" ; ", validCommands);
+        return executeShell(context, compoundCommand);
+    }
+
+    public static Result executeBatch(Context context, String... shellCommands) {
+        if (shellCommands == null || shellCommands.length == 0) {
+            return Result.failure("No commands provided.");
+        }
+        return executeBatch(context, Arrays.asList(shellCommands));
+    }
+
+    public static Result executeBatchShell(Context context, List<String> shellCommands) {
+        return executeBatch(context, shellCommands);
+    }
+
+    public static Result executeBatchShell(Context context, String... shellCommands) {
+        return executeBatch(context, shellCommands);
     }
 
     private static Result runShellCommand(String shellCommand, AdbCrypto crypto, boolean generatedNewKey) {
@@ -331,6 +447,10 @@ public final class LocalAdbBridge {
                 message.checksum = header.getInt();
                 message.magic = header.getInt();
 
+                if (message.payloadLength < 0 || message.payloadLength > MAX_ADB_PAYLOAD) {
+                    throw new IOException("Invalid or oversized ADB payload: " + message.payloadLength);
+                }
+
                 if (message.payloadLength != 0) {
                     message.payload = new byte[message.payloadLength];
                     dataRead = 0;
@@ -352,7 +472,7 @@ public final class LocalAdbBridge {
     }
 
     private static final class AdbConnection implements Closeable {
-        private final HashMap<Integer, AdbStream> openStreams = new HashMap<>();
+        private final java.util.concurrent.ConcurrentHashMap<Integer, AdbStream> openStreams = new java.util.concurrent.ConcurrentHashMap<>();
         private final Thread connectionThread;
         private Socket socket;
         private InputStream inputStream;
@@ -387,7 +507,7 @@ public final class LocalAdbBridge {
             connectionThread.start();
             synchronized (this) {
                 if (!connected) {
-                    wait();
+                    wait(CONNECT_TIMEOUT_MS);
                 }
                 if (!connected) {
                     throw new IOException("Connection failed");
@@ -402,7 +522,7 @@ public final class LocalAdbBridge {
             }
             synchronized (this) {
                 if (!connected) {
-                    wait();
+                    wait(CONNECT_TIMEOUT_MS);
                 }
                 if (!connected) {
                     throw new IOException("Connection failed");
@@ -415,7 +535,7 @@ public final class LocalAdbBridge {
             outputStream.flush();
 
             synchronized (stream) {
-                stream.wait();
+                stream.wait(SOCKET_TIMEOUT_MS);
             }
             if (stream.isClosed()) {
                 throw new ConnectException("Stream open actively rejected by remote peer");
@@ -428,7 +548,7 @@ public final class LocalAdbBridge {
             socket.close();
             connectionThread.interrupt();
             try {
-                connectionThread.join();
+                connectionThread.join(1000);
             } catch (InterruptedException ignored) {
             }
         }
@@ -530,9 +650,10 @@ public final class LocalAdbBridge {
             byte[] data = null;
             synchronized (readQueue) {
                 while (!closed && (data = readQueue.poll()) == null) {
-                    readQueue.wait();
+                    readQueue.wait(SOCKET_TIMEOUT_MS);
+                    if ((data = readQueue.poll()) != null || closed) break;
                 }
-                if (closed) {
+                if (closed && data == null) {
                     throw new IOException("Stream closed");
                 }
             }

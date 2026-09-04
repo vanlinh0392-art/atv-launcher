@@ -67,6 +67,35 @@ void main() {
     final yearValue = _textValue(tester);
     expect(yearValue, isNot(equals(monthValue)));
   });
+
+  test('formats Vietnamese full date with slash and hyphen correctly', () {
+    final dtThursday = DateTime(2026, 9, 3);
+    final formattedSlash = DateTimeWidget.formatVietnameseDate(
+      dtThursday,
+      "Thứ 5 ngày d/M/y",
+    );
+    expect(formattedSlash, "Thứ 5 ngày 3/9/2026");
+
+    final formattedDash = DateTimeWidget.formatVietnameseDate(
+      dtThursday,
+      "Thứ 5 ngày d-M-y",
+    );
+    expect(formattedDash, "Thứ 5 ngày 3-9-2026");
+
+    final dtSunday = DateTime(2026, 9, 6);
+    final formattedSunday = DateTimeWidget.formatVietnameseDate(
+      dtSunday,
+      "Thứ 5 ngày d/M/y",
+    );
+    expect(formattedSunday, "Chủ nhật ngày 6/9/2026");
+
+    final dtMonday = DateTime(2026, 9, 7);
+    final formattedMonday = DateTimeWidget.formatVietnameseDate(
+      dtMonday,
+      "Thứ 5 ngày d/M/y",
+    );
+    expect(formattedMonday, "Thứ 2 ngày 7/9/2026");
+  });
 }
 
 Widget _buildHarness({

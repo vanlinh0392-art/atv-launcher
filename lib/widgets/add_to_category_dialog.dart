@@ -38,25 +38,39 @@ class AddToCategoryDialog extends StatelessWidget {
         builder: (context, categories, _) {
           AppLocalizations localizations = AppLocalizations.of(context)!;
 
+          final screenSize = MediaQuery.sizeOf(context);
           return SimpleDialog(
             title: Text(localizations.withEllipsisAddTo),
-            contentPadding: EdgeInsets.all(16),
-            children: categories
-                .map(
-                  (category) => Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      onTap: () async {
-                        await context
-                            .read<AppsService>()
-                            .addToCategory(selectedApplication, category);
-                        Navigator.of(context).pop();
-                      },
-                      title: Text(category.name),
-                    ),
+            contentPadding: const EdgeInsets.all(16),
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: screenSize.height * 0.65,
+                  maxWidth: 480,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: categories
+                        .map(
+                          (category) => Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              onTap: () async {
+                                await context
+                                    .read<AppsService>()
+                                    .addToCategory(selectedApplication, category);
+                                Navigator.of(context).pop();
+                              },
+                              title: Text(category.name),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
-                )
-                .toList(),
+                ),
+              ),
+            ],
           );
         },
       );

@@ -21,9 +21,6 @@ import 'package:flutter/foundation.dart';
 
 class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   static const bool fastStartupEnabled = true;
-  static const int _homeRecoveryWarmUpMaxRetries = 2;
-  static const Duration _homeRecoveryWarmUpRetryDelay =
-      Duration(milliseconds: 650);
 
   final FLauncherChannel _fLauncherChannel;
   final SettingsService _settingsService;
@@ -31,21 +28,17 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   ImageProvider<Object>? _wallpaper;
   String _loadedWallpaperPreviewPath = '';
   int? _videoTextureId;
-  bool _videoWarmUpScheduled = false;
   bool _videoWarmUpCompleted = false;
-  bool _videoNeedsForegroundRearm = false;
   int _settingsPlaybackSuppressionCount = 0;
   final int _bootstrapStartedAt = DateTime.now().millisecondsSinceEpoch;
-  Timer? _pendingVideoWarmUpTimer;
   bool _homeVisibleAndUsable = false;
   late String _lastKnownPerformanceMode;
 
   ImageProvider<Object>? get wallpaper => _wallpaper;
   int? get videoTextureId => _videoTextureId;
   bool get isVideoMode => _settingsService.wallpaperMode == 'video';
-  bool get videoAllowedByPerformanceMode =>
-      _performanceProfile.allowVideoWallpaper;
-  bool get videoBlockedByPerformanceMode => !videoAllowedByPerformanceMode;
+  bool get videoAllowedByPerformanceMode => true;
+  bool get videoBlockedByPerformanceMode => false;
   bool get settingsPlaybackSuppressed => _settingsPlaybackSuppressionCount > 0;
   String get wallpaperMode => _settingsService.wallpaperMode;
   String get wallpaperAssetUri => _settingsService.wallpaperAssetUri;
@@ -78,22 +71,11 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   HomePerformanceProfile get _performanceProfile =>
       HomePerformanceProfile.resolve(_settingsService.homeDockPerformanceMode);
 
-  Duration get _videoWarmUpDelay =>
-      _performanceProfile.wallpaperVideoWarmUpDelay;
-
   bool get _disableAudioRendererWhenMuted =>
       _performanceProfile.disableAudioRendererWhenMuted;
 
   bool get _shouldDelayVideoUntilHomeSettles =>
       _performanceProfile.startVideoAfterHomeSettles;
-
-  bool get _shouldDelayVideoAfterReturningHome =>
-      _settingsService.homeDockPerformanceMode ==
-      SettingsService.homeDockPerformanceModeSmooth;
-
-  bool get _shouldExplicitlyRearmVideoAfterForegroundReturn =>
-      _settingsService.homeDockPerformanceMode ==
-      SettingsService.homeDockPerformanceModeBalanced;
 
   bool get _shouldReleasePlayerOnBackground =>
       _settingsService.homeDockPerformanceMode !=
@@ -102,19 +84,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
 
   bool get _canActivateVideoWallpaper =>
       isVideoMode && videoAllowedByPerformanceMode;
-
-  bool get _hasStoredVideoSelection =>
-      videoUris.isNotEmpty ||
-      wallpaperAssetUri.isNotEmpty ||
-      videoFolderUri.isNotEmpty ||
-      videoFolderBucketId.isNotEmpty;
-
-  bool get _shouldAutoRestoreVideoAfterOffFallback =>
-      _settingsService.wallpaperVideoRestoreCandidatePending &&
-      videoAllowedByPerformanceMode &&
-      _settingsService.homeDockPerformanceMode !=
-          SettingsService.homeDockPerformanceModeQuality &&
-      _hasStoredVideoSelection;
 
   WallpaperService(this._fLauncherChannel, this._settingsService) {
     _lastKnownPerformanceMode = _settingsService.homeDockPerformanceMode;
@@ -129,14 +98,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       'time_to_wallpaper_poster',
       DateTime.now().millisecondsSinceEpoch - _bootstrapStartedAt,
     );
-    if (videoBlockedByPerformanceMode && isVideoMode) {
-      await _fallbackFromVideoForPerformanceMode(autoRestoreEligible: true);
-      return;
-    }
-    if (_shouldAutoRestoreVideoAfterOffFallback) {
-      await _restoreVideoAfterOffFallback();
-      return;
-    }
     if (!_canActivateVideoWallpaper) {
       await _syncCurrentNonVideoModeToNative(
         clearRestoreCandidateForQuality: true,
@@ -156,14 +117,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> restoreFromSettings() async {
     await _reloadPreviewImage();
-    if (videoBlockedByPerformanceMode && isVideoMode) {
-      await _fallbackFromVideoForPerformanceMode(autoRestoreEligible: true);
-      return;
-    }
-    if (_shouldAutoRestoreVideoAfterOffFallback) {
-      await _restoreVideoAfterOffFallback();
-      return;
-    }
     if (!_canActivateVideoWallpaper) {
       await _syncCurrentNonVideoModeToNative(
         clearRestoreCandidateForQuality: true,
@@ -256,7 +209,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _scheduleVideoWarmUp({required bool allowDeferredStart}) {
     if (!_canActivateVideoWallpaper ||
-        _videoWarmUpScheduled ||
         _videoWarmUpCompleted) {
       return;
     }
@@ -264,13 +216,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
         (!_homeVisibleAndUsable || settingsPlaybackSuppressed)) {
       return;
     }
-    _pendingVideoWarmUpTimer?.cancel();
-    _videoWarmUpScheduled = true;
-    _pendingVideoWarmUpTimer = Timer(_videoWarmUpDelay, () async {
-      _pendingVideoWarmUpTimer = null;
-      _videoWarmUpScheduled = false;
-      await _startVideoWarmUpIfEligible(allowDeferredStart: allowDeferredStart);
-    });
+    unawaited(
+      _startVideoWarmUpIfEligible(allowDeferredStart: allowDeferredStart),
+    );
   }
 
   Future<void> _warmUpVideoControllerForCurrentMode({
@@ -310,7 +258,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await _ensureVideoTextureId();
     await syncVideoOptionsToNative(notifyFlutter: false);
     _videoWarmUpCompleted = true;
-    _videoNeedsForegroundRearm = false;
     notifyListeners();
     _logStartupMetric(
       'time_to_video_ready_request',
@@ -336,9 +283,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> pickVideoWallpaper() async {
-    if (videoBlockedByPerformanceMode) {
-      return;
-    }
     final result = await _fLauncherChannel.pickWallpaperAsset(kind: 'video');
     if (result['cancelled'] == true) {
       return;
@@ -355,9 +299,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> pickVideoWallpaperFilesSaf() async {
-    if (videoBlockedByPerformanceMode) {
-      return;
-    }
     final result = await _fLauncherChannel.pickWallpaperFiles();
     if (result['cancelled'] == true) {
       return;
@@ -376,9 +317,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> pickVideoWallpaperFolderSaf() async {
-    if (videoBlockedByPerformanceMode) {
-      return;
-    }
     final result = await _fLauncherChannel.pickWallpaperFolder();
     if (result['cancelled'] == true) {
       return;
@@ -408,9 +346,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     String folderBucketId = '',
     String folderName = '',
   }) async {
-    if (videoBlockedByPerformanceMode) {
-      return;
-    }
     await _applyVideoSelection(
       sourceType: sourceType,
       wallpaperAssetUri: uris.isEmpty ? '' : uris.first,
@@ -430,9 +365,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     String folderBucketId = '',
     String folderName = '',
   }) async {
-    if (videoBlockedByPerformanceMode) {
-      return;
-    }
     await _settingsService.setWallpaperAssetUri(wallpaperAssetUri);
     await _settingsService.setWallpaperPreviewPath(previewPath);
     await _settingsService.setWallpaperMode('video');
@@ -518,12 +450,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     if (suppressed) {
       _settingsPlaybackSuppressionCount += 1;
       cancelPendingHomeVideoStart();
-      if (_shouldDelayVideoAfterReturningHome) {
-        _markVideoNeedsWarmUp(clearTexture: false);
-      } else if (_shouldExplicitlyRearmVideoAfterForegroundReturn &&
-          _videoWarmUpCompleted) {
-        _videoNeedsForegroundRearm = true;
-      }
     } else if (_settingsPlaybackSuppressionCount > 0) {
       _settingsPlaybackSuppressionCount -= 1;
     }
@@ -540,10 +466,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     if (nextSuppressed || !_canActivateVideoWallpaper) {
       return;
     }
-    if (_shouldDelayVideoAfterReturningHome) {
-      scheduleHomeVisibleVideoStart();
-      return;
-    }
     await _resumeVideoAfterForegroundReturnIfNeeded(
       reason: 'settings_release',
     );
@@ -554,17 +476,12 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
       return;
     }
-    if (_videoNeedsForegroundRearm) {
-      unawaited(
-        _resumeVideoAfterForegroundReturnIfNeeded(
-          reason: 'home_visible',
-        ),
-      );
-      return;
+    if (_videoTextureId != null && _videoTextureId! >= 0) {
+      _videoWarmUpCompleted = true;
     }
     if (_shouldDelayVideoUntilHomeSettles) {
       scheduleHomeVisibleVideoStart();
-    } else if (!_videoWarmUpCompleted && !_videoWarmUpScheduled) {
+    } else if (!_videoWarmUpCompleted) {
       if (fastStartupEnabled) {
         _scheduleVideoWarmUp(allowDeferredStart: false);
       } else {
@@ -575,61 +492,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> recoverVideoPlaybackAfterHomeFrame({
     required String reason,
-  }) async {
-    await _recoverVideoPlaybackAfterHomeFrame(reason: reason, attempt: 0);
-  }
-
-  Future<void> _recoverVideoPlaybackAfterHomeFrame({
-    required String reason,
-    required int attempt,
-  }) async {
-    _homeVisibleAndUsable = true;
-    if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
-      return;
-    }
-    cancelPendingHomeVideoStart();
-    _logRuntimeEvent(
-      'wallpaper_home_recovery reason=$reason mode=${_settingsService.homeDockPerformanceMode}',
-    );
-    try {
-      await _warmUpVideoController();
-    } catch (error, stackTrace) {
-      if (_isTransientHomeRecoveryBridgeError(error) &&
-          attempt < _homeRecoveryWarmUpMaxRetries) {
-        Timer(_homeRecoveryWarmUpRetryDelay, () {
-          if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
-            return;
-          }
-          unawaited(
-            _recoverVideoPlaybackAfterHomeFrame(
-              reason: reason,
-              attempt: attempt + 1,
-            ),
-          );
-        });
-        return;
-      }
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stackTrace,
-          library: 'wallpaper_service',
-          context: ErrorDescription('while recovering video wallpaper on HOME'),
-        ),
-      );
-    }
-  }
-
-  bool _isTransientHomeRecoveryBridgeError(Object error) {
-    final message = error.toString();
-    return message.contains('activity_unavailable') ||
-        message.contains('Launcher activity is not attached');
-  }
+  }) async {}
 
   void cancelPendingHomeVideoStart({bool clearHomeVisible = false}) {
-    _pendingVideoWarmUpTimer?.cancel();
-    _pendingVideoWarmUpTimer = null;
-    _videoWarmUpScheduled = false;
     if (clearHomeVisible) {
       _homeVisibleAndUsable = false;
     }
@@ -682,8 +547,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
         !_canActivateVideoWallpaper ||
         settingsPlaybackSuppressed ||
         !_homeVisibleAndUsable ||
-        _videoWarmUpCompleted ||
-        _videoWarmUpScheduled) {
+        _videoWarmUpCompleted) {
       return;
     }
     _scheduleVideoWarmUp(allowDeferredStart: true);
@@ -695,7 +559,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }) {
     cancelPendingHomeVideoStart();
     _videoWarmUpCompleted = false;
-    _videoNeedsForegroundRearm = false;
     if (clearTexture) {
       _videoTextureId = null;
     }
@@ -706,11 +569,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _handleAppBackgrounded() {
     cancelPendingHomeVideoStart(clearHomeVisible: true);
-    if (_shouldExplicitlyRearmVideoAfterForegroundReturn &&
-        _canActivateVideoWallpaper &&
-        _videoWarmUpCompleted) {
-      _videoNeedsForegroundRearm = true;
-    }
     if (_shouldReleasePlayerOnBackground && _canActivateVideoWallpaper) {
       _markVideoNeedsWarmUp(clearTexture: false);
     }
@@ -723,22 +581,8 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
         return;
       }
       _homeVisibleAndUsable = true;
-      if (_shouldDelayVideoAfterReturningHome) {
-        if (!_videoWarmUpCompleted &&
-            !_videoWarmUpScheduled &&
-            !settingsPlaybackSuppressed) {
-          scheduleHomeVisibleVideoStart();
-        } else {
-          unawaited(
-            _resumeVideoAfterForegroundReturnIfNeeded(
-              reason: 'app_resumed',
-            ),
-          );
-        }
-        return;
-      }
       unawaited(
-        _resumeVideoAfterForegroundReturnIfNeeded(
+        _resumeVideoInstantlyOnWake(
           reason: 'app_resumed',
         ),
       );
@@ -767,24 +611,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _applyPerformanceModePolicyChange() async {
-    if (!_shouldExplicitlyRearmVideoAfterForegroundReturn) {
-      _videoNeedsForegroundRearm = false;
-    }
     await syncVideoOptionsToNative(notifyFlutter: false);
-    if (videoBlockedByPerformanceMode && isVideoMode) {
-      await _fallbackFromVideoForPerformanceMode(autoRestoreEligible: true);
-      return;
-    }
-    if (_shouldAutoRestoreVideoAfterOffFallback) {
-      await _restoreVideoAfterOffFallback();
-      return;
-    }
-    if (videoAllowedByPerformanceMode &&
-        _settingsService.wallpaperVideoRestoreCandidatePending &&
-        _settingsService.homeDockPerformanceMode ==
-            SettingsService.homeDockPerformanceModeQuality) {
-      await _settingsService.setWallpaperVideoRestoreCandidatePending(false);
-    }
     if (!_canActivateVideoWallpaper) {
       notifyListeners();
       return;
@@ -797,7 +624,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return;
     }
-    if (!_videoWarmUpCompleted && !_videoWarmUpScheduled) {
+    if (!_videoWarmUpCompleted) {
       if (fastStartupEnabled) {
         _scheduleVideoWarmUp(allowDeferredStart: false);
       } else {
@@ -805,28 +632,6 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     notifyListeners();
-  }
-
-  Future<void> _fallbackFromVideoForPerformanceMode({
-    required bool autoRestoreEligible,
-  }) async {
-    cancelPendingHomeVideoStart(clearHomeVisible: true);
-    _markVideoNeedsWarmUp(clearTexture: true, notify: false);
-    final hasPosterPreview = await _reloadPreviewImage();
-    await _settingsService.setWallpaperVideoRestoreCandidatePending(
-      autoRestoreEligible && _hasStoredVideoSelection,
-    );
-    if (hasPosterPreview) {
-      await _settingsService.setWallpaperMode('image');
-      await _fLauncherChannel.setWallpaperMode('image');
-      await syncVideoOptionsToNative(notifyFlutter: false);
-      notifyListeners();
-      return;
-    }
-    await _settingsService.setWallpaperMode('gradient');
-    await _fLauncherChannel.setWallpaperMode('gradient');
-    await _setWallpaperPreview(null, previewPath: '');
-    await syncVideoOptionsToNative(notifyFlutter: false);
   }
 
   Future<void> _syncCurrentNonVideoModeToNative({
@@ -845,23 +650,8 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     await syncVideoOptionsToNative(notifyFlutter: false);
   }
 
-  Future<void> _restoreVideoAfterOffFallback() async {
-    await _settingsService.setWallpaperVideoRestoreCandidatePending(false);
-    await _settingsService.setWallpaperMode('video');
-    await _fLauncherChannel.setWallpaperMode('video');
-    await _reloadPreviewImage();
-    _markVideoNeedsWarmUp(
-      clearTexture: false,
-      notify: false,
-    );
-    await _warmUpVideoControllerForCurrentMode(allowDeferred: true);
-    notifyListeners();
-  }
-
   Future<void> _resumeVideoImmediatelyIfNeeded() async {
-    if (!_canActivateVideoWallpaper ||
-        _videoWarmUpCompleted ||
-        _videoWarmUpScheduled) {
+    if (!_canActivateVideoWallpaper || _videoWarmUpCompleted) {
       return;
     }
     await _warmUpVideoController();
@@ -873,16 +663,24 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
       return;
     }
-    if (_videoNeedsForegroundRearm) {
-      if (_videoWarmUpScheduled) {
-        return;
-      }
-      _logRuntimeEvent(
-        'wallpaper_rearm reason=$reason mode=${_settingsService.homeDockPerformanceMode}',
-      );
-      await _warmUpVideoController();
+    await _resumeVideoImmediatelyIfNeeded();
+  }
+
+  Future<void> _resumeVideoInstantlyOnWake({
+    required String reason,
+  }) async {
+    if (!_canActivateVideoWallpaper || settingsPlaybackSuppressed) {
       return;
     }
-    await _resumeVideoImmediatelyIfNeeded();
+    _logRuntimeEvent(
+      'wallpaper_wake_instant_resume reason=$reason mode=${_settingsService.homeDockPerformanceMode}',
+    );
+    cancelPendingHomeVideoStart();
+    if (_videoTextureId == null || _videoTextureId! < 0) {
+      await _ensureVideoTextureId();
+    }
+    await syncVideoOptionsToNative(notifyFlutter: false);
+    _videoWarmUpCompleted = true;
+    notifyListeners();
   }
 }

@@ -111,6 +111,9 @@ class _RoundedSwitchListTileState extends State<RoundedSwitchListTile> {
           },
           child: SettingsFocusFrame(
             padding: EdgeInsets.zero,
+            borderRadius: const BorderRadius.all(
+              Radius.circular(TvDrawerTokens.radiusCard),
+            ),
             variant: SettingsFocusFrameVariant.rowOnly,
             focusEmphasis: 1.28,
             focused: _focused,
@@ -121,32 +124,55 @@ class _RoundedSwitchListTileState extends State<RoundedSwitchListTile> {
                 duration: const Duration(milliseconds: 110),
                 opacity:
                     widget.onChanged == null ? 0.46 : (_focused ? 1 : 0.97),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      IconTheme.merge(
-                        data: IconThemeData(
-                          color: widget.onChanged == null
-                              ? Colors.white38
-                              : (_focused ? Colors.white : Colors.white70),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: TvDrawerTokens.cardMinHeight,
+                  ),
+                  child: Padding(
+                    padding: TvDrawerTokens.cardPadding,
+                    child: Row(
+                      children: [
+                        IconTheme.merge(
+                          data: IconThemeData(
+                            color: widget.onChanged == null
+                                ? Colors.white38
+                                : (_focused ? Colors.white : Colors.white70),
+                          ),
+                          child: widget.secondary,
                         ),
-                        child: widget.secondary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: widget.title),
-                      const SizedBox(width: 8),
-                      ExcludeFocus(
-                        child: SizedBox(
-                          height: 18,
-                          child: Switch(
-                            value: widget.value,
-                            onChanged: widget.onChanged,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DefaultTextStyle.merge(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyLarge
+                                ?.copyWith(
+                                  color: widget.onChanged == null
+                                      ? Colors.white38
+                                      : (_focused
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.96)),
+                                  fontWeight: _focused
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                            child: widget.title,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        ExcludeFocus(
+                          child: IgnorePointer(
+                            child: SizedBox(
+                              height: 18,
+                              child: Switch(
+                                value: widget.value,
+                                onChanged: null,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -19,6 +19,7 @@
 //import 'dart:html';
 
 import 'package:flauncher/providers/settings_service.dart';
+import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
@@ -152,6 +153,10 @@ void main() async {
         settingsService.statusBarClockScalePercent,
         SettingsService.statusBarClockScaleDefault,
       );
+      expect(
+        settingsService.settingsBackdropTheme,
+        TvSettingsBackdropTheme.deepSlate,
+      );
     });
 
     test("backup and restore include dock and status bar fields", () async {
@@ -165,6 +170,7 @@ void main() async {
         'homeDockRowSpacing': 8,
         'appLocaleMode': 'vi',
         'settingsUiTransparencyPercent': 70,
+        'settingsBackdropTheme': 'ocean_navy',
         'appCardCornerRadius': 18,
         'appCardLayoutScalePercent': 95,
         'appHighlightAnimationColorPreset':
@@ -190,6 +196,10 @@ void main() async {
       expect(
           settingsService.appLocaleMode, SettingsService.appLocaleVietnamese);
       expect(settingsService.settingsUiTransparencyPercent, 70);
+      expect(
+        settingsService.settingsBackdropTheme,
+        TvSettingsBackdropTheme.oceanNavy,
+      );
       expect(settingsService.appCardCornerRadius, 18);
       expect(settingsService.appCardLayoutScalePercent, 95);
       expect(
@@ -212,6 +222,7 @@ void main() async {
       expect(backup['homeDockRowSpacing'], 8);
       expect(backup['appLocaleMode'], SettingsService.appLocaleVietnamese);
       expect(backup['settingsUiTransparencyPercent'], 70);
+      expect(backup['settingsBackdropTheme'], 'ocean_navy');
       expect(backup['appCardCornerRadius'], 18);
       expect(backup['appCardLayoutScalePercent'], 95);
       expect(
@@ -248,6 +259,9 @@ void main() async {
       await settingsService.setAppCardMediaScalePercent(125);
       await settingsService.setVideoWallpaperRepeatCountPerItem(8);
       await settingsService.setStatusBarClockScalePercent(180);
+      await settingsService.setSettingsBackdropTheme(
+        TvSettingsBackdropTheme.forestMoss,
+      );
 
       await settingsService.applyBackupMap(const <String, dynamic>{
         'homeDockRowsPreset': 2,
@@ -300,6 +314,10 @@ void main() async {
       expect(
         settingsService.statusBarClockScalePercent,
         SettingsService.statusBarClockScaleDefault,
+      );
+      expect(
+        settingsService.settingsBackdropTheme,
+        TvSettingsBackdropTheme.deepSlate,
       );
     });
 
@@ -440,6 +458,181 @@ void main() async {
         settingsService.settingsUiTransparencyPercent,
         0,
       );
+    });
+  });
+
+  group("settingsBackdropTheme", () {
+    test("defaults to deepSlate when nothing is stored", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+      final service = SettingsService(sharedPreferences);
+
+      expect(service.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+    });
+
+    test("saves and restores each TvSettingsBackdropTheme accurately", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+      final service = SettingsService(sharedPreferences);
+
+      // Default is deepSlate. Transition through all themes including deepSlate
+      const sequence = [
+        TvSettingsBackdropTheme.obsidianOled,
+        TvSettingsBackdropTheme.oceanNavy,
+        TvSettingsBackdropTheme.smokyAmethyst,
+        TvSettingsBackdropTheme.forestMoss,
+        TvSettingsBackdropTheme.warmEspresso,
+        TvSettingsBackdropTheme.deepSlate,
+      ];
+      for (final theme in sequence) {
+        await service.setSettingsBackdropTheme(theme);
+        expect(service.settingsBackdropTheme, theme);
+        expect(
+          sharedPreferences.getString("settings_backdrop_theme"),
+          theme.key,
+        );
+      }
+    });
+
+    test("safely falls back to deepSlate for null, empty, wrong type or invalid string keys", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+      final service = SettingsService(sharedPreferences);
+
+      // Null or not set
+      expect(service.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+
+      // Empty string
+      await sharedPreferences.setString("settings_backdrop_theme", "");
+      expect(service.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+
+      // Invalid string key
+      await sharedPreferences.setString("settings_backdrop_theme", "non_existent_key_xyz");
+      expect(service.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+
+      // Directly test TvSettingsBackdropTheme.fromKey
+      expect(TvSettingsBackdropTheme.fromKey(null), TvSettingsBackdropTheme.deepSlate);
+      expect(TvSettingsBackdropTheme.fromKey(""), TvSettingsBackdropTheme.deepSlate);
+      expect(TvSettingsBackdropTheme.fromKey("unknown"), TvSettingsBackdropTheme.deepSlate);
+      expect(TvSettingsBackdropTheme.fromKey("obsidian_oled"), TvSettingsBackdropTheme.obsidianOled);
+      expect(TvSettingsBackdropTheme.fromKey("ocean_navy"), TvSettingsBackdropTheme.oceanNavy);
+      expect(TvSettingsBackdropTheme.fromKey("smoky_amethyst"), TvSettingsBackdropTheme.smokyAmethyst);
+      expect(TvSettingsBackdropTheme.fromKey("forest_moss"), TvSettingsBackdropTheme.forestMoss);
+      expect(TvSettingsBackdropTheme.fromKey("warm_espresso"), TvSettingsBackdropTheme.warmEspresso);
+      expect(TvSettingsBackdropTheme.fromKey("deep_slate"), TvSettingsBackdropTheme.deepSlate);
+    });
+
+    test("notifies listeners on theme change and does not notify when setting same theme (idempotency)", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+      final service = SettingsService(sharedPreferences);
+
+      var notifyCount = 0;
+      service.addListener(() {
+        notifyCount++;
+      });
+
+      // Default is deepSlate. Setting deepSlate again should not notify (idempotent)
+      await service.setSettingsBackdropTheme(TvSettingsBackdropTheme.deepSlate);
+      expect(notifyCount, 0);
+
+      // Changing to oceanNavy should notify once
+      await service.setSettingsBackdropTheme(TvSettingsBackdropTheme.oceanNavy);
+      expect(notifyCount, 1);
+      expect(service.settingsBackdropTheme, TvSettingsBackdropTheme.oceanNavy);
+
+      // Setting oceanNavy again should not notify
+      await service.setSettingsBackdropTheme(TvSettingsBackdropTheme.oceanNavy);
+      expect(notifyCount, 1);
+
+      // Changing to warmEspresso should notify
+      await service.setSettingsBackdropTheme(TvSettingsBackdropTheme.warmEspresso);
+      expect(notifyCount, 2);
+      expect(service.settingsBackdropTheme, TvSettingsBackdropTheme.warmEspresso);
+    });
+
+    test("backup and restore preserves settingsBackdropTheme correctly", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+      final service = SettingsService(sharedPreferences);
+
+      await service.setSettingsBackdropTheme(TvSettingsBackdropTheme.smokyAmethyst);
+      final backup = service.toBackupMap();
+      expect(backup['settingsBackdropTheme'], 'smoky_amethyst');
+
+      // Clear preferences to simulate new device / reset
+      await sharedPreferences.clear();
+      final restoredService = SettingsService(sharedPreferences);
+      expect(restoredService.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+
+      await restoredService.applyBackupMap(backup);
+      expect(restoredService.settingsBackdropTheme, TvSettingsBackdropTheme.smokyAmethyst);
+
+      // Fallback check when backup contains an invalid or unknown theme key
+      await restoredService.applyBackupMap(const <String, dynamic>{
+        'settingsBackdropTheme': 'hacked_or_unknown_theme',
+      });
+      expect(restoredService.settingsBackdropTheme, TvSettingsBackdropTheme.deepSlate);
+    });
+
+    test("locale migration and sanitization defaults to Vietnamese", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+
+      // Case 1: fresh install or null locale migrates to Vietnamese
+      final freshService = SettingsService(sharedPreferences);
+      expect(freshService.appLocaleMode, SettingsService.appLocaleVietnamese);
+
+      // Case 2: legacy 'system' locale migrates to Vietnamese
+      await sharedPreferences.setString('app_locale_mode', 'system');
+      final legacyService = SettingsService(sharedPreferences);
+      expect(legacyService.appLocaleMode, SettingsService.appLocaleVietnamese);
+
+      // Case 3: english is preserved
+      await legacyService.setAppLocaleMode('en');
+      expect(legacyService.appLocaleMode, SettingsService.appLocaleEnglish);
+
+      // Case 4: any invalid/unknown locale sanitizes to Vietnamese
+      await legacyService.setAppLocaleMode('fr');
+      expect(legacyService.appLocaleMode, SettingsService.appLocaleVietnamese);
+
+      // Case 5: backup restore sanitizes locale
+      await legacyService.applyBackupMap(const <String, dynamic>{
+        'appLocaleMode': 'unknown_lang',
+      });
+      expect(legacyService.appLocaleMode, SettingsService.appLocaleVietnamese);
+
+      await legacyService.applyBackupMap(const <String, dynamic>{
+        'appLocaleMode': 'en',
+      });
+      expect(legacyService.appLocaleMode, SettingsService.appLocaleEnglish);
+    });
+
+    test("statusBarDateStyle getter, setter, default, and backup/restore", () async {
+      final sharedPreferences = await SharedPreferences.getInstance();
+      await sharedPreferences.clear();
+      final settingsService = SettingsService(sharedPreferences);
+
+      expect(settingsService.statusBarDateStyle, SettingsService.defaultDateStyle);
+
+      await settingsService.setStatusBarDateStyle(SettingsService.dateStyleBold);
+      expect(settingsService.statusBarDateStyle, SettingsService.dateStyleBold);
+
+      await settingsService.setStatusBarDateStyle(SettingsService.dateStyleMonospace);
+      expect(settingsService.statusBarDateStyle, SettingsService.dateStyleMonospace);
+
+      await settingsService.setDateFormat("Thứ 5 ngày d/M/y");
+      expect(settingsService.dateFormat, "Thứ 5 ngày d/M/y");
+
+      final backup = settingsService.toBackupMap();
+      expect(backup['statusBarDateStyle'], SettingsService.dateStyleMonospace);
+      expect(backup['dateFormat'], "Thứ 5 ngày d/M/y");
+
+      await sharedPreferences.clear();
+      final freshService = SettingsService(sharedPreferences);
+      await freshService.applyBackupMap(backup);
+      expect(freshService.statusBarDateStyle, SettingsService.dateStyleMonospace);
+      expect(freshService.dateFormat, "Thứ 5 ngày d/M/y");
     });
   });
 }

@@ -14,11 +14,13 @@ public class VoiceModeControlReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent != null ? intent.getAction() : null;
-        if (TextUtils.equals(action, VoiceModeControlContract.ACTION_GET_MODE)) {
+        if (TextUtils.equals(action, VoiceModeControlContract.ACTION_GET_MODE)
+                || TextUtils.equals(action, VoiceModeControlContract.LEGACY_ACTION_GET_MODE)) {
             respondWithConfig(context, Activity.RESULT_OK, VoiceModeControlContract.STATUS_OK);
             return;
         }
-        if (TextUtils.equals(action, VoiceModeControlContract.ACTION_SET_MODE)) {
+        if (TextUtils.equals(action, VoiceModeControlContract.ACTION_SET_MODE)
+                || TextUtils.equals(action, VoiceModeControlContract.LEGACY_ACTION_SET_MODE)) {
             int mode = intent.getIntExtra(VoiceModeControlContract.EXTRA_MODE, Integer.MIN_VALUE);
             if (!isSupportedMode(mode)) {
                 respondWithConfig(context, Activity.RESULT_CANCELED, VoiceModeControlContract.STATUS_INVALID_MODE);

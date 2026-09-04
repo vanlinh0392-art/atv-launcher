@@ -220,8 +220,7 @@ class FLauncherDatabase extends _$FLauncherDatabase {
 
     return query.get();
   }
-
-  Future<List<LauncherSpacer>> getLauncherSpacers() {
+  Future<List<LauncherSpacer>> getLauncherSpacers() {
     final query = select(launcherSpacers);
     query.orderBy([(s) => OrderingTerm.asc(s.order)]);
 
@@ -242,50 +241,52 @@ class FLauncherDatabase extends _$FLauncherDatabase {
   Future<List<App>> listApplications() => getApplications();
 
   Future<List<CategoryWithApps>> listCategoriesWithVisibleApps() async {
-    final categories = await getCategories();
-    final appCategoryRows = await getAppsCategories();
-    final applications = await getApplications();
+    return transaction(() async {
+      final categories = await getCategories();
+      final appCategoryRows = await getAppsCategories();
+      final applications = await getApplications();
 
-    final visibleApps = <String, App>{
-      for (final application in applications)
-        if (!application.hidden) application.packageName: application,
-    };
-    final categoriesById = <int, Category>{
-      for (final category in categories) category.id: category,
-    };
+      final visibleApps = <String, App>{
+        for (final application in applications)
+          if (!application.hidden) application.packageName: application,
+      };
+      final categoriesById = <int, Category>{
+        for (final category in categories) category.id: category,
+      };
 
-    for (final appCategory in appCategoryRows) {
-      final category = categoriesById[appCategory.categoryId];
-      final application = visibleApps[appCategory.appPackageName];
-      if (category == null || application == null) {
-        continue;
+      for (final appCategory in appCategoryRows) {
+        final category = categoriesById[appCategory.categoryId];
+        final application = visibleApps[appCategory.appPackageName];
+        if (category == null || application == null) {
+          continue;
+        }
+
+        application.categoryOrders[category.id] = appCategory.order;
+        category.applications.add(application);
       }
 
-      application.categoryOrders[category.id] = appCategory.order;
-      category.applications.add(application);
-    }
-
-    for (final category in categories) {
-      if (category.sort == CategorySort.alphabetical) {
-        category.applications.sort((left, right) => left.name.compareTo(right.name));
-      } else {
-        category.applications.sort((left, right) {
-          final leftOrder = left.categoryOrders[category.id] ?? 0;
-          final rightOrder = right.categoryOrders[category.id] ?? 0;
-          return leftOrder.compareTo(rightOrder);
-        });
+      for (final category in categories) {
+        if (category.sort == CategorySort.alphabetical) {
+          category.applications.sort((left, right) => left.name.compareTo(right.name));
+        } else {
+          category.applications.sort((left, right) {
+            final leftOrder = left.categoryOrders[category.id] ?? 0;
+            final rightOrder = right.categoryOrders[category.id] ?? 0;
+            return leftOrder.compareTo(rightOrder);
+          });
+        }
       }
-    }
 
-    return categories
-        .where((category) => category.applications.isNotEmpty)
-        .map(
-          (category) => CategoryWithApps(
-            category.unmodifiable(),
-            List<App>.unmodifiable(category.applications),
-          ),
-        )
-        .toList(growable: false);
+      return categories
+          .where((category) => category.applications.isNotEmpty)
+          .map(
+            (category) => CategoryWithApps(
+              category.unmodifiable(),
+              List<App>.unmodifiable(category.applications),
+            ),
+          )
+          .toList(growable: false);
+    });
   }
 
   Future<int?> nextAppCategoryOrder(int categoryId) async {
@@ -304,5 +305,12 @@ DatabaseConnection connect() => DatabaseConnection.delayed(() async {
       final dbFolder = await getApplicationDocumentsDirectory();
       final file = File(path.join(dbFolder.path, 'db.sqlite'));
       return DatabaseConnection(
-          NativeDatabase(file, logStatements: foundation.kDebugMode));
+        NativeDatabase(
+          file,
+          logStatements: foundation.kDebugMode,
+          setup: (rawDb) {
+            rawDb.execute('PRAGMA busy_timeout = 5000;');
+          },
+        ),
+      );
     }());

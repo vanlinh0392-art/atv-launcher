@@ -61,8 +61,7 @@ void main() {
     ).called(1);
   });
 
-  test('balanced startup waits for home usable signal before delayed warm-up',
-      () async {
+  test('balanced startup warms up video instantly on startup', () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
           SettingsService.homeDockPerformanceModeBalanced,
@@ -76,7 +75,8 @@ void main() {
     final service = WallpaperService(channel, settings);
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    verifyNever(channel.getVideoWallpaperTextureId());
+    expect(service.videoTextureId, 17);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
     verify(
       channel.setVideoWallpaperOptions(
         sourceType: anyNamed('sourceType'),
@@ -97,18 +97,9 @@ void main() {
         autoResume: anyNamed('autoResume'),
         videoAllowedByPerformanceMode: true,
         disableAudioRendererWhenMuted: true,
-        deferForegroundResume: true,
+        deferForegroundResume: false,
       ),
     ).called(1);
-
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    verifyNever(channel.getVideoWallpaperTextureId());
-
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
-    expect(service.videoTextureId, 17);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
   });
 
   test('balanced home warm-up syncs native video mode before texture request',
@@ -125,10 +116,6 @@ void main() {
 
     final service = WallpaperService(channel, settings);
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    clearInteractions(channel);
-
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
 
     expect(service.videoTextureId, 18);
     verifyInOrder([
@@ -157,12 +144,12 @@ void main() {
         disableAudioRendererWhenMuted: anyNamed(
           'disableAudioRendererWhenMuted',
         ),
-        deferForegroundResume: true,
+        deferForegroundResume: false,
       ),
     ]);
   });
 
-  test('restoreFromSettings defers video warm-up until home becomes usable',
+  test('restoreFromSettings warms up video immediately for active video mode',
       () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
@@ -180,17 +167,14 @@ void main() {
     await settings.setWallpaperMode('video');
     await settings.setWallpaperAssetUri('content://video/restore');
 
+    clearInteractions(channel);
     await service.restoreFromSettings();
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    verify(channel.setWallpaperMode('video')).called(1);
-    verifyNever(channel.getVideoWallpaperTextureId());
-
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
     expect(service.videoTextureId, 11);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
+    verify(channel.setWallpaperMode('video')).called(greaterThanOrEqualTo(1));
+    verify(channel.getVideoWallpaperTextureId())
+        .called(greaterThanOrEqualTo(1));
   });
 
   test('smooth settings suppression reschedules video after release', () async {
@@ -206,24 +190,23 @@ void main() {
 
     final service = WallpaperService(channel, settings);
     await Future<void>.delayed(const Duration(milliseconds: 50));
-
-    service.notifyHomeVisibleAndUsable();
-    await service.setSettingsPlaybackSuppressed(true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-
-    verifyNever(channel.getVideoWallpaperTextureId());
-
-    await service.setSettingsPlaybackSuppressed(false);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-
     expect(service.videoTextureId, 23);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
+
+    await service.setSettingsPlaybackSuppressed(true);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(service.settingsPlaybackSuppressed, isTrue);
     verify(
       channel.setVideoWallpaperPlaybackSuppressed(
         suppressed: true,
         reason: 'settings_panel',
       ),
     ).called(1);
+
+    await service.setSettingsPlaybackSuppressed(false);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(service.settingsPlaybackSuppressed, isFalse);
     verify(
       channel.setVideoWallpaperPlaybackSuppressed(
         suppressed: false,
@@ -232,7 +215,7 @@ void main() {
     ).called(1);
   });
 
-  test('balanced rearms warmed video immediately after settings release',
+  test('balanced retains warmed video texture across settings suppression',
       () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
@@ -246,8 +229,6 @@ void main() {
 
     final service = WallpaperService(channel, settings);
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
 
     expect(service.videoTextureId, 31);
     verify(channel.getVideoWallpaperTextureId()).called(1);
@@ -258,10 +239,17 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
     expect(service.videoTextureId, 31);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
+    verify(channel.setVideoWallpaperPlaybackSuppressed(
+      suppressed: true,
+      reason: 'settings_panel',
+    )).called(1);
+    verify(channel.setVideoWallpaperPlaybackSuppressed(
+      suppressed: false,
+      reason: 'settings_panel_release',
+    )).called(1);
   });
 
-  test('balanced home recovery resyncs native video mode before rearm',
+  test('balanced home recovery is safe no-op retaining video state',
       () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
@@ -275,8 +263,7 @@ void main() {
 
     final service = WallpaperService(channel, settings);
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+    expect(service.videoTextureId, 32);
     clearInteractions(channel);
 
     await service.recoverVideoPlaybackAfterHomeFrame(
@@ -284,39 +271,9 @@ void main() {
     );
 
     expect(service.videoTextureId, 32);
-    verifyInOrder([
-      channel.setWallpaperMode('video'),
-      channel.getVideoWallpaperTextureId(),
-      channel.setVideoWallpaperOptions(
-        sourceType: anyNamed('sourceType'),
-        assetUris: anyNamed('assetUris'),
-        folderUri: anyNamed('folderUri'),
-        folderBucketId: anyNamed('folderBucketId'),
-        folderName: anyNamed('folderName'),
-        orderMode: anyNamed('orderMode'),
-        advanceMode: anyNamed('advanceMode'),
-        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
-        repeatCountPerItem: anyNamed('repeatCountPerItem'),
-        playlistLoop: anyNamed('playlistLoop'),
-        loop: anyNamed('loop'),
-        mute: anyNamed('mute'),
-        fit: anyNamed('fit'),
-        dimPercent: anyNamed('dimPercent'),
-        blur: anyNamed('blur'),
-        autoResume: anyNamed('autoResume'),
-        videoAllowedByPerformanceMode: anyNamed(
-          'videoAllowedByPerformanceMode',
-        ),
-        disableAudioRendererWhenMuted: anyNamed(
-          'disableAudioRendererWhenMuted',
-        ),
-        deferForegroundResume: true,
-      ),
-    ]);
   });
 
-  test('balanced starts pending video immediately after settings release',
-      () async {
+  test('balanced starts video immediately on library selection', () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
           SettingsService.homeDockPerformanceModeBalanced,
@@ -327,8 +284,6 @@ void main() {
     when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 29);
 
     final service = WallpaperService(channel, settings);
-    service.notifyHomeVisibleAndUsable();
-    await service.setSettingsPlaybackSuppressed(true);
 
     await service.applyLibrarySelection(
       uris: ['content://video/91'],
@@ -337,12 +292,6 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
     expect(settings.wallpaperMode, 'video');
-    expect(service.videoTextureId, isNull);
-    verifyNever(channel.getVideoWallpaperTextureId());
-
-    await service.setSettingsPlaybackSuppressed(false);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
     expect(service.videoTextureId, 29);
     verify(channel.getVideoWallpaperTextureId()).called(1);
   });
@@ -376,11 +325,36 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
     expect(service.videoTextureId, 41);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
+    verify(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: anyNamed('autoResume'),
+        videoAllowedByPerformanceMode: anyNamed(
+          'videoAllowedByPerformanceMode',
+        ),
+        disableAudioRendererWhenMuted: anyNamed(
+          'disableAudioRendererWhenMuted',
+        ),
+        deferForegroundResume: anyNamed('deferForegroundResume'),
+      ),
+    ).called(1);
   });
 
-  test('smooth restores video after app resumes and home becomes usable',
-      () async {
+  test('smooth restores video after app resumes', () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
           SettingsService.homeDockPerformanceModeSmooth,
@@ -393,8 +367,6 @@ void main() {
 
     final service = WallpaperService(channel, settings);
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 700));
 
     expect(service.videoTextureId, 47);
     verify(channel.getVideoWallpaperTextureId()).called(1);
@@ -405,129 +377,176 @@ void main() {
     expect(service.videoTextureId, 47);
 
     service.didChangeAppLifecycleState(AppLifecycleState.resumed);
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-    verifyNever(channel.getVideoWallpaperTextureId());
-
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     expect(service.videoTextureId, 47);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
   });
 
-  test('off startup falls back to poster image and preserves video restore',
+  test('wake auto-resume restores video immediately when app resumes from sleep',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeSmooth,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/wake-test',
+      'wallpaper_video_auto_resume': true,
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 99);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(service.videoTextureId, 99);
+    clearInteractions(channel);
+
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    expect(service.videoTextureId, 99);
+    verify(
+      channel.setVideoWallpaperOptions(
+        sourceType: anyNamed('sourceType'),
+        assetUris: anyNamed('assetUris'),
+        folderUri: anyNamed('folderUri'),
+        folderBucketId: anyNamed('folderBucketId'),
+        folderName: anyNamed('folderName'),
+        orderMode: anyNamed('orderMode'),
+        advanceMode: anyNamed('advanceMode'),
+        switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+        repeatCountPerItem: anyNamed('repeatCountPerItem'),
+        playlistLoop: anyNamed('playlistLoop'),
+        loop: anyNamed('loop'),
+        mute: anyNamed('mute'),
+        fit: anyNamed('fit'),
+        dimPercent: anyNamed('dimPercent'),
+        blur: anyNamed('blur'),
+        autoResume: true,
+        videoAllowedByPerformanceMode: anyNamed(
+          'videoAllowedByPerformanceMode',
+        ),
+        disableAudioRendererWhenMuted: anyNamed(
+          'disableAudioRendererWhenMuted',
+        ),
+        deferForegroundResume: anyNamed('deferForegroundResume'),
+      ),
+    ).called(1);
+  });
+
+  test(
+      'TC-WPS-01: switching between quality, smooth, and off preserves video mode without fallback',
       () async {
     final previewFile = await _createTempPreviewFile();
     final settings = await _createSettingsService(<String, Object>{
-      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeQuality,
       'wallpaper_mode': 'video',
-      'wallpaper_asset_uri': 'content://video/off-1',
+      'wallpaper_asset_uri': 'content://video/persistent-1',
       'wallpaper_preview_path': previewFile.path,
     });
     final channel = MockFLauncherChannel();
     _stubVideoWallpaperOptions(channel);
     when(channel.setWallpaperMode(any))
         .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 44);
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-
-    expect(settings.wallpaperMode, 'image');
-    expect(settings.wallpaperVideoRestoreCandidatePending, isTrue);
-    expect(service.wallpaper, isNotNull);
-    verify(channel.setWallpaperMode('image')).called(1);
-    verifyNever(channel.getVideoWallpaperTextureId());
-  });
-
-  test('off startup without a poster falls back to gradient', () async {
-    final settings = await _createSettingsService(<String, Object>{
-      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
-      'wallpaper_mode': 'video',
-      'wallpaper_asset_uri': 'content://video/off-2',
-      'wallpaper_preview_path': 'C:/missing/poster.jpg',
-    });
-    final channel = MockFLauncherChannel();
-    _stubVideoWallpaperOptions(channel);
-    when(channel.setWallpaperMode(any))
-        .thenAnswer((_) async => <String, dynamic>{});
-
-    final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-
-    expect(settings.wallpaperMode, 'gradient');
-    expect(settings.wallpaperVideoRestoreCandidatePending, isTrue);
-    expect(service.wallpaper, isNull);
-    verify(channel.setWallpaperMode('gradient')).called(1);
-    verifyNever(channel.getVideoWallpaperTextureId());
-  });
-
-  test('balanced restores saved video automatically after off fallback',
-      () async {
-    final previewFile = await _createTempPreviewFile();
-    final settings = await _createSettingsService(<String, Object>{
-      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
-      'wallpaper_mode': 'video',
-      'wallpaper_asset_uri': 'content://video/off-3',
-      'wallpaper_preview_path': previewFile.path,
-    });
-    final channel = MockFLauncherChannel();
-    _stubVideoWallpaperOptions(channel);
-    when(channel.setWallpaperMode(any))
-        .thenAnswer((_) async => <String, dynamic>{});
-    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 31);
-
-    final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(settings.wallpaperMode, 'image');
-
-    await settings.setHomeDockPerformanceMode(
-      SettingsService.homeDockPerformanceModeBalanced,
-    );
     await Future<void>.delayed(const Duration(milliseconds: 200));
 
     expect(settings.wallpaperMode, 'video');
-    expect(settings.wallpaperVideoRestoreCandidatePending, isFalse);
-    verify(channel.setWallpaperMode('video')).called(1);
-    verifyNever(channel.getVideoWallpaperTextureId());
+    expect(service.videoTextureId, 44);
 
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+    // Switch to smooth mode: must remain video mode
+    await settings.setHomeDockPerformanceMode(
+      SettingsService.homeDockPerformanceModeSmooth,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(settings.wallpaperMode, 'video');
 
-    expect(service.videoTextureId, 31);
-    verify(channel.getVideoWallpaperTextureId()).called(1);
+    // Switch to off mode: must remain video mode, no fallback to image or gradient
+    await settings.setHomeDockPerformanceMode(
+      SettingsService.homeDockPerformanceModeOff,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(settings.wallpaperMode, 'video');
+
+    // Switch back to balanced mode
+    await settings.setHomeDockPerformanceMode(
+      SettingsService.homeDockPerformanceModeBalanced,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(settings.wallpaperMode, 'video');
+
+    verifyNever(channel.setWallpaperMode('image'));
+    verifyNever(channel.setWallpaperMode('gradient'));
   });
 
-  test('quality does not auto-restore saved video after off fallback',
+  test(
+      'TC-WPS-02: videoTextureId is preserved across performance mode transitions',
       () async {
-    final previewFile = await _createTempPreviewFile();
     final settings = await _createSettingsService(<String, Object>{
-      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeQuality,
       'wallpaper_mode': 'video',
-      'wallpaper_asset_uri': 'content://video/off-4',
-      'wallpaper_preview_path': previewFile.path,
+      'wallpaper_asset_uri': 'content://video/texture-preserve',
     });
     final channel = MockFLauncherChannel();
     _stubVideoWallpaperOptions(channel);
     when(channel.setWallpaperMode(any))
         .thenAnswer((_) async => <String, dynamic>{});
-    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 37);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 77);
 
     final service = WallpaperService(channel, settings);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(settings.wallpaperMode, 'image');
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(service.videoTextureId, 77);
 
+    // Switching to off mode must NOT clear videoTextureId
     await settings.setHomeDockPerformanceMode(
-      SettingsService.homeDockPerformanceModeQuality,
+      SettingsService.homeDockPerformanceModeOff,
     );
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(service.videoTextureId, 77);
 
-    expect(settings.wallpaperMode, 'image');
-    expect(settings.wallpaperVideoRestoreCandidatePending, isFalse);
+    // Switching to smooth mode must NOT clear videoTextureId
+    await settings.setHomeDockPerformanceMode(
+      SettingsService.homeDockPerformanceModeSmooth,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(service.videoTextureId, 77);
+  });
 
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+  test(
+      'TC-WPS-03: video picker functions operate normally without being blocked in any mode',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
+      'wallpaper_mode': 'gradient',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 88);
+    when(channel.pickWallpaperAsset(kind: 'video')).thenAnswer(
+      (_) async => <String, dynamic>{
+        'cancelled': false,
+        'uri': 'content://video/picked-in-off',
+        'previewPath': 'C:/preview/off.jpg',
+      },
+    );
 
-    verifyNever(channel.getVideoWallpaperTextureId());
+    final service = WallpaperService(channel, settings);
+    await service.pickVideoWallpaper();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    expect(settings.wallpaperMode, 'video');
+    expect(settings.wallpaperAssetUri, 'content://video/picked-in-off');
+    expect(service.videoTextureId, 88);
+    verify(channel.pickWallpaperAsset(kind: 'video')).called(1);
   });
 
   test('quality startup clears pending restore and keeps non-video wallpaper',
@@ -602,18 +621,12 @@ void main() {
       settings.videoWallpaperUris,
       ['content://video/21', 'content://video/22'],
     );
-    expect(service.videoTextureId, isNull);
-    verifyNever(channel.getVideoWallpaperTextureId());
-
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
     expect(service.videoTextureId, 19);
     verify(channel.getVideoWallpaperTextureId()).called(1);
   });
 
   test(
-      'applyLibrarySelection stores folder playlist metadata and waits for home',
+      'applyLibrarySelection stores folder playlist metadata and starts video',
       () async {
     final settings = await _createSettingsService(<String, Object>{
       'home_dock_performance_mode':
@@ -639,12 +652,8 @@ void main() {
     expect(settings.videoWallpaperFolderName, 'Trailers');
     expect(settings.videoWallpaperUris,
         ['content://video/10', 'content://video/11']);
-    expect(service.videoTextureId, isNull);
-
-    service.notifyHomeVisibleAndUsable();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
     expect(service.videoTextureId, 5);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
   });
 
   test('setVideoRepeatCountPerItem persists and syncs repeat count', () async {
@@ -738,6 +747,375 @@ void main() {
         reason: 'settings_panel_release',
       ),
     ).called(1);
+  });
+
+  test('pickVideoWallpaper applies single video selection and warms up video',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeQuality,
+    });
+    final channel = MockFLauncherChannel();
+    when(channel.pickWallpaperAsset(kind: 'video')).thenAnswer(
+      (_) async => <String, dynamic>{
+        'uri': 'content://video/single_sample',
+        'previewPath': 'C:/preview_single.jpg',
+      },
+    );
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 55);
+    _stubVideoWallpaperOptions(channel);
+    final service = WallpaperService(channel, settings);
+
+    await service.pickVideoWallpaper();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(settings.wallpaperMode, 'video');
+    expect(settings.videoWallpaperSourceType, 'single_file');
+    expect(settings.wallpaperAssetUri, 'content://video/single_sample');
+    expect(settings.videoWallpaperUris, ['content://video/single_sample']);
+    expect(service.videoTextureId, 55);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
+  });
+
+  test('pickVideoWallpaperFolderSaf applies folder selection and stores metadata',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+    });
+    final channel = MockFLauncherChannel();
+    when(channel.pickWallpaperFolder()).thenAnswer(
+      (_) async => <String, dynamic>{
+        'uris': ['content://video/f1', 'content://video/f2'],
+        'primaryUri': 'content://video/f1',
+        'previewPath': 'C:/preview_folder.jpg',
+        'folderUri': 'content://folder/1',
+        'folderName': 'Movies',
+      },
+    );
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 88);
+    _stubVideoWallpaperOptions(channel);
+    final service = WallpaperService(channel, settings);
+
+    await service.pickVideoWallpaperFolderSaf();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(settings.wallpaperMode, 'video');
+    expect(settings.videoWallpaperSourceType, 'folder_playlist');
+    expect(settings.videoWallpaperFolderName, 'Movies');
+    expect(settings.videoWallpaperFolderUri, 'content://folder/1');
+    expect(settings.videoWallpaperUris,
+        ['content://video/f1', 'content://video/f2']);
+    expect(service.videoTextureId, 88);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
+  });
+
+  test('recoverVideoPlaybackAfterHomeFrame is safe no-op', () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'image',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+
+    final service = WallpaperService(channel, settings);
+    await service.recoverVideoPlaybackAfterHomeFrame(
+      reason: 'boot_recovery',
+    );
+    expect(service.videoTextureId, isNull);
+  });
+
+  test(
+      'TC-WPS-04: direct startup in off mode with existing video activates player immediately without fallback',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/instant_off',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.setWallpaperMode(any))
+        .thenAnswer((_) async => <String, dynamic>{});
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 88);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(settings.wallpaperMode, 'video');
+    expect(service.videoTextureId, 88);
+    verify(channel.setWallpaperMode('video')).called(1);
+    verify(channel.getVideoWallpaperTextureId()).called(1);
+    verifyNever(channel.setWallpaperMode('image'));
+    verifyNever(channel.setWallpaperMode('gradient'));
+  });
+
+  test(
+      'TC-WPS-WAKE-01: rapid sleep and wake cycle (paused -> resumed -> paused -> resumed) cleanly rearms video',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/rapid-wake',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 50);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(service.videoTextureId, 50);
+    clearInteractions(channel);
+
+    // Cycle 1: Pause then immediate Resume
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(service.videoTextureId, 50);
+    verify(channel.setVideoWallpaperOptions(
+      sourceType: anyNamed('sourceType'),
+      assetUris: anyNamed('assetUris'),
+      folderUri: anyNamed('folderUri'),
+      folderBucketId: anyNamed('folderBucketId'),
+      folderName: anyNamed('folderName'),
+      orderMode: anyNamed('orderMode'),
+      advanceMode: anyNamed('advanceMode'),
+      switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+      repeatCountPerItem: anyNamed('repeatCountPerItem'),
+      playlistLoop: anyNamed('playlistLoop'),
+      loop: anyNamed('loop'),
+      mute: anyNamed('mute'),
+      fit: anyNamed('fit'),
+      dimPercent: anyNamed('dimPercent'),
+      blur: anyNamed('blur'),
+      autoResume: anyNamed('autoResume'),
+      videoAllowedByPerformanceMode: anyNamed('videoAllowedByPerformanceMode'),
+      disableAudioRendererWhenMuted: anyNamed('disableAudioRendererWhenMuted'),
+      deferForegroundResume: anyNamed('deferForegroundResume'),
+    )).called(1);
+
+    clearInteractions(channel);
+
+    // Cycle 2: Immediate Pause then immediate Resume again
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(service.videoTextureId, 50);
+    verify(channel.setVideoWallpaperOptions(
+      sourceType: anyNamed('sourceType'),
+      assetUris: anyNamed('assetUris'),
+      folderUri: anyNamed('folderUri'),
+      folderBucketId: anyNamed('folderBucketId'),
+      folderName: anyNamed('folderName'),
+      orderMode: anyNamed('orderMode'),
+      advanceMode: anyNamed('advanceMode'),
+      switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+      repeatCountPerItem: anyNamed('repeatCountPerItem'),
+      playlistLoop: anyNamed('playlistLoop'),
+      loop: anyNamed('loop'),
+      mute: anyNamed('mute'),
+      fit: anyNamed('fit'),
+      dimPercent: anyNamed('dimPercent'),
+      blur: anyNamed('blur'),
+      autoResume: anyNamed('autoResume'),
+      videoAllowedByPerformanceMode: anyNamed('videoAllowedByPerformanceMode'),
+      disableAudioRendererWhenMuted: anyNamed('disableAudioRendererWhenMuted'),
+      deferForegroundResume: anyNamed('deferForegroundResume'),
+    )).called(1);
+  });
+
+  test(
+      'TC-WPS-WAKE-02: wake during active settings suppression does not trigger instant video rearm until released',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/wake-suppressed',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 60);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(service.videoTextureId, 60);
+
+    // Open settings (suppress playback)
+    await service.setSettingsPlaybackSuppressed(true);
+    expect(service.settingsPlaybackSuppressed, isTrue);
+    clearInteractions(channel);
+
+    // Sleep then Wake while settings is still open
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // Must NOT call setVideoWallpaperOptions because settingsPlaybackSuppressed is true
+    verifyNever(channel.setVideoWallpaperOptions(
+      sourceType: anyNamed('sourceType'),
+      assetUris: anyNamed('assetUris'),
+      folderUri: anyNamed('folderUri'),
+      folderBucketId: anyNamed('folderBucketId'),
+      folderName: anyNamed('folderName'),
+      orderMode: anyNamed('orderMode'),
+      advanceMode: anyNamed('advanceMode'),
+      switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+      repeatCountPerItem: anyNamed('repeatCountPerItem'),
+      playlistLoop: anyNamed('playlistLoop'),
+      loop: anyNamed('loop'),
+      mute: anyNamed('mute'),
+      fit: anyNamed('fit'),
+      dimPercent: anyNamed('dimPercent'),
+      blur: anyNamed('blur'),
+      autoResume: anyNamed('autoResume'),
+      videoAllowedByPerformanceMode: anyNamed('videoAllowedByPerformanceMode'),
+      disableAudioRendererWhenMuted: anyNamed('disableAudioRendererWhenMuted'),
+      deferForegroundResume: anyNamed('deferForegroundResume'),
+    ));
+
+    // Now close settings: playback suppression released
+    await service.setSettingsPlaybackSuppressed(false);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(service.settingsPlaybackSuppressed, isFalse);
+    expect(service.videoTextureId, 60);
+  });
+
+  test(
+      'TC-WPS-WAKE-03: wake when videoTextureId is null re-acquires texture from native channel',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/wake-reacquire',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 72);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(service.videoTextureId, 72);
+
+    // Switch temporarily to gradient which clears videoTextureId
+    await service.setGradient(FLauncherGradients.greatWhale);
+    expect(service.videoTextureId, isNull);
+
+    // Switch back to video via settings
+    await settings.setWallpaperMode('video');
+    clearInteractions(channel);
+
+    // Trigger wake (resumed)
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    // Verify channel was queried to acquire the texture ID
+    verify(channel.getVideoWallpaperTextureId()).called(1);
+    expect(service.videoTextureId, 72);
+  });
+
+  test(
+      'TC-WPS-WAKE-04: wake in non-video modes (image and gradient) safely ignores video rearm',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode':
+          SettingsService.homeDockPerformanceModeBalanced,
+      'wallpaper_mode': 'gradient',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(service.videoTextureId, isNull);
+    clearInteractions(channel);
+
+    // Send sleep and wake
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // Must NOT call video options or texture ID
+    verifyNever(channel.getVideoWallpaperTextureId());
+    verifyNever(channel.setVideoWallpaperOptions(
+      sourceType: anyNamed('sourceType'),
+      assetUris: anyNamed('assetUris'),
+      folderUri: anyNamed('folderUri'),
+      folderBucketId: anyNamed('folderBucketId'),
+      folderName: anyNamed('folderName'),
+      orderMode: anyNamed('orderMode'),
+      advanceMode: anyNamed('advanceMode'),
+      switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+      repeatCountPerItem: anyNamed('repeatCountPerItem'),
+      playlistLoop: anyNamed('playlistLoop'),
+      loop: anyNamed('loop'),
+      mute: anyNamed('mute'),
+      fit: anyNamed('fit'),
+      dimPercent: anyNamed('dimPercent'),
+      blur: anyNamed('blur'),
+      autoResume: anyNamed('autoResume'),
+      videoAllowedByPerformanceMode: anyNamed('videoAllowedByPerformanceMode'),
+      disableAudioRendererWhenMuted: anyNamed('disableAudioRendererWhenMuted'),
+      deferForegroundResume: anyNamed('deferForegroundResume'),
+    ));
+    expect(service.videoTextureId, isNull);
+  });
+
+  test(
+      'TC-WPS-WAKE-05: wake in effects-off mode maintains video playback and texture without fallback',
+      () async {
+    final settings = await _createSettingsService(<String, Object>{
+      'home_dock_performance_mode': SettingsService.homeDockPerformanceModeOff,
+      'wallpaper_mode': 'video',
+      'wallpaper_asset_uri': 'content://video/wake-off',
+    });
+    final channel = MockFLauncherChannel();
+    _stubVideoWallpaperOptions(channel);
+    when(channel.getVideoWallpaperTextureId()).thenAnswer((_) async => 82);
+
+    final service = WallpaperService(channel, settings);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(service.videoTextureId, 82);
+    clearInteractions(channel);
+
+    // Sleep and wake in Off mode
+    service.didChangeAppLifecycleState(AppLifecycleState.paused);
+    service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    expect(settings.wallpaperMode, 'video');
+    expect(service.videoTextureId, 82);
+    verify(channel.setVideoWallpaperOptions(
+      sourceType: anyNamed('sourceType'),
+      assetUris: anyNamed('assetUris'),
+      folderUri: anyNamed('folderUri'),
+      folderBucketId: anyNamed('folderBucketId'),
+      folderName: anyNamed('folderName'),
+      orderMode: anyNamed('orderMode'),
+      advanceMode: anyNamed('advanceMode'),
+      switchIntervalSeconds: anyNamed('switchIntervalSeconds'),
+      repeatCountPerItem: anyNamed('repeatCountPerItem'),
+      playlistLoop: anyNamed('playlistLoop'),
+      loop: anyNamed('loop'),
+      mute: anyNamed('mute'),
+      fit: anyNamed('fit'),
+      dimPercent: anyNamed('dimPercent'),
+      blur: anyNamed('blur'),
+      autoResume: anyNamed('autoResume'),
+      videoAllowedByPerformanceMode: true,
+      disableAudioRendererWhenMuted: anyNamed('disableAudioRendererWhenMuted'),
+      deferForegroundResume: anyNamed('deferForegroundResume'),
+    )).called(1);
+    verifyNever(channel.setWallpaperMode('image'));
+    verifyNever(channel.setWallpaperMode('gradient'));
   });
 }
 

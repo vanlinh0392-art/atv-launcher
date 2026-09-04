@@ -66,36 +66,48 @@ public final class VietnamNewsProvider {
     private VietnamNewsProvider() {
     }
 
+    private static final java.util.concurrent.ExecutorService PARALLEL_EXECUTOR =
+            java.util.concurrent.Executors.newFixedThreadPool(4);
+
     public static synchronized List<NewsItem> getLatestTop3News() {
         if (cache != null && cache.isValid() && cache.items != null && !cache.items.isEmpty()) {
             Log.i(TAG, "Serving latest news from RAM cache (" + cache.items.size() + " items)");
             return cache.items;
         }
 
-        List<NewsItem> collected = new ArrayList<>();
-
+        List<java.util.concurrent.CompletableFuture<List<NewsItem>>> futures = new ArrayList<>();
         for (String[] feed : RSS_FEEDS) {
-            String sourceName = feed[0];
-            String feedUrl = feed[1];
-            try {
-                List<NewsItem> items = fetchRssFeed(sourceName, feedUrl);
-                if (items != null && !items.isEmpty()) {
-                    for (NewsItem it : items) {
-                        if (!isDuplicate(collected, it)) {
-                            collected.add(it);
-                        }
-                        if (collected.size() >= 3) {
-                            break;
+            final String sourceName = feed[0];
+            final String feedUrl = feed[1];
+            futures.add(java.util.concurrent.CompletableFuture.supplyAsync(
+                    () -> fetchRssFeed(sourceName, feedUrl),
+                    PARALLEL_EXECUTOR
+            ));
+        }
+
+        List<NewsItem> collected = new ArrayList<>();
+        try {
+            java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0]))
+                    .get(3800, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception ignored) {
+            Log.w(TAG, "Parallel RSS fetch reached deadline (3.8s), gathering available items...");
+        }
+
+        for (java.util.concurrent.CompletableFuture<List<NewsItem>> f : futures) {
+            if (f.isDone() && !f.isCompletedExceptionally()) {
+                try {
+                    List<NewsItem> items = f.getNow(Collections.emptyList());
+                    if (items != null) {
+                        for (NewsItem it : items) {
+                            if (!isDuplicate(collected, it)) {
+                                collected.add(it);
+                            }
+                            if (collected.size() >= 3) break;
                         }
                     }
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Failed fetching feed from " + sourceName + ": " + e.getMessage());
+                } catch (Exception ignored) {}
             }
-
-            if (collected.size() >= 3) {
-                break;
-            }
+            if (collected.size() >= 3) break;
         }
 
         if (!collected.isEmpty()) {
@@ -157,8 +169,8 @@ public final class VietnamNewsProvider {
         try {
             URL url = new URL(feedUrl);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(4000);
-            conn.setReadTimeout(4000);
+            conn.setConnectTimeout(2500);
+            conn.setReadTimeout(3000);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ATVLauncherNews/1.0");
             conn.setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml; q=0.9, */*; q=0.8");
@@ -170,7 +182,7 @@ public final class VietnamNewsProvider {
 
             in = conn.getInputStream();
             XmlPullParser parser = Xml.newPullParser();
-            parser.setInput(in, "UTF-8");
+            parser.setInput(in, null);
 
             int eventType = parser.getEventType();
             boolean insideItem = false;
@@ -190,13 +202,13 @@ public final class VietnamNewsProvider {
                         currentLink = "";
                     } else if (insideItem) {
                         if ("title".equalsIgnoreCase(tagName)) {
-                            currentTitle = parser.nextText();
+                            currentTitle = readElementContentSafely(parser);
                         } else if ("description".equalsIgnoreCase(tagName)) {
-                            currentDesc = parser.nextText();
+                            currentDesc = readElementContentSafely(parser);
                         } else if ("pubDate".equalsIgnoreCase(tagName)) {
-                            currentPubDate = parser.nextText();
+                            currentPubDate = readElementContentSafely(parser);
                         } else if ("link".equalsIgnoreCase(tagName)) {
-                            currentLink = parser.nextText();
+                            currentLink = readElementContentSafely(parser);
                         }
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
@@ -231,6 +243,27 @@ public final class VietnamNewsProvider {
         return results;
     }
 
+    private static String readElementContentSafely(XmlPullParser parser) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            int depth = 1;
+            while (depth > 0) {
+                int type = parser.next();
+                if (type == XmlPullParser.END_DOCUMENT) break;
+                if (type == XmlPullParser.START_TAG) {
+                    depth++;
+                } else if (type == XmlPullParser.END_TAG) {
+                    depth--;
+                } else if (type == XmlPullParser.TEXT || type == XmlPullParser.CDSECT) {
+                    sb.append(parser.getText());
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "readElementContentSafely error", e);
+        }
+        return sb.toString().trim();
+    }
+
     private static String cleanHtml(String raw) {
         if (raw == null) return "";
         String text = HTML_TAG_PATTERN.matcher(raw).replaceAll(" ");
@@ -238,8 +271,10 @@ public final class VietnamNewsProvider {
                 .replace("&amp;", "&")
                 .replace("&quot;", "\"")
                 .replace("&apos;", "'")
+                .replace("&#39;", "'")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
+                .replaceAll("&#x[0-9a-fA-F]+;", "")
                 .replaceAll("&#\\d+;", "")
                 .replaceAll("\\s+", " ")
                 .trim();

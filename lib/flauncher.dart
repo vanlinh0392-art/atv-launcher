@@ -82,6 +82,9 @@ typedef _NavigationSnapshot = ({
   String reason,
 });
 
+final RouteObserver<ModalRoute<void>> homeRouteObserver =
+    RouteObserver<ModalRoute<void>>();
+
 class FLauncher extends StatefulWidget {
   const FLauncher({super.key});
 
@@ -91,7 +94,7 @@ class FLauncher extends StatefulWidget {
 
 class _FLauncherState extends State<FLauncher> {
   final FocusNode _statusBarPrimaryFocusNode = FocusNode(
-    debugLabel: 'status_bar_primary_search',
+    debugLabel: 'status_bar_primary_reorder',
   );
 
   @override
@@ -183,9 +186,136 @@ class _HomeContent extends StatefulWidget {
   State<_HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends State<_HomeContent> {
+class _HomeContentState extends State<_HomeContent>
+    with WidgetsBindingObserver, RouteAware {
+  final GlobalKey<_HomeDockViewportState> _dockViewportKey =
+      GlobalKey<_HomeDockViewportState>(debugLabel: 'home_dock_viewport');
   String? _lastScheduledHomeUsableKey;
   String? _pendingHomeUsableKey;
+  int _lastHandledHomeSequence = 0;
+  bool _lastLauncherVisible = false;
+  Timer? _focusWatchdogTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FocusManager.instance.addListener(_handlePrimaryFocusChange);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      homeRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_handlePrimaryFocusChange);
+    homeRouteObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    _focusWatchdogTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    _scheduleFocusRecovery(reason: 'dialog_closed');
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _scheduleFocusRecovery(reason: 'activity_resume');
+    }
+  }
+
+  void _handlePrimaryFocusChange() {
+    if (!mounted) {
+      return;
+    }
+    if (FocusManager.instance.primaryFocus == null) {
+      _scheduleFocusRecovery(reason: 'null_focus');
+    }
+  }
+
+  void _scheduleFocusRecovery({required String reason}) {
+    _focusWatchdogTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _checkAndRecoverFocus(reason: reason);
+    });
+    _focusWatchdogTimer = Timer(const Duration(milliseconds: 100), () {
+      if (!mounted) {
+        return;
+      }
+      _checkAndRecoverFocus(reason: '$reason:delayed');
+    });
+  }
+
+  void _checkAndRecoverFocus({required String reason}) {
+    if (!mounted) {
+      return;
+    }
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      return;
+    }
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    if (_isFocusOrphanOrInactive(primaryFocus)) {
+      final dock = _dockViewportKey.currentState;
+      if (dock != null) {
+        dock.recoverDockFocus();
+      }
+    }
+  }
+
+  bool _isFocusOrphanOrInactive(FocusNode? focus) {
+    if (focus == null) {
+      return true;
+    }
+    final focusContext = focus.context;
+    if (focusContext == null || !focusContext.mounted) {
+      return true;
+    }
+    if (!focus.canRequestFocus || focus.skipTraversal) {
+      return true;
+    }
+    final renderObject = focusContext.findRenderObject();
+    if (renderObject == null || !renderObject.attached) {
+      return true;
+    }
+    if (focus is FocusScopeNode && focus.parent == null) {
+      return true;
+    }
+    final statusBarNode = widget.statusBarPrimaryFocusNode;
+    if (focus == statusBarNode ||
+        statusBarNode.traversalDescendants.contains(focus)) {
+      return false;
+    }
+    final dock = _dockViewportKey.currentState;
+    if (dock != null && dock.isDockDescendant(focusContext)) {
+      return false;
+    }
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _shouldRecoverFocusForNavigation(String reason) =>
+      reason == 'screen_wake' ||
+      reason == 'home_reentry' ||
+      reason == 'launcher_reentry' ||
+      reason == 'activity_start' ||
+      reason == 'activity_resume';
 
   void _scheduleHomeUsableSignal(
     BuildContext context,
@@ -202,24 +332,9 @@ class _HomeContentState extends State<_HomeContent> {
       }
       _pendingHomeUsableKey = null;
       _lastScheduledHomeUsableKey = key;
-      final wallpaperService = context.read<WallpaperService>();
-      wallpaperService.notifyHomeVisibleAndUsable();
-      if (_isHomeRecoveryReason(reason)) {
-        unawaited(
-          wallpaperService.recoverVideoPlaybackAfterHomeFrame(
-            reason: reason,
-          ),
-        );
-      }
+      context.read<WallpaperService>().notifyHomeVisibleAndUsable();
     });
   }
-
-  bool _isHomeRecoveryReason(String reason) =>
-      reason == 'screen_wake' ||
-      reason == 'activity_start' ||
-      reason == 'activity_resume' ||
-      reason == 'home_reentry' ||
-      reason == 'launcher_reentry';
 
   @override
   Widget build(BuildContext context) {
@@ -290,8 +405,23 @@ class _HomeContentState extends State<_HomeContent> {
           );
         }
 
+        if (navigation.homeSequence != _lastHandledHomeSequence &&
+            navigation.homeSequence > 0) {
+          _lastHandledHomeSequence = navigation.homeSequence;
+          if (_shouldRecoverFocusForNavigation(navigation.reason)) {
+            _scheduleFocusRecovery(reason: navigation.reason);
+          }
+        }
+        if (launcherVisible && !_lastLauncherVisible) {
+          _lastLauncherVisible = true;
+          _scheduleFocusRecovery(reason: 'launcher_visible');
+        } else if (!launcherVisible) {
+          _lastLauncherVisible = false;
+        }
+
         return LayoutBuilder(
           builder: (context, constraints) => _HomeDockViewport(
+            key: _dockViewportKey,
             sections: homeSections.sections,
             maxWidth: constraints.maxWidth,
             maxHeight: constraints.maxHeight,
@@ -347,6 +477,57 @@ Widget _buildWallpaperLayer(
   final physicalSize = MediaQuery.sizeOf(context);
   final isVideo = wallpaper.isVideoMode;
 
+  final isFatalVideoError = wallpaperStatus.lastError.isNotEmpty &&
+      !wallpaperStatus.videoReady &&
+      (wallpaperStatus.lastError.contains('No playable') ||
+          wallpaperStatus.lastError.contains('All wallpaper videos') ||
+          wallpaperStatus.lastError.contains('quarantined'));
+
+  if (isVideo && wallpaper.videoTextureId != null && !isFatalVideoError) {
+    final blurSigma = performanceProfile
+        .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
+    final dimOpacity =
+        wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
+
+    Widget videoLayer = SizedBox.expand(
+      child: FittedBox(
+        fit: _videoBoxFit(wallpaper.videoFit),
+        child: SizedBox(
+          width: wallpaperStatus.videoWidth > 0
+              ? wallpaperStatus.videoWidth
+              : physicalSize.width,
+          height: wallpaperStatus.videoHeight > 0
+              ? wallpaperStatus.videoHeight
+              : physicalSize.height,
+          child: Texture(textureId: wallpaper.videoTextureId!),
+        ),
+      ),
+    );
+
+    if (blurSigma > 0) {
+      videoLayer = ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+        child: videoLayer,
+      );
+    }
+
+    if (dimOpacity > 0) {
+      return RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(child: videoLayer),
+            Positioned.fill(
+              child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RepaintBoundary(child: videoLayer);
+  }
+
   final Widget baseWallpaper;
   if (wallpaper.wallpaperMode == 'gradient') {
     baseWallpaper = Container(
@@ -390,52 +571,7 @@ Widget _buildWallpaperLayer(
     );
   }
 
-  final isFatalVideoError = wallpaperStatus.lastError.isNotEmpty &&
-      !wallpaperStatus.videoReady &&
-      (wallpaperStatus.lastError.contains('No playable') ||
-          wallpaperStatus.lastError.contains('All wallpaper videos') ||
-          wallpaperStatus.lastError.contains('quarantined'));
-
-  if (!isVideo ||
-      wallpaper.videoTextureId == null ||
-      isFatalVideoError ||
-      !wallpaperStatus.videoReady) {
-    return RepaintBoundary(child: baseWallpaper);
-  }
-
-  final blurSigma = performanceProfile
-      .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
-  final dimOpacity = wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
-
-  Widget videoLayer = SizedBox.expand(
-    child: FittedBox(
-      fit: _videoBoxFit(wallpaper.videoFit),
-      child: SizedBox(
-        width: wallpaperStatus.videoWidth > 0 ? wallpaperStatus.videoWidth : physicalSize.width,
-        height: wallpaperStatus.videoHeight > 0 ? wallpaperStatus.videoHeight : physicalSize.height,
-        child: Texture(textureId: wallpaper.videoTextureId!),
-      ),
-    ),
-  );
-
-  if (blurSigma > 0) {
-    videoLayer = ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-      child: videoLayer,
-    );
-  }
-
-  return RepaintBoundary(
-    child: Stack(
-      children: [
-        Positioned.fill(child: videoLayer),
-        if (dimOpacity > 0)
-          Positioned.fill(
-            child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
-          ),
-      ],
-    ),
-  );
+  return RepaintBoundary(child: baseWallpaper);
 }
 
 BoxFit _videoBoxFit(String fit) {
@@ -481,6 +617,7 @@ class _HomeDockViewport extends StatefulWidget {
   final FocusNode statusBarPrimaryFocusNode;
 
   const _HomeDockViewport({
+    super.key,
     required this.sections,
     required this.maxWidth,
     required this.maxHeight,
@@ -823,8 +960,42 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
     }
   }
 
+  bool isDockDescendant(BuildContext? candidate) {
+    final dockContext = _dockListKey.currentContext;
+    if (dockContext == null) {
+      return false;
+    }
+    return _isDockDescendant(candidate, dockContext);
+  }
+
+  bool recoverDockFocus() {
+    if (!mounted) {
+      return false;
+    }
+    _invalidateDockTraversalCache();
+
+    // 1. Try to restore to the last focused item if still mounted and usable
+    final lastContext = _lastFocusedItemContext;
+    if (lastContext != null && lastContext.mounted) {
+      final node = Focus.maybeOf(lastContext);
+      if (node != null && node.canRequestFocus && !node.skipTraversal) {
+        node.requestFocus();
+        return true;
+      }
+    }
+
+    // 2. Fallback to the first usable dock node
+    final nodes = _dockTraversalNodes();
+    if (nodes.isNotEmpty) {
+      nodes.first.requestFocus();
+      return true;
+    }
+
+    return false;
+  }
+
   KeyEventResult _handleDockKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
     final direction = _traversalDirectionForKey(event.logicalKey);
@@ -832,7 +1003,8 @@ class _HomeDockViewportState extends State<_HomeDockViewport> {
       final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
       if (!isTest) {
         final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - _lastDpadTime < 95) {
+        final debounceMs = event is KeyRepeatEvent ? 30 : 50;
+        if (now - _lastDpadTime < debounceMs) {
           return KeyEventResult.handled;
         }
         _lastDpadTime = now;

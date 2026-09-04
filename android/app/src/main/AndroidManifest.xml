@@ -49,6 +49,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="com.atv.launcher.permission.KICK_GUARDIAN" />
@@ -118,7 +119,7 @@
 
         <activity
             android:name="com.atv.launcher.systembridge.shared.voice.VoiceCaptureTransparentActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
             android:noHistory="true"
@@ -164,7 +165,8 @@
             android:name="com.atv.launcher.systembridge.shared.control.VoiceModeControlReceiver"
             android:directBootAware="true"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.atv.launcher.permission.KICK_GUARDIAN">
             <intent-filter android:priority="999999">
                 <action android:name="com.atv.launcher.control.GET_MODE" />
                 <action android:name="com.atv.launcher.control.SET_MODE" />

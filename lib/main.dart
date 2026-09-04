@@ -28,6 +28,7 @@ import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/providers/weather_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -55,6 +56,10 @@ Future<void> main() async {
         create: (_) => AppsService(fLauncherChannel, fLauncherDatabase)),
     ChangeNotifierProvider(create: (_) => LauncherState()),
     ChangeNotifierProvider(create: (_) => NetworkService(fLauncherChannel)),
+    ChangeNotifierProvider(create: (context) {
+      NetworkService networkService = Provider.of(context, listen: false);
+      return WeatherService(sharedPreferences, networkService);
+    }),
     ChangeNotifierProvider(
         create: (_) => SystemBridgeService(fLauncherChannel)),
     ChangeNotifierProvider(
