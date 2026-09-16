@@ -7,6 +7,7 @@ import 'package:flauncher/providers/search_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/system_bridge_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
+import 'package:flauncher/widgets/rounded_switch_list_tile.dart';
 import 'package:flauncher/widgets/settings/settings_chrome.dart';
 import 'package:flauncher/widgets/settings/tv_controls.dart';
 import 'package:flutter/material.dart';
@@ -100,6 +101,16 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
           Text(_lastMessage, style: Theme.of(context).textTheme.bodyMedium),
         ],
         const SizedBox(height: TvDrawerTokens.surfaceSpacing),
+        SettingsSurfaceCard(
+          padding: EdgeInsets.zero,
+          child: RoundedSwitchListTile(
+            title: const Text("Tự động sao lưu hàng ngày"),
+            secondary: const Icon(Icons.auto_mode_outlined),
+            value: context.watch<SettingsService>().backupAutoEnabled,
+            onChanged: (value) => context.read<SettingsService>().setBackupAutoEnabled(value),
+          ),
+        ),
+        const SizedBox(height: TvDrawerTokens.surfaceSpacing),
         Text(
           "Bản sao lưu cục bộ",
           style: Theme.of(context).textTheme.titleMedium,
@@ -140,6 +151,7 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
                       isSelected: isSelected,
                       busy: _busy,
                       onPreview: () => _previewLocalBackup(name),
+                      onRestore: () => _restoreDirectLocalBackup(name),
                       onDelete: () => _deleteLocalBackup(name),
                     );
                   },
@@ -390,6 +402,33 @@ class _BackupRestorePanelPageState extends State<BackupRestorePanelPage> {
       if (mounted) {
         setState(() => _busy = false);
       }
+    }
+  }
+
+  Future<void> _restoreDirectLocalBackup(String fileName) async {
+    await _previewLocalBackup(fileName);
+    if (!mounted || _preview == null) return;
+    final isAuto = fileName.startsWith('atv-launcher-auto-backup-');
+    final typeLabel = isAuto ? "Tự động" : "Thủ công";
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Xác nhận khôi phục"),
+        content: Text("Bạn có chắc chắn muốn khôi phục giao diện từ bản sao lưu này không?\n\n$fileName\nLoại: $typeLabel"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Hủy"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Khôi phục", style: TextStyle(color: Colors.greenAccent)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _applyBackup(context, applySystemSettings: false);
     }
   }
 
@@ -802,6 +841,7 @@ class _BackupItemTile extends StatefulWidget {
   final bool isSelected;
   final bool busy;
   final VoidCallback onPreview;
+  final VoidCallback onRestore;
   final VoidCallback onDelete;
 
   const _BackupItemTile({
@@ -812,6 +852,7 @@ class _BackupItemTile extends StatefulWidget {
     required this.isSelected,
     required this.busy,
     required this.onPreview,
+    required this.onRestore,
     required this.onDelete,
   });
 
@@ -899,6 +940,11 @@ class _BackupItemTileState extends State<_BackupItemTile> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: const Icon(Icons.settings_backup_restore, color: Colors.greenAccent),
+                tooltip: "Khôi phục",
+                onPressed: widget.busy ? null : widget.onRestore,
+              ),
               IconButton(
                 icon: const Icon(Icons.preview_outlined, color: Colors.cyan),
                 tooltip: "Xem trước",

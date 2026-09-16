@@ -81,6 +81,7 @@ const _backupLastImportName = "backup_last_import_name";
 const _backupLastRestoreSummary = "backup_last_restore_summary";
 const _backupLastRestoreAt = "backup_last_restore_at";
 const _backupLastAutoAt = "backup_last_auto_at";
+const _backupAutoEnabled = "backup_auto_enabled";
 const _adbLocalOnboardingHandled = "adb_local_onboarding_handled";
 const _useSideSheetSettings = "launcher_pref_use_side_sheet_settings";
 const _statusBarDateStyleKey = "status_bar_date_style";
@@ -373,6 +374,9 @@ class SettingsService extends ChangeNotifier {
 
   int get backupLastAutoAt =>
       _sharedPreferences.getInt(_backupLastAutoAt) ?? 0;
+
+  bool get backupAutoEnabled =>
+      _sharedPreferences.getBool(_backupAutoEnabled) ?? true;
 
   bool get adbLocalOnboardingHandled =>
       _sharedPreferences.getBool(_adbLocalOnboardingHandled) ?? false;
@@ -734,6 +738,11 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setBackupAutoEnabled(bool value) async {
+    await _sharedPreferences.setBool(_backupAutoEnabled, value);
+    notifyListeners();
+  }
+
   Future<void> setAdbLocalOnboardingHandled(bool value) async {
     await _sharedPreferences.setBool(_adbLocalOnboardingHandled, value);
     notifyListeners();
@@ -792,6 +801,7 @@ class SettingsService extends ChangeNotifier {
       'videoWallpaperDimPercent': videoWallpaperDimPercent,
       'videoWallpaperBlur': videoWallpaperBlur,
       'videoWallpaperAutoResume': videoWallpaperAutoResume,
+      'backupAutoEnabled': backupAutoEnabled,
     };
   }
 
@@ -1084,6 +1094,10 @@ class SettingsService extends ChangeNotifier {
       _sharedPreferences.setString(
         _videoWallpaperBlur,
         _readString(data, 'videoWallpaperBlur', videoWallpaperBlur),
+      ),
+      _sharedPreferences.setBool(
+        _backupAutoEnabled,
+        _readBool(data, 'backupAutoEnabled', backupAutoEnabled),
       ),
       _sharedPreferences.setBool(
         _videoWallpaperAutoResume,

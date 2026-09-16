@@ -657,15 +657,31 @@ class _FLauncherAppState extends State<FLauncherApp>
     );
   }
 
-  Future<void> _checkAndRunAutoBackup() async {
+  Future<void> _checkAndRunAutoBackup({bool force = false}) async {
     if (!mounted || _autoBackupChecking) return;
-    _autoBackupChecking = true;
     try {
       final settings = context.read<SettingsService>();
+      if (!settings.backupAutoEnabled && !force) return;
+
+      final appsService = context.read<AppsService>();
+      if (appsService.startupPhase != AppsService.startupPhaseReady) {
+        void syncListener() {
+          if (appsService.startupPhase == AppsService.startupPhaseReady) {
+            appsService.removeListener(syncListener);
+            if (mounted) {
+              _checkAndRunAutoBackup(force: force);
+            }
+          }
+        }
+        appsService.addListener(syncListener);
+        return;
+      }
+
+      _autoBackupChecking = true;
       final now = DateTime.now().millisecondsSinceEpoch;
       final lastAutoBackup = settings.backupLastAutoAt;
 
-      if (now - lastAutoBackup >= 86400000) {
+      if (force || now - lastAutoBackup >= 86400000) {
         await settings.setBackupLastAutoAt(now);
 
         final bridge = context.read<SystemBridgeService>();

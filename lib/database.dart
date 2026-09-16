@@ -136,9 +136,16 @@ class FLauncherDatabase extends _$FLauncherDatabase {
         beforeOpen: (openingDetails) async {
           await customStatement('PRAGMA foreign_keys = ON;');
           await customStatement('PRAGMA journal_mode = WAL;');
+          await customStatement('PRAGMA synchronous = FULL;');
           wasCreated = openingDetails.wasCreated;
         },
       );
+
+  Future<void> checkpointWal() async {
+    try {
+      await customStatement('PRAGMA wal_checkpoint(FULL);');
+    } catch (_) {}
+  }
 
   Future<void> persistApps(Iterable<AppsCompanion> applications) =>
       batch((batch) => batch.insertAllOnConflictUpdate(apps, applications));

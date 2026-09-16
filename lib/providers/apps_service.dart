@@ -614,6 +614,7 @@ class AppsService extends ChangeNotifier {
 
   Future<void> removeFromCategory(App application, Category category) async {
     await _database.deleteAppCategory(category.id, application.packageName);
+    await _database.checkpointWal();
     if (_categoriesById.containsKey(category.id)) {
       Category categoryFound = _categoriesById[category.id]!;
       application.categoryOrders.remove(categoryFound.id);
@@ -648,6 +649,7 @@ class AppsService extends ChangeNotifier {
       ));
     }
     await _database.replaceAppsCategories(orderedAppCategories);
+    await _database.checkpointWal();
     if (shouldNotifyListeners) {
       notifyListeners();
     }
@@ -908,6 +910,7 @@ class AppsService extends ChangeNotifier {
   Future<void> hideApplication(App application) async {
     await _database.updateApp(
         application.packageName, const AppsCompanion(hidden: Value(true)));
+    await _database.checkpointWal();
 
     if (_applications.containsKey(application.packageName)) {
       App applicationFound = _applications[application.packageName]!;
@@ -928,6 +931,7 @@ class AppsService extends ChangeNotifier {
   Future<void> showApplication(App application) async {
     await _database.updateApp(
         application.packageName, const AppsCompanion(hidden: Value(false)));
+    await _database.checkpointWal();
 
     if (_applications.containsKey(application.packageName)) {
       App applicationFound = _applications[application.packageName]!;
@@ -1210,6 +1214,7 @@ class AppsService extends ChangeNotifier {
       }
     });
 
+    await _database.checkpointWal();
     await _loadStateFromDatabase();
     return <String, dynamic>{
       'success': true,

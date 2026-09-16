@@ -5,6 +5,20 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-09-16 - Official release 2026.09.006 — Khắc phục lỗi khôi phục cấu hình cũ & Mất sắp xếp icon khi tắt/bật TV (STR)
+
+### 1. Đồng Bộ Checkpoint SQLite WAL Tức Thì (Zero Layout Loss on Sleep/STR)
+- **Kích Hoạt `PRAGMA synchronous = FULL`**: Đảm bảo mọi thay đổi vị trí icon hoặc danh mục đều được fsync vào bộ nhớ lưu trữ vật lý của TV.
+- **Checkpoint WAL Ngay Lập Tức**: Tự động gọi `PRAGMA wal_checkpoint(FULL)` sau mỗi thao tác sắp xếp icon (`commitApplicationReorderSession`), lưu thứ tự, ẩn/hiện app, thêm/xóa mục, và khôi phục layout.
+- **Chống Mất Layout Khi Bị Force-Stop (STR)**: Khi TV đi vào Suspend-To-RAM và hệ điều hành MiTV gửi tín hiệu `str_shutdown` kết liễu tiến trình, dữ liệu vị trí icon đã được bảo toàn 100% trong `flauncher.db`.
+
+### 2. Bảo Vệ Tiến Trình Tự Động Sao Lưu (Guarded Auto-Backup)
+- **Hoãn Auto-Backup Tới Khi Hoàn Tất Live-Sync**: `_checkAndRunAutoBackup` chờ đến khi `appsService.startupPhase == AppsService.startupPhaseReady`, tuyệt đối không lưu snapshot từ bộ đệm khởi động nhanh chưa đồng bộ (tránh tình trạng app bị ẩn hoặc thiếu vị trí).
+- **Công Tắc Bật/Tắt Tự Động Sao Lưu Hàng Ngày**: Thêm tùy chọn "Tự động sao lưu hàng ngày" trong Cài đặt > Sao lưu & Khôi phục, cho phép người dùng hoàn toàn làm chủ việc tạo bản sao lưu.
+
+### 3. Nút Khôi Phục Trực Tiếp Từng File Sao Lưu (Direct Restore UX)
+- **Khôi Phục 1 Chạm Kèm Hộp Thoại Xác Nhận**: Bổ sung nút Khôi phục riêng biệt trên từng dòng file sao lưu trong danh sách bản sao lưu cục bộ, hiển thị rõ ràng nhãn `(Thủ công)` hoặc `(Tự động)` để loại bỏ hoàn toàn việc chọn nhầm file.
+
 ## 2026-09-04 - Official release 2026.09.005 — Khắc phục xung đột cờ vòng đời nguồn Xiaomi TV & Bảo đảm bấm phím nguồn vào Ngủ sâu (Standby)
 
 ### 1. Khắc Phục Xung Đột Cờ Vòng Đời Nguồn Xiaomi (Power State Machine Fix)
