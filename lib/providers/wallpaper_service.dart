@@ -207,6 +207,14 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void updateVideoTextureId(int? textureId) {
+    final nextId = textureId != null && textureId >= 0 ? textureId : null;
+    if (_videoTextureId != nextId) {
+      _videoTextureId = nextId;
+      notifyListeners();
+    }
+  }
+
   void _scheduleVideoWarmUp({required bool allowDeferredStart}) {
     if (!_canActivateVideoWallpaper ||
         _videoWarmUpCompleted) {

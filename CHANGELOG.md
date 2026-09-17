@@ -5,6 +5,22 @@ ATV Launcher là một public fork cá nhân, xây trên nền:
 - [etienn01/flauncher](https://gitlab.com/flauncher/flauncher)
 - [osrosal/flauncher](https://github.com/osrosal/flauncher)
 
+## 2026-09-17 - Official release 2026.09.007 — Khắc phục triệt để lỗi Video Wallpaper không tự phát sau Deep Sleep (STR), Nhảy bài liên hoàn & Kẹt snapshot
+
+### 1. Nhận Diện Chuẩn Xác 100% STR Deep Sleep Wake (Hardware Invariant)
+- **Công Thức Hardware Invariant**: Khắc phục cái bẫy `surface.isValid()` trong AOSP (chỉ kiểm tra con trỏ RAM, không phát hiện được native BufferQueue/VDEC bị ngắt nguồn khi TV ngủ sâu). Tính toán độ lệch giữa đồng hồ RTC (`elapsedRealtime`) và đồng hồ CPU tick (`uptimeMillis`): $\Delta > 1500$ms.
+- **Cold Purge & Settling Delay (350ms)**: Khi phát hiện mở máy từ ngủ sâu, tự động giải phóng sạch sẽ `releasePlayer()` + `releaseSurfaceAndTextureEntry()`, xóa cache cách ly và đợi 350ms cho xung nhịp VDEC/VPU trên chip SoC Xiaomi ổn định trước khi tái khởi tạo `Surface` và phát video.
+
+### 2. Triệt Tiêu Nhảy Bài Liên Hoàn & Cầu Dao Ngắt Cách Ly (Quarantine Circuit Breaker)
+- **Sửa Trôi Đồng Hồ `currentItemStartedAtMs`**: Luôn làm mới mốc thời gian phát thực tế ngay khi wake để không bị ngộ nhận thời gian phát ảo.
+- **Sửa Tiêu Chuẩn Hoàn Thành Video trong `handlePlaybackEnded`**: Loại bỏ điều kiện sai lầm `playedAtLeastTwoSeconds`. Chỉ chuyển bài khi video thực sự kết thúc tự nhiên (đạt >= 90% thời lượng hoặc gần hết bài).
+- **Tăng Cooldown Ổ Cứng (10s) & Circuit Breaker**: Tăng thời gian chờ ổ cứng mount lên 10s cho lỗi IO; tự động ngắt cầu dao không cách ly file khi toàn bộ danh sách phát gặp lỗi do USB/bộ nhớ ngoài chưa mount kịp.
+- **Tự Động Xóa Quarantine Khi Cắm Lại/Mount Ổ Cứng**: `StorageMountWatchdog` tự động xóa sạch `quarantinedUris` khi nhận broadcast `ACTION_MEDIA_MOUNTED` hoặc khi STR wake.
+
+### 3. Đồng Bộ Texture Thời Gian Thực & Xếp Lớp Chuyển Đổi Mượt Mà (Flutter Bridge)
+- **Đồng Bộ Texture ID Trực Tiếp từ EventChannel**: Flutter UI trích xuất `textureId` mới nhất thời gian thực từ `wallpaperStatus['textureId']`, chấm dứt tình trạng split-brain giữ textureId cũ/null sau khi native tạo SurfaceTexture mới.
+- **Chuyển Tiếp Trơn Tru Không Chớp Đen**: Giữ ảnh nền snapshot preview/gradient hiển thị ở lớp dưới trong lúc bộ giải mã nạp frame đầu tiên, sau đó video hiển thị mượt mà không chớp giật hay kẹt ở ảnh snapshot.
+
 ## 2026-09-16 - Official release 2026.09.006 — Khắc phục lỗi khôi phục cấu hình cũ & Mất sắp xếp icon khi tắt/bật TV (STR)
 
 ### 1. Đồng Bộ Checkpoint SQLite WAL Tức Thì (Zero Layout Loss on Sleep/STR)

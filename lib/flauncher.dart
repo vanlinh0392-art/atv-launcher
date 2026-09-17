@@ -58,6 +58,7 @@ typedef _WallpaperStatusSnapshot = ({
   String lastError,
   double videoWidth,
   double videoHeight,
+  int? textureId,
 });
 
 typedef _HomeDockSettingsSnapshot = ({
@@ -157,12 +158,16 @@ class _WallpaperLayer extends StatelessWidget {
         context.select<SystemBridgeService, _WallpaperStatusSnapshot>(
       (service) {
         final status = service.wallpaperStatus;
+        final rawTextureId = status['textureId'];
         return (
           videoReady: status['videoReady'] == true,
           playbackSuppressed: status['playbackSuppressed'] == true,
           lastError: status['lastError']?.toString().trim() ?? '',
           videoWidth: ((status['videoWidth'] as num?) ?? 1920).toDouble(),
           videoHeight: ((status['videoHeight'] as num?) ?? 1080).toDouble(),
+          textureId: (rawTextureId is num && rawTextureId >= 0)
+              ? rawTextureId.toInt()
+              : null,
         );
       },
     );
@@ -483,7 +488,10 @@ Widget _buildWallpaperLayer(
           wallpaperStatus.lastError.contains('All wallpaper videos') ||
           wallpaperStatus.lastError.contains('quarantined'));
 
-  if (isVideo && wallpaper.videoTextureId != null && !isFatalVideoError) {
+  final effectiveTextureId =
+      wallpaperStatus.textureId ?? wallpaper.videoTextureId;
+
+  if (isVideo && effectiveTextureId != null && !isFatalVideoError) {
     final blurSigma = performanceProfile
         .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
     final dimOpacity =
@@ -499,7 +507,7 @@ Widget _buildWallpaperLayer(
           height: wallpaperStatus.videoHeight > 0
               ? wallpaperStatus.videoHeight
               : physicalSize.height,
-          child: Texture(textureId: wallpaper.videoTextureId!),
+          child: Texture(textureId: effectiveTextureId),
         ),
       ),
     );

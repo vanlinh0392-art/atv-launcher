@@ -54,6 +54,8 @@ public final class VideoWallpaperController {
     private static final long MIN_LEGITIMATE_PLAYBACK_DURATION_MS = 1200L;
     private static final int MAX_GLITCH_RETRIES = 3;
     private static final long RESUME_DEBOUNCE_MS = 350L;
+    private static final long STR_SETTLING_DELAY_MS = 350L;
+    private static final long STORAGE_WAKE_COOLDOWN_MS = 10000L;
 
     private final Context appContext;
     private final TextureRegistry textureRegistry;
@@ -104,6 +106,8 @@ public final class VideoWallpaperController {
     private boolean isAdvanceScheduled = false;
     private long currentItemStartedAtMs = 0L;
     private int consecutiveGlitchRetryCount = 0;
+    private long lastSleepElapsedRealtimeMs = 0L;
+    private long lastSleepUptimeMillis = 0L;
 
     private BroadcastReceiver storageReceiver;
     private ContentObserver mediaStoreObserver;
@@ -117,6 +121,7 @@ public final class VideoWallpaperController {
                 return;
             }
             Log.i(TAG, "StorageMountWatchdog: reloading playlist reason=" + pendingStorageReloadReason);
+            quarantinedUris.clear();
             List<String> freshUris = resolvePlaylistUris(false);
             if (!freshUris.isEmpty()) {
                 if (player == null) {
@@ -241,6 +246,48 @@ public final class VideoWallpaperController {
         }
 
         long now = SystemClock.elapsedRealtime();
+        long uptime = SystemClock.uptimeMillis();
+        long elapsedSleepDuration = lastSleepElapsedRealtimeMs > 0L ? (now - lastSleepElapsedRealtimeMs) : 0L;
+        long uptimeSleepDuration = lastSleepUptimeMillis > 0L ? (uptime - lastSleepUptimeMillis) : 0L;
+        long deepSleepDelta = elapsedSleepDuration - uptimeSleepDuration;
+        boolean isDeepSleepWake = (lastSleepElapsedRealtimeMs > 0L && deepSleepDelta > 1500L)
+                || isStrWakeReason(resolvedReason);
+
+        if (isDeepSleepWake) {
+            Log.i(TAG, "wallpaper_resume deep_sleep_wake detected (deepSleepDelta=" + deepSleepDelta
+                    + "ms, elapsedSleep=" + elapsedSleepDuration + "ms, reason=" + resolvedReason
+                    + ") -> executing clean hardware cold-purge");
+            lastSleepElapsedRealtimeMs = 0L;
+            lastSleepUptimeMillis = 0L;
+            lastResumeElapsedRealtimeMs = now;
+            lastWakeElapsedRealtimeMs = now;
+            currentItemStartedAtMs = now;
+            wakeRearmStartedAtNanos = System.nanoTime();
+            pendingWakeReason = resolvedReason;
+            consecutiveGlitchRetryCount = 0;
+            consecutivePlayerErrorCount = 0;
+            foregroundActive = true;
+            startupWarmupReady = true;
+            mainHandler.removeCallbacks(backgroundReleaseRunnable);
+            mainHandler.removeCallbacks(wakePlaylistRetryRunnable);
+
+            // Cold purge: MediaCodec and EGL Surface buffers died during STR
+            releasePlayer();
+            releaseSurfaceAndTextureEntry();
+            quarantinedUris.clear();
+            notifyStatusChangedIf(setVideoReady(false));
+
+            // Settling delay for SoC VDEC clock/power rail stabilization
+            mainHandler.postDelayed(() -> {
+                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                    Log.i(TAG, "wallpaper_resume STR settling complete, recreating surface & starting playback");
+                    ensureSurface();
+                    notifyStatusChanged();
+                    maybeStartPlayback(true, true, true);
+                }
+            }, STR_SETTLING_DELAY_MS);
+            return;
+        }
 
         // 1. DEBOUNCE GUARD: Chặn bão sự kiện (home_reentry, start, resume, focus...)
         if (player != null && player.getMediaItemCount() > 0 && surface != null && surface.isValid()) {
@@ -271,6 +318,7 @@ public final class VideoWallpaperController {
         // 2. FAST-PATH (0ms DELAY): Surface & Player còn nguyên vẹn trong RAM và đã có playlist!
         // TUYỆT ĐỐI KHÔNG releaseSurface() hay ensureSurface() ở đây!
         if (player != null && player.getMediaItemCount() > 0 && surface != null && surface.isValid()) {
+            currentItemStartedAtMs = now;
             int state = player.getPlaybackState();
             if (state == Player.STATE_IDLE) {
                 player.prepare();
@@ -337,6 +385,8 @@ public final class VideoWallpaperController {
     }
 
     public void onPause(boolean isInteractive) {
+        lastSleepElapsedRealtimeMs = SystemClock.elapsedRealtime();
+        lastSleepUptimeMillis = SystemClock.uptimeMillis();
         foregroundActive = false;
         lifecycleEpoch++;
         stopIntervalAdvance();
@@ -681,11 +731,14 @@ public final class VideoWallpaperController {
 
                 long now = SystemClock.elapsedRealtime();
                 boolean inWakeCooldown = (now - lastWakeElapsedRealtimeMs < WAKE_COOLDOWN_MS);
+                boolean inStorageWakeCooldown = (now - lastWakeElapsedRealtimeMs < STORAGE_WAKE_COOLDOWN_MS);
 
                 if (isContainerOrFileNotFoundError(error, rawMsg)) {
-                    if (!inWakeCooldown) {
+                    if (!inStorageWakeCooldown) {
                         String failedUri = resolveCurrentFailedUri();
-                        if (!TextUtils.isEmpty(failedUri)) {
+                        int totalMediaItems = player != null ? player.getMediaItemCount() : 0;
+                        boolean circuitBreakerTripped = (quarantinedUris.size() + 1 >= Math.max(1, totalMediaItems));
+                        if (!TextUtils.isEmpty(failedUri) && !circuitBreakerTripped) {
                             quarantinedUris.add(failedUri);
                             if (failedUri.startsWith("file://")) {
                                 quarantinedUris.add(failedUri.substring(7));
@@ -694,8 +747,10 @@ public final class VideoWallpaperController {
                             }
                             cachedResolvedPlaylistUris.remove(failedUri);
                             Log.w(TAG, "Quarantined broken video URI: " + maskSensitiveText(failedUri));
+                        } else if (circuitBreakerTripped) {
+                            Log.w(TAG, "StorageCircuitBreaker tripped: Suppressed quarantine to protect playlist (storage likely unmounted)");
                         }
-                        if (player != null && player.getMediaItemCount() > 1) {
+                        if (player != null && player.getMediaItemCount() > 1 && !circuitBreakerTripped) {
                             int failedIndex = player.getCurrentMediaItemIndex();
                             boolean advanced = advancePlaylist();
                             if (advanced) {
@@ -712,7 +767,8 @@ public final class VideoWallpaperController {
                             }
                         }
                     } else {
-                        Log.i(TAG, "onPlayerError: Suppressed quarantine/advance during wake cooldown");
+                        Log.i(TAG, "onPlayerError: Suppressed quarantine/advance during storage wake cooldown ("
+                                + (now - lastWakeElapsedRealtimeMs) + "ms)");
                     }
                 }
 
@@ -722,8 +778,8 @@ public final class VideoWallpaperController {
                         | setLastError(isTransient ? "" : errorMsg);
                 notifyStatusChangedIf(statusChanged);
                 releasePlayer();
-                if (isTransient) {
-                    releaseSurface();
+                if (isTransient || consecutivePlayerErrorCount >= 2) {
+                    releaseSurfaceAndTextureEntry();
                 }
 
                 if (isTransient && consecutivePlayerErrorCount == 1) {
@@ -962,20 +1018,21 @@ public final class VideoWallpaperController {
         long playedWallTimeMs = currentItemStartedAtMs > 0L ? (now - currentItemStartedAtMs) : 0L;
         long timeSinceWakeMs = lastWakeElapsedRealtimeMs > 0L ? (now - lastWakeElapsedRealtimeMs) : Long.MAX_VALUE;
 
-        // 1. Tiêu chuẩn video hoàn thành hợp lệ: >= 90% duration HOẶC playedWallTimeMs >= 2000ms
+        // 1. Tiêu chuẩn video hoàn thành hợp lệ: >= 90% duration HOẶC position >= duration - 1500L
         boolean isDurationKnown = duration > 0L && duration != C.TIME_UNSET;
         boolean reachedNinetyPercent = isDurationKnown && (position >= (long) (duration * 0.90f));
-        boolean playedAtLeastTwoSeconds = playedWallTimeMs >= MIN_PLAY_BEFORE_ADVANCE_MS;
-        boolean isValidNaturalCompletion = reachedNinetyPercent || playedAtLeastTwoSeconds;
+        boolean nearEnd = isDurationKnown && (position >= duration - 1500L);
+        boolean isValidNaturalCompletion = reachedNinetyPercent || nearEnd;
 
-        // 2. Phát hiện Decoder Wake Glitch (trong thời gian wake cooldown hoặc played time < 1200ms)
+        // 2. Phát hiện Decoder Wake Glitch (trong thời gian wake cooldown hoặc video chưa phát xong hợp lệ)
         boolean inWakeCooldown = (timeSinceWakeMs < WAKE_COOLDOWN_MS);
-        boolean isWakeGlitch = inWakeCooldown || (!isValidNaturalCompletion && playedWallTimeMs < MIN_LEGITIMATE_PLAYBACK_DURATION_MS);
+        boolean isWakeGlitch = inWakeCooldown || !isValidNaturalCompletion;
 
         if (isWakeGlitch) {
             consecutiveGlitchRetryCount++;
-            Log.w(TAG, "PlaybackDurationGuard: Detected wake decoder glitch (timeSinceWake=" + timeSinceWakeMs
-                    + "ms, playedWallTime=" + playedWallTimeMs + "ms). Rebinding surface and resuming current item at "
+            Log.w(TAG, "PlaybackDurationGuard: Detected wake decoder glitch or premature end (timeSinceWake=" + timeSinceWakeMs
+                    + "ms, playedWallTime=" + playedWallTimeMs + "ms, pos=" + position + "/" + duration
+                    + "). Rebinding surface and resuming current item at "
                     + savedPositionMs + "ms (attempt " + consecutiveGlitchRetryCount + ")");
             releaseSurface();
             ensureSurface();
@@ -1111,6 +1168,7 @@ public final class VideoWallpaperController {
             } catch (Exception e) {
                 Log.w(TAG, "Failed to set default buffer size on SurfaceTexture: " + e.getMessage());
             }
+            notifyStatusChanged();
         }
         boolean surfaceRecreated = false;
         if (surface == null || !surface.isValid()) {
@@ -1263,6 +1321,18 @@ public final class VideoWallpaperController {
         return text.replaceAll("content://[^\\s]+", "content://***")
                 .replaceAll("/storage/[^\\s]+", "/storage/***")
                 .replaceAll("/data/[^\\s]+", "/data/***");
+    }
+
+    private static boolean isStrWakeReason(String reason) {
+        if (TextUtils.isEmpty(reason)) {
+            return false;
+        }
+        String r = reason.toLowerCase(Locale.US);
+        return r.contains("str_boot_completed")
+                || r.contains("panel_on")
+                || r.contains("screen_saver")
+                || r.contains("deep_sleep")
+                || r.contains("power_on");
     }
 
     private static boolean isSamePlaylist(List<String> a, List<String> b) {
