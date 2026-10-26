@@ -41,6 +41,8 @@ const _bootstrapMethodChannel = MethodChannel('com.atv.launcher/method');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSize = 50;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 12 * 1024 * 1024;
   initializeDateFormatting();
 
   final sharedPreferences = await _loadSharedPreferencesWithRecovery();

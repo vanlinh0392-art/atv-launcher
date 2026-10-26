@@ -136,14 +136,14 @@ class FLauncherDatabase extends _$FLauncherDatabase {
         beforeOpen: (openingDetails) async {
           await customStatement('PRAGMA foreign_keys = ON;');
           await customStatement('PRAGMA journal_mode = WAL;');
-          await customStatement('PRAGMA synchronous = FULL;');
+          await customStatement('PRAGMA synchronous = NORMAL;');
           wasCreated = openingDetails.wasCreated;
         },
       );
 
   Future<void> checkpointWal() async {
     try {
-      await customStatement('PRAGMA wal_checkpoint(FULL);');
+      await customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
     } catch (_) {}
   }
 
@@ -317,6 +317,9 @@ DatabaseConnection connect() => DatabaseConnection.delayed(() async {
           logStatements: foundation.kDebugMode,
           setup: (rawDb) {
             rawDb.execute('PRAGMA busy_timeout = 5000;');
+            rawDb.execute('PRAGMA synchronous = NORMAL;');
+            rawDb.execute('PRAGMA cache_size = -1024;');
+            rawDb.execute('PRAGMA temp_store = MEMORY;');
           },
         ),
       );

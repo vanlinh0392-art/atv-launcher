@@ -74,8 +74,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
   bool get _disableAudioRendererWhenMuted =>
       _performanceProfile.disableAudioRendererWhenMuted;
 
-  bool get _shouldDelayVideoUntilHomeSettles =>
-      _performanceProfile.startVideoAfterHomeSettles;
+  bool get _shouldDelayVideoUntilHomeSettles => false;
 
   bool get _shouldReleasePlayerOnBackground =>
       _settingsService.homeDockPerformanceMode !=
@@ -104,15 +103,7 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
       );
       return;
     }
-    if (_shouldDelayVideoUntilHomeSettles) {
-      await syncVideoOptionsToNative(notifyFlutter: false);
-      return;
-    }
-    if (fastStartupEnabled) {
-      _scheduleVideoWarmUp(allowDeferredStart: false);
-    } else {
-      await _warmUpVideoController();
-    }
+    await _warmUpVideoController();
   }
 
   Future<void> restoreFromSettings() async {
@@ -589,6 +580,9 @@ class WallpaperService extends ChangeNotifier with WidgetsBindingObserver {
         return;
       }
       _homeVisibleAndUsable = true;
+      if (_wallpaper == null) {
+        unawaited(_reloadPreviewImage());
+      }
       unawaited(
         _resumeVideoInstantlyOnWake(
           reason: 'app_resumed',

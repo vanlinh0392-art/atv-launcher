@@ -1430,6 +1430,10 @@ class AppsService extends ChangeNotifier {
       ..clear()
       ..addAll(reorderedApplications);
   }
+
+  Future<void> checkpointDatabase() async {
+    await _database.checkpointWal();
+  }
 }
 
 class _ApplicationReorderSession {

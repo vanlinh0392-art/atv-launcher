@@ -481,63 +481,22 @@ Widget _buildWallpaperLayer(
 }) {
   final physicalSize = MediaQuery.sizeOf(context);
   final isVideo = wallpaper.isVideoMode;
-
-  final isFatalVideoError = wallpaperStatus.lastError.isNotEmpty &&
-      !wallpaperStatus.videoReady &&
-      (wallpaperStatus.lastError.contains('No playable') ||
-          wallpaperStatus.lastError.contains('All wallpaper videos') ||
-          wallpaperStatus.lastError.contains('quarantined'));
+  const darkVideoBackdrop = ColoredBox(
+    color: Colors.black,
+    key: Key('background'),
+  );
 
   final effectiveTextureId =
       wallpaperStatus.textureId ?? wallpaper.videoTextureId;
 
-  if (isVideo && effectiveTextureId != null && !isFatalVideoError) {
-    final blurSigma = performanceProfile
-        .capWallpaperVideoBlurSigma(_videoBlurSigma(wallpaper.videoBlur));
-    final dimOpacity =
-        wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
-
-    Widget videoLayer = SizedBox.expand(
-      child: FittedBox(
-        fit: _videoBoxFit(wallpaper.videoFit),
-        child: SizedBox(
-          width: wallpaperStatus.videoWidth > 0
-              ? wallpaperStatus.videoWidth
-              : physicalSize.width,
-          height: wallpaperStatus.videoHeight > 0
-              ? wallpaperStatus.videoHeight
-              : physicalSize.height,
-          child: Texture(textureId: effectiveTextureId),
-        ),
-      ),
-    );
-
-    if (blurSigma > 0) {
-      videoLayer = ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: videoLayer,
-      );
-    }
-
-    if (dimOpacity > 0) {
-      return RepaintBoundary(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(child: videoLayer),
-            Positioned.fill(
-              child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RepaintBoundary(child: videoLayer);
+  if (isVideo && effectiveTextureId == null) {
+    return const RepaintBoundary(child: darkVideoBackdrop);
   }
 
   final Widget baseWallpaper;
-  if (wallpaper.wallpaperMode == 'gradient') {
+  if (isVideo) {
+    baseWallpaper = darkVideoBackdrop;
+  } else if (wallpaper.wallpaperMode == 'gradient') {
     baseWallpaper = Container(
       key: const Key('background'),
       decoration: BoxDecoration(gradient: wallpaper.gradient),
@@ -552,17 +511,6 @@ Widget _buildWallpaperLayer(
       filterQuality: performanceProfile.wallpaperFilterQuality,
       gaplessPlayback: isVideo,
     );
-  } else if (isVideo) {
-    baseWallpaper = Container(
-      key: const Key('background'),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF020617)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-    );
   } else {
     baseWallpaper = Image.asset(
       'assets/default_tv_wallpaper.jpg',
@@ -571,10 +519,62 @@ Widget _buildWallpaperLayer(
       height: physicalSize.height,
       width: physicalSize.width,
       filterQuality: performanceProfile.wallpaperFilterQuality,
-      gaplessPlayback: false,
+      gaplessPlayback: isVideo,
       errorBuilder: (_, __, ___) => Container(
         key: const Key('background'),
         decoration: BoxDecoration(gradient: wallpaper.gradient),
+      ),
+    );
+  }
+
+  final isFatalVideoError = wallpaperStatus.lastError.isNotEmpty &&
+      !wallpaperStatus.videoReady &&
+      (wallpaperStatus.lastError.contains('No playable') ||
+          wallpaperStatus.lastError.contains('All wallpaper videos') ||
+          wallpaperStatus.lastError.contains('quarantined'));
+
+  if (isVideo && effectiveTextureId != null && !isFatalVideoError) {
+    // Video blur is disabled on video layer to eliminate GPU fillrate choke on TV hardware.
+    const double blurSigma = 0.0;
+    final dimOpacity =
+        wallpaper.videoDimPercent.clamp(0, 100).toDouble() / 100.0;
+
+    final Widget videoLayer = SizedBox.expand(
+      child: FittedBox(
+        fit: _videoBoxFit(wallpaper.videoFit),
+        child: SizedBox(
+          width: wallpaperStatus.videoWidth > 0
+              ? wallpaperStatus.videoWidth
+              : physicalSize.width,
+          height: wallpaperStatus.videoHeight > 0
+              ? wallpaperStatus.videoHeight
+              : physicalSize.height,
+          child: Texture(textureId: effectiveTextureId),
+        ),
+      ),
+    );
+
+    // ImageFilter.blur is disabled when displaying video layer to eliminate GPU fillrate choke.
+    assert(blurSigma == 0.0);
+
+    final Widget animatedVideoLayer = AnimatedOpacity(
+      opacity: 1.0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      child: videoLayer,
+    );
+
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Positioned.fill(child: darkVideoBackdrop),
+          Positioned.fill(child: animatedVideoLayer),
+          if (dimOpacity > 0)
+            Positioned.fill(
+              child: ColoredBox(color: Colors.black.withOpacity(dimOpacity)),
+            ),
+        ],
       ),
     );
   }
@@ -590,19 +590,6 @@ BoxFit _videoBoxFit(String fit) {
       return BoxFit.fill;
     default:
       return BoxFit.cover;
-  }
-}
-
-double _videoBlurSigma(String blur) {
-  switch (blur) {
-    case 'low':
-      return 2;
-    case 'medium':
-      return 5;
-    case 'high':
-      return 9;
-    default:
-      return 0;
   }
 }
 

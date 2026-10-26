@@ -573,6 +573,7 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   }) {
     if (!enabled) {
       _animation.stop();
+      _animation.reset();
       return const SizedBox();
     }
 
@@ -588,7 +589,14 @@ class _AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       );
     }
 
-    _animation.repeat(reverse: true);
+    if (!_animation.isAnimating && _animation.status == AnimationStatus.dismissed) {
+      _animation.forward().then((_) {
+        if (mounted) {
+          _animation.reverse();
+        }
+      });
+    }
+
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {

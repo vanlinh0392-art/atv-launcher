@@ -44,7 +44,7 @@ import io.flutter.view.TextureRegistry;
 public final class VideoWallpaperController {
     private static final String TAG = "FLauncherPerf";
     private static final boolean FAST_STARTUP_ENABLED = true;
-    private static final long APP_SWITCH_RELEASE_DELAY_MS = 60000L;
+    private static final long APP_SWITCH_RELEASE_DELAY_MS = 5000L;
     private static final long WAKE_PLAYLIST_RETRY_DELAY_MS = 750L;
     private static final int MAX_WAKE_PLAYLIST_RETRIES = 4;
     private static final int MAX_CONSECUTIVE_PLAYER_ERRORS = 3;
@@ -54,7 +54,6 @@ public final class VideoWallpaperController {
     private static final long MIN_LEGITIMATE_PLAYBACK_DURATION_MS = 1200L;
     private static final int MAX_GLITCH_RETRIES = 3;
     private static final long RESUME_DEBOUNCE_MS = 350L;
-    private static final long STR_SETTLING_DELAY_MS = 350L;
     private static final long STORAGE_WAKE_COOLDOWN_MS = 10000L;
 
     private final Context appContext;
@@ -155,7 +154,11 @@ public final class VideoWallpaperController {
         }
     };
 
-    private final Runnable backgroundReleaseRunnable = this::releasePlayer;
+    private boolean backgroundReleaseScheduled = false;
+    private final Runnable backgroundReleaseRunnable = () -> {
+        backgroundReleaseScheduled = false;
+        releasePlayer();
+    };
 
     private final Runnable wakePlaylistRetryRunnable = new Runnable() {
         @Override
@@ -256,7 +259,7 @@ public final class VideoWallpaperController {
         if (isDeepSleepWake) {
             Log.i(TAG, "wallpaper_resume deep_sleep_wake detected (deepSleepDelta=" + deepSleepDelta
                     + "ms, elapsedSleep=" + elapsedSleepDuration + "ms, reason=" + resolvedReason
-                    + ") -> executing clean hardware cold-purge");
+                    + ") -> executing clean hardware cold-purge and immediate playback start");
             lastSleepElapsedRealtimeMs = 0L;
             lastSleepUptimeMillis = 0L;
             lastResumeElapsedRealtimeMs = now;
@@ -269,23 +272,21 @@ public final class VideoWallpaperController {
             foregroundActive = true;
             startupWarmupReady = true;
             mainHandler.removeCallbacks(backgroundReleaseRunnable);
+            backgroundReleaseScheduled = false;
             mainHandler.removeCallbacks(wakePlaylistRetryRunnable);
 
             // Cold purge: MediaCodec and EGL Surface buffers died during STR
             releasePlayer();
             releaseSurfaceAndTextureEntry();
+            hasRenderedFirstFrameEver = false;
             quarantinedUris.clear();
             notifyStatusChangedIf(setVideoReady(false));
 
-            // Settling delay for SoC VDEC clock/power rail stabilization
-            mainHandler.postDelayed(() -> {
-                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
-                    Log.i(TAG, "wallpaper_resume STR settling complete, recreating surface & starting playback");
-                    ensureSurface();
-                    notifyStatusChanged();
-                    maybeStartPlayback(true, true, true);
-                }
-            }, STR_SETTLING_DELAY_MS);
+            if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                ensureSurface();
+                notifyStatusChanged();
+                maybeStartPlayback(true, true, true);
+            }
             return;
         }
 
@@ -305,6 +306,7 @@ public final class VideoWallpaperController {
         consecutiveGlitchRetryCount = 0;
         logWakeInfo("wallpaper_resume reason=" + resolvedReason);
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        backgroundReleaseScheduled = false;
         foregroundActive = true;
         startupWarmupReady = true;
         pendingWakePlaylistRetryCount = 0;
@@ -328,9 +330,6 @@ public final class VideoWallpaperController {
             player.setPlayWhenReady(true);
             player.play();
             scheduleIntervalAdvance();
-            if (state == Player.STATE_READY) {
-                notifyStatusChangedIf(setVideoReady(true));
-            }
             Log.i(TAG, "wallpaper_resume fast-path 0ms success (reason=" + resolvedReason + ", state=" + state + ")");
             return;
         }
@@ -351,9 +350,6 @@ public final class VideoWallpaperController {
                 player.setPlayWhenReady(true);
                 player.play();
                 scheduleIntervalAdvance();
-                if (state == Player.STATE_READY) {
-                    notifyStatusChangedIf(setVideoReady(true));
-                }
                 Log.i(TAG, "wallpaper_resume slow-path rebind success (reason=" + resolvedReason + ")");
                 return;
             } catch (Exception e) {
@@ -392,6 +388,7 @@ public final class VideoWallpaperController {
         stopIntervalAdvance();
         cancelWakePlaylistRetry();
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        backgroundReleaseScheduled = false;
         pausePlayer();
 
         if (!isInteractive) {
@@ -400,8 +397,9 @@ public final class VideoWallpaperController {
             logWakeInfo("wallpaper_hot_standby_entered: kept surface and player in RAM");
         } else {
             // User switched to another app on active TV (isInteractive == true):
-            // Delay release by 60s to yield VDEC hardware decoder to external media apps.
+            // Delay release by 5000ms to yield VDEC hardware decoder to external media apps.
             mainHandler.postDelayed(backgroundReleaseRunnable, APP_SWITCH_RELEASE_DELAY_MS);
+            backgroundReleaseScheduled = true;
             logWakeInfo("wallpaper_app_switch: delayed release scheduled in " + APP_SWITCH_RELEASE_DELAY_MS + "ms");
         }
     }
@@ -411,7 +409,15 @@ public final class VideoWallpaperController {
     }
 
     public void onStop(boolean isInteractive) {
-        onPause(isInteractive);
+        // Two-Tier Standby: Không kill ExoPlayer ngay lập tức trong onStop.
+        // Chỉ pausePlayer() và cấp thời gian ân hạn 5000ms (APP_SWITCH_RELEASE_DELAY_MS = 5000L).
+        if (foregroundActive) {
+            onPause(isInteractive);
+        } else if (isInteractive && !backgroundReleaseScheduled) {
+            mainHandler.postDelayed(backgroundReleaseRunnable, APP_SWITCH_RELEASE_DELAY_MS);
+            backgroundReleaseScheduled = true;
+        }
+        logWakeInfo("wallpaper_app_stopped: two-tier standby grace period active (" + APP_SWITCH_RELEASE_DELAY_MS + "ms)");
     }
 
     private void pausePlayer() {
@@ -428,6 +434,7 @@ public final class VideoWallpaperController {
 
     public void onDestroy() {
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        backgroundReleaseScheduled = false;
         cancelWakePlaylistRetry();
         unregisterStorageWatchdog();
         releasePlayer();
@@ -653,6 +660,7 @@ public final class VideoWallpaperController {
                 ? savedMediaIndex : 0;
         long targetPosition = (savedMediaIndex == targetIndex && savedPositionMs > 0L)
                 ? savedPositionMs : 0L;
+        ensurePreviewPosterAsync(resolvedPlaylistUris.get(targetIndex));
 
         boolean readyChanged = false;
         if (surfaceTextureEntry == null || !hasRenderedFirstFrameEver) {
@@ -666,7 +674,7 @@ public final class VideoWallpaperController {
         notifyStatusChangedIf(resetStatusChanged);
 
         DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(appContext)
-                .setEnableDecoderFallback(true);
+                .setEnableDecoderFallback(false);
         trackSelector = new DefaultTrackSelector(appContext);
         androidx.media3.common.AudioAttributes audioAttributes = new androidx.media3.common.AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -686,11 +694,9 @@ public final class VideoWallpaperController {
                     if (currentItemStartedAtMs == 0L) {
                         currentItemStartedAtMs = SystemClock.elapsedRealtime();
                     }
-                    boolean statusChanged = setVideoReady(true);
                     logPerf("time_to_video_ready", videoWarmupStartedAtNanos);
                     videoWarmupStartedAtNanos = 0L;
                     scheduleIntervalAdvance(false);
-                    notifyStatusChangedIf(statusChanged);
                 } else if (playbackState == Player.STATE_ENDED) {
                     handlePlaybackEnded();
                 }
@@ -700,8 +706,6 @@ public final class VideoWallpaperController {
             public void onIsPlayingChanged(boolean isPlaying) {
                 if (isPlaying) {
                     consecutivePlayerErrorCount = 0;
-                    boolean statusChanged = setVideoReady(true);
-                    notifyStatusChangedIf(statusChanged);
                 }
             }
 
@@ -737,7 +741,7 @@ public final class VideoWallpaperController {
                     if (!inStorageWakeCooldown) {
                         String failedUri = resolveCurrentFailedUri();
                         int totalMediaItems = player != null ? player.getMediaItemCount() : 0;
-                        boolean circuitBreakerTripped = (quarantinedUris.size() + 1 >= Math.max(1, totalMediaItems));
+                        boolean circuitBreakerTripped = totalMediaItems > 1 && (quarantinedUris.size() + 1 >= totalMediaItems);
                         if (!TextUtils.isEmpty(failedUri) && !circuitBreakerTripped) {
                             quarantinedUris.add(failedUri);
                             if (failedUri.startsWith("file://")) {
@@ -772,13 +776,18 @@ public final class VideoWallpaperController {
                     }
                 }
 
-                boolean isTransient = isCodecContentionOrTransientError(rawMsg);
+                boolean isCodecResourceError = isCodecResourceContentionError(error, rawMsg);
+                boolean isTransient = isCodecResourceError || isCodecContentionOrTransientError(rawMsg);
 
-                boolean statusChanged = setVideoReady(false)
+                boolean preserveVideoReady = isCodecResourceError && surface != null && surface.isValid() && hasRenderedFirstFrameEver;
+                boolean statusChanged = (preserveVideoReady ? false : setVideoReady(false))
                         | setLastError(isTransient ? "" : errorMsg);
                 notifyStatusChangedIf(statusChanged);
                 releasePlayer();
-                if (isTransient || consecutivePlayerErrorCount >= 2) {
+
+                // TUYỆT ĐỐI KHÔNG hủy surfaceTextureEntry khi gặp lỗi codec 0x80001013 (giữ nguyên Texture ID).
+                // Chỉ hủy surfaceTextureEntry khi lỗi fatal không phải codec contention và vượt ngưỡng thử lại.
+                if (!isCodecResourceError && consecutivePlayerErrorCount >= MAX_CONSECUTIVE_PLAYER_ERRORS) {
                     releaseSurfaceAndTextureEntry();
                 }
 
@@ -786,7 +795,25 @@ public final class VideoWallpaperController {
                     forceReleaseExternalCodecHolders();
                 }
 
-                if (consecutivePlayerErrorCount <= MAX_CONSECUTIVE_PLAYER_ERRORS) {
+                if (isCodecResourceError) {
+                    // Retry backoff: 300ms cho lần 1, 800ms cho lần 2 để chờ app ngoài giải phóng VDEC
+                    if (consecutivePlayerErrorCount <= 2) {
+                        long delayMs = (consecutivePlayerErrorCount == 1) ? 300L : 800L;
+                        if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                            mainHandler.postDelayed(() -> {
+                                if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
+                                    logWakeInfo("wallpaper_codec_resource_retry attempt=" + consecutivePlayerErrorCount
+                                            + " delay=" + delayMs + "ms");
+                                    ensureSurface();
+                                    maybeStartPlayback(true, true, true);
+                                }
+                            }, delayMs);
+                        }
+                    } else {
+                        Log.w(TAG, "ExoPlayer: Codec resource contention retry exhausted ("
+                                + consecutivePlayerErrorCount + "). Awaiting next foreground/wake trigger.");
+                    }
+                } else if (consecutivePlayerErrorCount <= MAX_CONSECUTIVE_PLAYER_ERRORS) {
                     long delayMs = 600L * consecutivePlayerErrorCount;
                     if (foregroundActive && !playbackSuppressed && shouldAutoResumeFromWake()) {
                         mainHandler.postDelayed(() -> {
@@ -1105,6 +1132,7 @@ public final class VideoWallpaperController {
     private void releasePlayer() {
         stopIntervalAdvance();
         mainHandler.removeCallbacks(backgroundReleaseRunnable);
+        backgroundReleaseScheduled = false;
         if (player != null) {
             try {
                 player.stop();
@@ -1117,7 +1145,10 @@ public final class VideoWallpaperController {
             player = null;
         }
         trackSelector = null;
-        notifyStatusChangedIf(setVideoReady(false));
+        boolean preserveVideoReady = surface != null && surface.isValid() && hasRenderedFirstFrameEver;
+        if (!preserveVideoReady) {
+            notifyStatusChangedIf(setVideoReady(false));
+        }
         activePlaybackConfigSignature = "";
     }
 
@@ -1146,6 +1177,7 @@ public final class VideoWallpaperController {
             }
             surfaceTextureEntry = null;
         }
+        notifyStatusChangedIf(setVideoReady(false));
     }
 
     private void ensureSurface() {
@@ -1164,7 +1196,7 @@ public final class VideoWallpaperController {
         }
         if (isNewTexture) {
             try {
-                surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(1920, 1080);
+                surfaceTextureEntry.surfaceTexture().setDefaultBufferSize(960, 540);
             } catch (Exception e) {
                 Log.w(TAG, "Failed to set default buffer size on SurfaceTexture: " + e.getMessage());
             }
@@ -1362,9 +1394,6 @@ public final class VideoWallpaperController {
         }
         player.setPlayWhenReady(true);
         player.play();
-        if (playbackState == Player.STATE_READY) {
-            notifyStatusChangedIf(setVideoReady(true));
-        }
     }
 
     private boolean shouldResumeWhenUnsuppressed() {
@@ -1465,6 +1494,47 @@ public final class VideoWallpaperController {
                 || errorMsg.contains("busy");
     }
 
+    private boolean isCodecResourceContentionError(PlaybackException error, String rawMsg) {
+        if (rawMsg != null) {
+            String lower = rawMsg.toLowerCase(Locale.US);
+            if (lower.contains("0x80001013")
+                    || lower.contains("omx_errorinsufficientresources")
+                    || lower.contains("insufficientresources")
+                    || lower.contains("no_resources")
+                    || lower.contains("insufficient resource")
+                    || lower.contains("insufficient_resource")
+                    || lower.contains("error_insufficient_resource")) {
+                return true;
+            }
+        }
+        if (error != null) {
+            if (error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) {
+                String msg = error.getMessage();
+                if (msg != null && (msg.contains("0x80001013") || msg.toLowerCase(Locale.US).contains("resource"))) {
+                    return true;
+                }
+            }
+            Throwable cause = error.getCause();
+            while (cause != null) {
+                String causeMsg = cause.getMessage();
+                if (causeMsg != null) {
+                    String lowerCause = causeMsg.toLowerCase(Locale.US);
+                    if (lowerCause.contains("0x80001013")
+                            || lowerCause.contains("omx_errorinsufficientresources")
+                            || lowerCause.contains("insufficientresources")
+                            || lowerCause.contains("no_resources")
+                            || lowerCause.contains("insufficient resource")
+                            || lowerCause.contains("insufficient_resource")
+                            || lowerCause.contains("error_insufficient_resource")) {
+                        return true;
+                    }
+                }
+                cause = cause.getCause();
+            }
+        }
+        return false;
+    }
+
     private String resolveCurrentFailedUri() {
         if (player != null) {
             try {
@@ -1526,12 +1596,11 @@ public final class VideoWallpaperController {
                             ? task.baseActivity.getPackageName() : null;
                     if (pkg == null || pkg.equals(ourPackage)) continue;
                     if (pkg.startsWith("com.android.") || pkg.equals("android") || pkg.startsWith("com.google.")) continue;
-                    Log.i(TAG, "Releasing background VDEC holder: " + pkg);
-                    am.killBackgroundProcesses(pkg);
+                    Log.i(TAG, "Detected background task holding VDEC: " + pkg + " (kill disabled to protect third-party apps)");
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to release external codec holders: " + e.getMessage());
+            Log.w(TAG, "Failed to inspect external codec holders: " + e.getMessage());
         }
     }
 
@@ -1589,5 +1658,65 @@ public final class VideoWallpaperController {
         }
         currentIndex = index;
         return true;
+    }
+
+    private void ensurePreviewPosterAsync(String uriString) {
+        if (TextUtils.isEmpty(uriString)) {
+            return;
+        }
+        String existingPath = BridgeStateStore.getWallpaperPreviewPath(appContext);
+        if (!TextUtils.isEmpty(existingPath)) {
+            File existingFile = new File(existingPath);
+            if (existingFile.exists() && existingFile.length() > 0) {
+                return;
+            }
+        }
+        new Thread(() -> {
+            android.media.MediaMetadataRetriever retriever = new android.media.MediaMetadataRetriever();
+            android.graphics.Bitmap frame = null;
+            try {
+                Uri videoUri = Uri.parse(uriString);
+                String scheme = videoUri.getScheme();
+                if (scheme != null && (scheme.startsWith("content") || scheme.startsWith("android.resource"))) {
+                    retriever.setDataSource(appContext, videoUri);
+                } else {
+                    String path = videoUri.getPath();
+                    if (path != null && new File(path).exists()) {
+                        retriever.setDataSource(path);
+                    } else {
+                        retriever.setDataSource(appContext, videoUri);
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    frame = retriever.getScaledFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 960, 540);
+                }
+                if (frame == null) {
+                    frame = retriever.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                }
+                if (frame != null) {
+                    File dir = new File(appContext.getFilesDir(), "wallpaper_assets");
+                    if (!dir.exists()) {
+                        dir.mkdirs();
+                    }
+                    File previewFile = new File(dir, "video_preview.jpg");
+                    try (java.io.FileOutputStream out = new java.io.FileOutputStream(previewFile, false)) {
+                        frame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out);
+                    }
+                    BridgeStateStore.setWallpaperPreviewPath(appContext, previewFile.getAbsolutePath());
+                    mainHandler.post(this::notifyStatusChanged);
+                    Log.i(TAG, "wallpaper_poster_extracted: path=" + previewFile.getAbsolutePath() + " bytes=" + previewFile.length());
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "wallpaper_poster_extract_failed: " + t.getMessage());
+            } finally {
+                if (frame != null && !frame.isRecycled()) {
+                    frame.recycle();
+                }
+                try {
+                    retriever.release();
+                } catch (Throwable ignored) {
+                }
+            }
+        }, "flauncher-poster-extract").start();
     }
 }

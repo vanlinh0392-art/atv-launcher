@@ -150,7 +150,7 @@ public class MainActivity extends FlutterActivity {
     private static final String AOSP_SETTINGS_ACTIVITY = "com.android.settings.Settings";
     private static final String CORE_VOICE_ACCESSIBILITY_SERVICE_CLASS =
             "com.atv.systembridge.shared.access.VoiceBridgeAccessibilityService";
-    private static final long SYSTEM_EVENT_INTERVAL_MS = 15000L;
+    private static final long SYSTEM_EVENT_INTERVAL_MS = 60000L;
     private static final long INITIAL_SYSTEM_SNAPSHOT_DELAY_MS = 180L;
     private static final long CORE_VOICE_REFRESH_THROTTLE_MS = 5000L;
     private static final long APPLICATIONS_CACHE_TTL_MS = 60_000L;
@@ -264,9 +264,9 @@ public class MainActivity extends FlutterActivity {
 
     private static final long SILENT_AUTO_GRANT_COOLDOWN_MS = 5_000L;
     private static final int MAX_SILENT_AUTO_GRANT_ATTEMPTS = 3;
-    private static long lastSilentAutoGrantAtElapsedMs;
-    private static int silentAutoGrantAttemptCount;
-    private static boolean silentAutoGrantCompleted;
+    private static volatile long lastSilentAutoGrantAtElapsedMs;
+    private static volatile int silentAutoGrantAttemptCount;
+    private static volatile boolean silentAutoGrantCompleted;
     private static boolean firstBridgeSnapshotLogged;
     private static boolean firstLiteBridgeStatusLogged;
     private static boolean firstFullBridgeStatusLogged;
@@ -576,8 +576,11 @@ public class MainActivity extends FlutterActivity {
         cachedLiteProvisioningSummary = null;
         cachedLiteProvisioningSummaryAtElapsedMs = 0L;
         cachedLiteMemoryStatus = null;
-        cachedLiteMemoryStatusAtElapsedMs = 0L;
-        appImageCacheBytes = 0;
+        synchronized (APP_IMAGE_CACHE) {
+            APP_IMAGE_CACHE.clear();
+            APP_IMAGE_NEGATIVE_CACHE.clear();
+            appImageCacheBytes = 0;
+        }
 
         if (level >= TRIM_MEMORY_BACKGROUND) {
             if (sharedVideoWallpaperController != null && !activityStarted) {
@@ -599,7 +602,11 @@ public class MainActivity extends FlutterActivity {
         cachedLiteProvisioningSummaryAtElapsedMs = 0L;
         cachedLiteMemoryStatus = null;
         cachedLiteMemoryStatusAtElapsedMs = 0L;
-        appImageCacheBytes = 0;
+        synchronized (APP_IMAGE_CACHE) {
+            APP_IMAGE_CACHE.clear();
+            APP_IMAGE_NEGATIVE_CACHE.clear();
+            appImageCacheBytes = 0;
+        }
         if (sharedVideoWallpaperController != null && !activityStarted) {
             try {
                 sharedVideoWallpaperController.onStop();
@@ -917,7 +924,8 @@ public class MainActivity extends FlutterActivity {
             case "testVoiceSearch" -> result.success(testVoiceSearch());
             case "openAccessibilitySettings" -> result.success(openSpecificSettingsPage("accessibility"));
             case "openSpecificAndroidSettingsPage" -> result.success(openSpecificSettingsPage((String) call.arguments));
-            case "repairAccessibility" -> result.success(repairAccessibility());
+            case "repairAccessibility" ->
+                    runMethodCallAsync(result, this::repairAccessibility);
             case "grantWriteSecureSettingsWithLocalAdb" ->
                     runMethodCallAsync(result, this::grantWriteSecureSettingsWithLocalAdb);
             case "setAdbAutomationPolicy" ->
@@ -3712,30 +3720,36 @@ public class MainActivity extends FlutterActivity {
     }
 
     private void maybeTriggerSilentAutoGrant(String reason) {
-        if (isWakeReason(reason)) {
-            try {
-                ProvisioningEvaluation eval = evaluateProvisioning();
-                if (hasActionableProvisioningGaps(eval)) {
-                    silentAutoGrantCompleted = false;
-                    silentAutoGrantAttemptCount = 0;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        if (silentAutoGrantCompleted) {
+        if (!isWakeReason(reason) && silentAutoGrantCompleted) {
             return;
         }
-        long now = SystemClock.elapsedRealtime();
-        if (lastSilentAutoGrantAtElapsedMs > 0L && now - lastSilentAutoGrantAtElapsedMs < SILENT_AUTO_GRANT_COOLDOWN_MS) {
-            return;
-        }
-        if (silentAutoGrantAttemptCount >= MAX_SILENT_AUTO_GRANT_ATTEMPTS) {
-            return;
-        }
-
         BACKGROUND_METHOD_EXECUTOR.execute(() -> {
             try {
-                ProvisioningEvaluation eval = evaluateProvisioning();
+                ProvisioningEvaluation eval = null;
+                if (isWakeReason(reason)) {
+                    try {
+                        eval = evaluateProvisioning();
+                        if (hasActionableProvisioningGaps(eval)) {
+                            silentAutoGrantCompleted = false;
+                            silentAutoGrantAttemptCount = 0;
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (silentAutoGrantCompleted) {
+                    return;
+                }
+                long now = SystemClock.elapsedRealtime();
+                if (lastSilentAutoGrantAtElapsedMs > 0L && now - lastSilentAutoGrantAtElapsedMs < SILENT_AUTO_GRANT_COOLDOWN_MS) {
+                    return;
+                }
+                if (silentAutoGrantAttemptCount >= MAX_SILENT_AUTO_GRANT_ATTEMPTS) {
+                    return;
+                }
+
+                if (eval == null) {
+                    eval = evaluateProvisioning();
+                }
                 if (!hasActionableProvisioningGaps(eval)) {
                     silentAutoGrantCompleted = true;
                     return;

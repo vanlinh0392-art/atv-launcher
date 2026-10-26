@@ -237,7 +237,7 @@ void main() {
     expect(background.gaplessPlayback, isFalse);
   });
 
-  testWidgets('video wallpaper keeps poster fallback until texture is usable',
+  testWidgets('video wallpaper keeps dark backdrop until texture is usable',
       (tester) async {
     _prepareView(tester);
     final appsService = MockAppsService();
@@ -279,8 +279,8 @@ void main() {
     );
 
     final background =
-        tester.widget<Image>(find.byKey(const Key('background')));
-    expect(background.gaplessPlayback, isTrue);
+        tester.widget<ColoredBox>(find.byKey(const Key('background')));
+    expect(background.color, Colors.black);
     expect(find.byType(Texture), findsNothing);
   });
 
@@ -327,7 +327,7 @@ void main() {
     );
 
     expect(find.byType(Texture), findsOneWidget);
-    expect(find.byKey(const Key('background')), findsNothing);
+    expect(find.byKey(const Key('background')), findsOneWidget);
   });
 
   testWidgets(
@@ -384,9 +384,9 @@ void main() {
       channel: channel,
     );
 
-    // Initial state: Texture is visible, no baseWallpaper (zero-overdraw)
+    // Initial state: Texture is visible, baseWallpaper is underneath (dual-layer)
     expect(find.byType(Texture), findsOneWidget);
-    expect(find.byKey(const Key('background')), findsNothing);
+    expect(find.byKey(const Key('background')), findsOneWidget);
 
     // Receive screen_wake event
     bridgeService.setNavigationStatus(const <String, dynamic>{
@@ -395,9 +395,9 @@ void main() {
     });
     await tester.pump();
 
-    // Verify Texture is maintained continuously, no opacity dip or fallback
+    // Verify Texture is maintained continuously, baseWallpaper remains underneath
     expect(find.byType(Texture), findsOneWidget);
-    expect(find.byKey(const Key('background')), findsNothing);
+    expect(find.byKey(const Key('background')), findsOneWidget);
 
     // Simulate transient 1-frame videoReady drop from native side during wake/rebind
     bridgeService.setWallpaperStatus(const <String, dynamic>{
@@ -409,9 +409,9 @@ void main() {
     });
     await tester.pump();
 
-    // Texture MUST still be rendered (freeze-frame hold, zero-flicker)
+    // Texture MUST still be rendered (in AnimatedOpacity stack, zero-flicker)
     expect(find.byType(Texture), findsOneWidget);
-    expect(find.byKey(const Key('background')), findsNothing);
+    expect(find.byKey(const Key('background')), findsOneWidget);
 
     // Receive home_reentry event
     bridgeService.setNavigationStatus(const <String, dynamic>{
@@ -421,7 +421,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(Texture), findsOneWidget);
-    expect(find.byKey(const Key('background')), findsNothing);
+    expect(find.byKey(const Key('background')), findsOneWidget);
 
     // Only fallback to base wallpaper on actual fatal video error
     bridgeService.setWallpaperStatus(const <String, dynamic>{

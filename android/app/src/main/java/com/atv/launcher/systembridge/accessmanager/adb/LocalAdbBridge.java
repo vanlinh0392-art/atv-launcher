@@ -1,8 +1,10 @@
 package com.atv.launcher.systembridge.accessmanager.adb;
 
 import android.content.Context;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Log;
 
 import java.io.Closeable;
 import java.io.File;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.Cipher;
 
 public final class LocalAdbBridge {
+    private static final String TAG = "LocalAdbBridge";
     private static final String KEY_DIRECTORY_NAME = "local_adb";
     private static final String PRIVATE_KEY_FILE_NAME = "adbkey";
     private static final String PUBLIC_KEY_FILE_NAME = "adbkey.pub";
@@ -71,6 +74,10 @@ public final class LocalAdbBridge {
     }
 
     public static Result tryExecuteRootShell(String shellCommand) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Log.w(TAG, "LocalAdbBridge.tryExecuteRootShell called on UI thread! Refusing execution to enforce off-main-thread policy.", new Throwable("MainThreadRootCall"));
+            return Result.failure("tryExecuteRootShell must not be executed on the main UI thread to prevent ANRs.");
+        }
         Process process = null;
         try {
             process = Runtime.getRuntime().exec(new String[]{"su", "-c", shellCommand});
@@ -142,6 +149,10 @@ public final class LocalAdbBridge {
     }
 
     public static Result executeShell(Context context, String shellCommand) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Log.w(TAG, "LocalAdbBridge.executeShell called on UI thread! Refusing execution to enforce off-main-thread policy.", new Throwable("MainThreadAdbCall"));
+            return Result.failure("LocalAdbBridge must not be executed on the main UI thread to prevent ANRs.");
+        }
         if (context == null || TextUtils.isEmpty(shellCommand)) {
             return Result.failure("Invalid context or command.");
         }

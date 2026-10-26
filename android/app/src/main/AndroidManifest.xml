@@ -153,6 +153,14 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="mitv.action.STR_BOOT_COMPLETED" />
             </intent-filter>
+            <intent-filter android:priority="999999">
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_CHANGED" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
         </receiver>
 
         <receiver
@@ -172,62 +180,6 @@
                 <action android:name="com.atv.launcher.control.SET_MODE" />
             </intent-filter>
         </receiver>
-
-        <receiver
-            android:name="com.atv.launcher.systembridge.accessmanager.boot.BootReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="999999">
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="mitv.action.STR_BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.atv.launcher.systembridge.accessmanager.boot.PackageChangeReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="999999">
-                <action android:name="android.intent.action.PACKAGE_ADDED" />
-                <action android:name="android.intent.action.PACKAGE_CHANGED" />
-                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
-                <action android:name="android.intent.action.PACKAGE_REMOVED" />
-                <action android:name="android.intent.action.PACKAGE_REPLACED" />
-
-                <data android:scheme="package" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.atv.launcher.systembridge.accessmanager.boot.MyPackageReplacedReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="999999">
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.atv.launcher.systembridge.accessmanager.boot.RecoveryKickReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="com.atv.launcher.permission.KICK_GUARDIAN">
-            <intent-filter android:priority="999999">
-                <action android:name="com.atv.launcher.action.KICK_GUARDIAN" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.atv.launcher.systembridge.accessmanager.boot.GuardianAlarmReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="false" />
 
         <service
             android:name="com.atv.launcher.systembridge.shared.service.ResidentCoreService"
@@ -257,20 +209,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/system_bridge_accessibility_service" />
         </service>
-
-        <service
-            android:name="com.atv.launcher.systembridge.accessmanager.service.GuardianService"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="false"
-            android:stopWithTask="false" />
-
-        <service
-            android:name="com.atv.launcher.systembridge.accessmanager.service.GuardianJobService"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

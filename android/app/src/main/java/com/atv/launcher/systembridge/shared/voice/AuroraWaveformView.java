@@ -51,7 +51,7 @@ public class AuroraWaveformView extends View {
             invalidate(); // Chỉ vẽ lại GPU, KHÔNG gọi requestLayout -> 0% rung lắc
 
             if (isAnimating) {
-                mainHandler.postDelayed(this, 16);
+                mainHandler.postDelayed(this, 33);
             }
         }
     };

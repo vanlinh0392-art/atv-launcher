@@ -118,28 +118,7 @@ public final class SystemBridgeCoordinator {
     }
 
     public static void kickAccessManager(Context context, String reason) {
-        Context appContext = context.getApplicationContext();
-        String normalizedReason = normalizeReason(reason);
-        String kickBucket = accessManagerKickBucket(normalizedReason);
-        if (TextUtils.isEmpty(kickBucket) || !isInstalled(appContext, ACCESS_MANAGER_PACKAGE)) {
-            return;
-        }
-        if (!tryAcquireEventWindow(appContext, "accessmanager_kick_" + kickBucket, ACCESS_MANAGER_KICK_THROTTLE_MS)) {
-            return;
-        }
-
-        Intent intent = new Intent(ACCESS_MANAGER_KICK_ACTION);
-        intent.setComponent(new ComponentName(ACCESS_MANAGER_PACKAGE, ACCESS_MANAGER_KICK_RECEIVER));
-        intent.setPackage(ACCESS_MANAGER_PACKAGE);
-        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-        intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
-        intent.putExtra(ACCESS_MANAGER_REASON_EXTRA, normalizedReason);
-        try {
-            appContext.sendBroadcast(intent);
-            Log.i(TAG, "AccessManager kick sent: " + normalizedReason);
-        } catch (Exception exception) {
-            Log.w(TAG, "Unable to kick AccessManager for reason=" + normalizedReason, exception);
-        }
+        // Redundant accessmanager broadcast removed (unified into ResidentCoreService)
     }
 
     private static void scheduleExactHealInternal(Context context, long delayMs, String reason, int requestCode) {
@@ -445,6 +424,18 @@ public final class SystemBridgeCoordinator {
     ) {
         if (!beforeState.canRepairAccessibility()) {
             return verifyAccessibilityRepair(beforeState, beforeState, repairPlan, false, false, REPAIR_MISSING_WSS);
+        }
+
+        boolean ownAlreadyInSetting = beforeState.currentEnabledSet.contains(repairPlan.ownServiceId);
+        boolean serviceInstanceDead = com.atv.launcher.systembridge.shared.access.VoiceBridgeAccessibilityService.getInstance() == null;
+        if (ownAlreadyInSetting && serviceInstanceDead) {
+            // Atomic Re-trigger: Strip ownServiceId first so Android AccessibilityManager detects mutation
+            List<String> tempEnabled = new ArrayList<>(repairPlan.targetEnabledIds);
+            tempEnabled.remove(repairPlan.ownServiceId);
+            writeSecureString(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, TextUtils.join(":", tempEnabled));
+            try {
+                Thread.sleep(120);
+            } catch (InterruptedException ignored) {}
         }
 
         boolean wroteServices = writeSecureString(

@@ -225,6 +225,11 @@ class _FLauncherAppState extends State<FLauncherApp>
     if (state == AppLifecycleState.resumed) {
       _refreshDefaultLauncherState();
       _scheduleAdbLocalOnboardingCheck();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      try {
+        context.read<AppsService>().checkpointDatabase();
+      } catch (_) {}
     }
   }
 
